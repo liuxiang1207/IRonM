@@ -14,7 +14,7 @@ from ironm.core.clock import FixedClock
 from ironm.store.db import connect
 from ironm.store.events import EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
-from sim.__main__ import main, summary_row
+from sim.__main__ import main, metrics_at_end, summary_row, true_slope
 from sim.generate import Simulation, generate
 from sim.persona import PERSONAS_DIR, AdherencePhase, Persona, load_personas
 from sim.runner import run
@@ -223,6 +223,25 @@ def test_command_runs_all_personas(tmp_path: Path) -> None:
     assert users == {p.user_id for p in PERSONAS.values()}
 
 
+def test_command_reports_metrics_at_end(tmp_path: Path) -> None:
+    report = main(tmp_path / "sim.sqlite")
+    for column in ("精度（体重/训练/饮食/恢复）", "体重趋势 kg/周", "真实趋势", "状态", "还差什么"):
+        assert column in report
+    rows = {
+        line.split("|")[1].strip(): line for line in report.splitlines() if line.startswith("| ")
+    }
+    assert "已过期" in rows["weekly_weigher（指标）"]  # 第 45 天起不再记录
+
+
+def test_metric_ci_covers_truth_for_adherent() -> None:
+    p = PERSONAS["adherent"]
+    sim = generate(p)
+    m = metrics_at_end(sim, p)
+    assert m.ci is not None and isinstance(m.value, float)
+    truth = true_slope(sim, m.window_days)
+    assert m.ci.low <= truth <= m.ci.high
+
+
 # ---- 独立审查后补充 ----
 
 
@@ -259,3 +278,13 @@ def test_summary_counts_device_switch_readings() -> None:
     sim = generate(p)
     last_weight = [e for d in sim.days for e in d.events if isinstance(e, WeightEvent)][-1]
     assert f"→ {last_weight.payload.weight_kg:.1f} |" in summary_row(sim)
+
+
+@pytest.mark.parametrize("pid", sorted(PERSONAS))
+def test_ok_trend_meets_certainty_target(pid: str) -> None:
+    # “正常”必须以实际算出的可信范围为准：半宽不超过规则表的目标（spec §20 澄清）
+    p = PERSONAS[pid]
+    m = metrics_at_end(generate(p), p)
+    if m.status == "ok":
+        assert m.ci is not None
+        assert (m.ci.high - m.ci.low) / 2 <= 0.25

@@ -163,3 +163,11 @@ def judgement_window(
         needed=needed,
         rule_id=JUDGEMENT_WINDOW,
     )
+
+
+def extra_days_for_target(window_days: int, half_width: float, target: float) -> int:
+    """实际半宽超过目标时，大约还需多少天。标准误约与天数的 1.5 次方成反比。"""
+    if half_width <= target:
+        return 0
+    needed: float = window_days * (half_width / target) ** (2 / 3)
+    return max(1, math.ceil(needed - window_days))

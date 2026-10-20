@@ -47,7 +47,12 @@ from ironm.engine.precision import (
 )
 from ironm.engine.stats import mean_known
 from ironm.engine.trend import weight_trend
-from ironm.engine.window import JUDGEMENT_WINDOW, WindowParams, judgement_window
+from ironm.engine.window import (
+    JUDGEMENT_WINDOW,
+    WindowParams,
+    extra_days_for_target,
+    judgement_window,
+)
 from ironm.rules.loader import RuleBook
 
 DIET_MIN_DATA = "R-DQ-DIET-ADJ-MIN-DATA"
@@ -126,11 +131,19 @@ def _weight_trend_metric(
     pending_in_window = any(e.event_id in pending and e.occurred_at >= start for e in effective)
 
     needed: tuple[Need, ...] = fit.needed or window.needed
+    # “正常”以实际可信范围为准：模型按均匀称重估算的天数可能不够
+    target = rulebook.get(JUDGEMENT_WINDOW).params_as(WindowParams).target_half_width_kg_per_week
+    too_wide = False
+    if isinstance(fit.ci_low, float) and isinstance(fit.ci_high, float):
+        half = (fit.ci_high - fit.ci_low) / 2
+        if half > target and window.status == "ok":
+            too_wide = True
+            needed = (Need(item="days", count=extra_days_for_target(days, half, target)),)
     if fresh.status == "stale":
         status = MetricStatus.STALE
     elif pending_in_window:
         status = MetricStatus.PENDING_CONFIRM
-    elif fit.status == "insufficient" or window.status == "insufficient":
+    elif fit.status == "insufficient" or window.status == "insufficient" or too_wide:
         status = MetricStatus.INSUFFICIENT
     else:
         status = MetricStatus.OK

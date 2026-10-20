@@ -94,3 +94,12 @@ def test_frequency_counts_days_and_skips_pending() -> None:
     spike = _w(17, 84.0)  # 与 3 天前的读数比跳了 4 千克 → 待确认，不算
     r = judgement_window([*base, *same_day, spike], as_of=AS_OF, tz=SH, rulebook=BOOK)
     assert r.readings_per_week == 1.0
+
+
+def test_extra_days_for_target() -> None:
+    from ironm.engine.window import extra_days_for_target
+
+    # 32 × (0.31 / 0.25)^(2/3) = 32 × 1.1541 ≈ 36.93 → 还差 5 天
+    assert extra_days_for_target(32, 0.31, 0.25) == 5
+    assert extra_days_for_target(32, 0.25, 0.25) == 0
+    assert extra_days_for_target(30, 0.2501, 0.25) == 1  # 稍超也至少 1 天
