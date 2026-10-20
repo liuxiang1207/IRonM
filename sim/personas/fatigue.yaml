@@ -1,0 +1,22 @@
+id: fatigue
+title: 疲劳累积：前 4 周执行好，之后疲劳上升、完成率下滑、减重停滞；第 33 天把斤当公斤记
+user_id: sim-fatigue
+seed: 303
+start_date: "2026-11-02"
+weeks: 8
+tz_offset_hours: 8
+profile: {sex: male, age: 41, height_cm: 172, start_weight_kg: 92.0}
+habits:
+  weigh_days: [mon, thu]
+  training_days: [mon, tue, thu, fri]
+  meal_logging: kcal
+  checkin_day: sun
+  scale_stream: "scale:home"
+hidden:
+  weight_phases: [{from_week: 1, kg_per_week: -0.6}, {from_week: 5, kg_per_week: -0.1}]
+  weight_noise_sd_kg: 0.4
+  adherence_phases: [{from_week: 1, p_done: 0.9}, {from_week: 5, p_done: 0.6}, {from_week: 7, p_done: 0.4}]
+  fatigue_phases: [{from_week: 1, level: 2}, {from_week: 5, level: 4}, {from_week: 7, level: 5}]
+  daily_kcal: 2100
+traps:
+  - {kind: unit_error, day: 33}

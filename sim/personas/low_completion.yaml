@@ -1,0 +1,22 @@
+id: low_completion
+title: 完成度低：训练常半途而废、只记吃了什么；第 29 天起换了一台偏重 0.8 千克的秤
+user_id: sim-low-completion
+seed: 202
+start_date: "2026-11-02"
+weeks: 8
+tz_offset_hours: 8
+profile: {sex: female, age: 28, height_cm: 162, start_weight_kg: 68.0}
+habits:
+  weigh_days: [mon, thu]
+  training_days: [tue, thu, sat]
+  meal_logging: slot_only
+  checkin_day: sun
+  scale_stream: "scale:home"
+hidden:
+  weight_phases: [{from_week: 1, kg_per_week: -0.15}]
+  weight_noise_sd_kg: 0.3
+  adherence_phases: [{from_week: 1, p_done: 0.45}]
+  fatigue_phases: [{from_week: 1, level: 3}]
+  daily_kcal: 1700
+traps:
+  - {kind: device_switch, day: 29, stream: "scale:gym", offset_kg: 0.8}

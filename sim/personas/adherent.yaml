@@ -1,0 +1,22 @@
+id: adherent
+title: 按计划执行：每周称两次、按计划训练、记热量；第 17 天一次体重尖峰
+user_id: sim-adherent
+seed: 101
+start_date: "2026-11-02"
+weeks: 8
+tz_offset_hours: 8
+profile: {sex: male, age: 32, height_cm: 176, start_weight_kg: 88.0}
+habits:
+  weigh_days: [mon, thu]
+  training_days: [mon, wed, fri]
+  meal_logging: kcal
+  checkin_day: sun
+  scale_stream: "scale:home"
+hidden:
+  weight_phases: [{from_week: 1, kg_per_week: -0.5}]
+  weight_noise_sd_kg: 0.35
+  adherence_phases: [{from_week: 1, p_done: 0.95}]
+  fatigue_phases: [{from_week: 1, level: 2}]
+  daily_kcal: 1900
+traps:
+  - {kind: spike, day: 17, delta_kg: 2.4}

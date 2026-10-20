@@ -1,0 +1,22 @@
+id: habit_mode
+title: 习惯模式：饮食只记吃了、不记热量；第 22–28 天出差完全没记录
+user_id: sim-habit-mode
+seed: 505
+start_date: "2026-11-02"
+weeks: 8
+tz_offset_hours: 8
+profile: {sex: male, age: 52, height_cm: 170, start_weight_kg: 82.0}
+habits:
+  weigh_days: [mon, thu]
+  training_days: [tue, sat]
+  meal_logging: slot_only
+  checkin_day: sun
+  scale_stream: "scale:home"
+hidden:
+  weight_phases: [{from_week: 1, kg_per_week: -0.3}]
+  weight_noise_sd_kg: 0.35
+  adherence_phases: [{from_week: 1, p_done: 0.8}]
+  fatigue_phases: [{from_week: 1, level: 3}]
+  daily_kcal: 2000
+traps:
+  - {kind: gap, from_day: 22, to_day: 28}

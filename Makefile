@@ -4,7 +4,7 @@ ifeq ($(strip $(UV)),)
 $(error 找不到 uv，请先安装：https://docs.astral.sh/uv/getting-started/installation/)
 endif
 
-.PHONY: setup check lock-check lint deps fmt type test run schemas migrate eval-models
+.PHONY: setup check lock-check lint deps fmt type test run schemas migrate eval-models sim
 
 setup:
 	$(UV) sync --locked
@@ -46,6 +46,10 @@ migrate:
 # 模型选型评测（会调用真实接口并产生费用）；密钥从 .env 读取，可在 ARGS 里指定配置名
 eval-models:
 	set -a; [ -f .env ] && . ./.env; set +a; $(UV) run python -m evals.model_selection.run $(ARGS)
+
+# 快进模拟：5 类模拟用户各 8 周，写入 data/sim/sim.sqlite 并输出汇总
+sim:
+	$(UV) run python -m sim
 
 run:
 	$(UV) run uvicorn ironm.api.app:app --reload

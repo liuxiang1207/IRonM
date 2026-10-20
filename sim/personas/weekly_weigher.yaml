@@ -1,0 +1,22 @@
+id: weekly_weigher
+title: 每周只称 1 次、不记饮食；第 6 周起体重回升，第 45 天起不再记录
+user_id: sim-weekly-weigher
+seed: 404
+start_date: "2026-11-02"
+weeks: 8
+tz_offset_hours: 8
+profile: {sex: female, age: 35, height_cm: 165, start_weight_kg: 74.0}
+habits:
+  weigh_days: [mon]
+  training_days: [wed, sat]
+  meal_logging: none
+  checkin_day: sun
+  scale_stream: "scale:home"
+hidden:
+  weight_phases: [{from_week: 1, kg_per_week: -0.4}, {from_week: 6, kg_per_week: 0.3}]
+  weight_noise_sd_kg: 0.35
+  adherence_phases: [{from_week: 1, p_done: 0.8}, {from_week: 6, p_done: 0.5}]
+  fatigue_phases: [{from_week: 1, level: 3}]
+  daily_kcal: 1800
+traps:
+  - {kind: stop_logging, from_day: 45}
