@@ -265,3 +265,22 @@ def test_batch_logging(client: TestClient, logs: io.StringIO) -> None:
     assert [x["status"] for x in per_item] == ["created", "invalid"]
     assert len(batch) == 1 and batch[0]["count"] == 2 and "duration_ms" in batch[0]
     assert "空腹" not in logs.getvalue() and "胸口疼" not in logs.getvalue()
+
+
+# ---- 今日精力（spec §14）----
+
+
+def test_energy_today_flow(client: TestClient) -> None:
+    url = "/energy/today?user_id=u1&tz=Asia/Shanghai"
+    assert client.get(url).json() == {"selected": False}
+    at = "2026-10-20T08:00:00+08:00"
+    _post(client, _event(type="energy_check", occurred_at=at, recorded_at=at, payload={"level": 3}))
+    body = client.get(url).json()
+    assert body["selected"] is True and body["level"] == 3
+    assert body["adjustment"]["mode"] == "reduced"
+    assert body["adjustment"]["rule_id"] == "R-RC-ENERGY-3"
+
+
+@pytest.mark.parametrize("query", ["user_id=u1", "user_id=u1&tz=Mars/Base"])
+def test_energy_today_needs_valid_tz(client: TestClient, query: str) -> None:
+    assert client.get(f"/energy/today?{query}").status_code == 422

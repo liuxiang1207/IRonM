@@ -21,6 +21,7 @@ PAYLOADS: dict[str, dict[str, Any]] = {
     "symptom": {"text": "右膝训练后有点酸", "severity": 2},
     "baseline_test": {"test_id": "pushup_max", "value": 18, "unit": "reps"},
     "circumference": {"waist_cm": 86.5},
+    "energy_check": {"level": 3},
 }
 
 
@@ -141,3 +142,9 @@ def test_events_are_immutable() -> None:
 def test_invalid_circumference_rejected(payload: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         _parse(_event("circumference", payload=payload))
+
+
+@pytest.mark.parametrize("level", [0, 6, "3"])
+def test_energy_level_out_of_range(level: object) -> None:
+    with pytest.raises(ValidationError):
+        _parse(_event("energy_check", payload={"level": level}))

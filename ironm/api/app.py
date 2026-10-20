@@ -9,16 +9,18 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import IO, Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from ironm import __version__
-from ironm.contracts.events import EVENT_ADAPTER, Event
-from ironm.core.clock import Clock, SystemClock
+from ironm.contracts.events import EVENT_ADAPTER, EnergyCheckEvent, Event
+from ironm.core.clock import Clock, SystemClock, local_day_bounds
 from ironm.core.config import Settings, load_settings
 from ironm.core.log import configure_logging, get_logger
+from ironm.engine.energy import EnergyAdjustment, energy_today
 from ironm.rules.loader import load_rules
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
@@ -66,7 +68,7 @@ def create_app(
 ) -> FastAPI:
     """配置或规则表有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
     configure_logging(settings, clock, log_stream)
-    load_rules(settings.rules_dir)
+    rulebook = load_rules(settings.rules_dir)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -157,6 +159,33 @@ def create_app(
             log.info("events.submitted", event_id=r["event_id"], status=r["status"])  # type: ignore[arg-type]
         log.info("events.batch_submitted", count=len(items), duration_ms=_ms(start))
         return JSONResponse(status_code=200, content={"results": ordered})
+
+    @app.get("/energy/today")
+    def energy_today_view(
+        user_id: str, tz: str, store: Annotated[EventStore, Depends(event_store)]
+    ) -> JSONResponse:
+        """用户所在时区今天的精力选择与训练量调整；未选择时 selected 为 false，不给调整。"""
+        try:
+            zone = ZoneInfo(tz)
+        except (ZoneInfoNotFoundError, ValueError):
+            msg = "时区无效，应为标准名称（如 Asia/Shanghai）"
+            return _invalid([{"loc": ["query", "tz"], "msg": msg, "type": "timezone"}])
+        today = clock.now().astimezone(zone).date()
+        start, end = local_day_bounds(today, zone)
+        checks = [
+            e
+            for e in store.list_for_user(user_id, types={"energy_check"}, since=start, until=end)
+            if isinstance(e, EnergyCheckEvent)
+        ]
+        result = energy_today(checks, day=today, tz=zone, rulebook=rulebook)
+        if not result.selected or not isinstance(result.adjustment, EnergyAdjustment):
+            return JSONResponse(content={"selected": False})
+        content = {
+            "selected": True,
+            "level": result.level,
+            "adjustment": result.adjustment.model_dump(),
+        }
+        return JSONResponse(content=content)
 
     return app
 

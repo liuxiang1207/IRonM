@@ -1,6 +1,6 @@
 """统一的时间来源。业务代码只通过注入的 Clock 取当前时间，测试与快进模拟用 FixedClock。"""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 from typing import Protocol
 
 
@@ -42,3 +42,10 @@ class FixedClock:
         if delta < timedelta(0):
             raise ValueError(f"只能向前拨动时钟：{delta}")
         self._now += delta
+
+
+def local_day_bounds(day: date, tz: tzinfo) -> tuple[datetime, datetime]:
+    """用户所在时区某一天的起止时刻（当地 0 点到次日 0 点），换算为 UTC，区间为 [起, 止)。"""
+    start = datetime.combine(day, time.min, tz)
+    end = datetime.combine(day + timedelta(days=1), time.min, tz)
+    return start.astimezone(UTC), end.astimezone(UTC)

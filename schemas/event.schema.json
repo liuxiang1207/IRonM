@@ -503,6 +503,117 @@
       "title": "CircumferencePayload",
       "type": "object"
     },
+    "EnergyCheckEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/EnergyCheckPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "energy_check",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "EnergyCheckEvent",
+      "type": "object"
+    },
+    "EnergyCheckPayload": {
+      "additionalProperties": false,
+      "description": "每日精力：1 很差、2 疲惫、3 一般、4 良好、5 充沛。",
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/Score"
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "title": "EnergyCheckPayload",
+      "type": "object"
+    },
     "MealEvent": {
       "additionalProperties": false,
       "properties": {
@@ -1250,6 +1361,7 @@
       "baseline_test": "#/$defs/BaselineTestEvent",
       "checkin": "#/$defs/CheckinEvent",
       "circumference": "#/$defs/CircumferenceEvent",
+      "energy_check": "#/$defs/EnergyCheckEvent",
       "meal": "#/$defs/MealEvent",
       "set_log": "#/$defs/SetLogEvent",
       "symptom": "#/$defs/SymptomEvent",
@@ -1282,6 +1394,9 @@
     },
     {
       "$ref": "#/$defs/CircumferenceEvent"
+    },
+    {
+      "$ref": "#/$defs/EnergyCheckEvent"
     }
   ]
 }

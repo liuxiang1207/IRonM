@@ -87,6 +87,12 @@ class CircumferencePayload(ContractModel):
     thigh_cm: Annotated[float, Field(ge=20, le=150)] | Unknown = NOT_RECORDED
 
 
+class EnergyCheckPayload(ContractModel):
+    """每日精力：1 很差、2 疲惫、3 一般、4 良好、5 充沛。"""
+
+    level: Score
+
+
 # ---- 记录 ----
 
 
@@ -153,6 +159,11 @@ class CircumferenceEvent(_EventBase):
     payload: CircumferencePayload
 
 
+class EnergyCheckEvent(_EventBase):
+    type: Literal["energy_check"]
+    payload: EnergyCheckPayload
+
+
 type Event = Annotated[
     WorkoutCheckEvent
     | SetLogEvent
@@ -161,7 +172,8 @@ type Event = Annotated[
     | MealEvent
     | SymptomEvent
     | BaselineTestEvent
-    | CircumferenceEvent,
+    | CircumferenceEvent
+    | EnergyCheckEvent,
     Field(discriminator="type"),
 ]
 

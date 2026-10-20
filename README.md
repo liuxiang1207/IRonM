@@ -42,6 +42,7 @@ make run       # 本地启动（启动时自动执行迁移）；/healthz 存活
 | GET | `/healthz` | 存活检查 |
 | POST | `/events` | 提交一条记录：201 已创建、200 重复（只存一次）、409 冲突、422 不合法（只给字段位置与原因，不回显内容） |
 | POST | `/events/batch` | 批量提交（离线队列上传），`{"events": [...]}`，每批 1–500 条；逐条处理、逐条返回结果，同批内更正排在原记录之后；提交顺序不影响最终结果 |
+| GET | `/energy/today?user_id=&tz=` | 今天的精力选择与训练量调整（时区用标准名称，如 Asia/Shanghai）；未选择时 `selected: false`，不给调整。精力通过 `POST /events` 提交 `energy_check` 记录 |
 
 ## 目录
 
