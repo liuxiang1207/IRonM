@@ -1,0 +1,43 @@
+# 参与评测的模型与配置。密钥不写在这里：api_key_env 指明从哪个环境变量读取（本地放在 .env）。
+# 价格：美元 / 百万 token，来自各家官方价格页（DeepSeek 核对于 2026-10-20）。
+# DeepSeek 高峰：周一至周五 UTC 01:00–04:00、06:00–10:00，其余为非高峰。
+models:
+  - name: deepseek-flash
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    thinking: false
+    extra_body: {thinking: {type: disabled}}
+    price_usd_per_mtok: &flash
+      offpeak: {input_hit: 0.003, input_miss: 0.15, output: 0.6}
+      peak: {input_hit: 0.006, input_miss: 0.3, output: 1.2}
+
+  - name: deepseek-flash-thinking
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    thinking: true
+    extra_body: {thinking: {type: enabled}}
+    price_usd_per_mtok: *flash
+
+  - name: deepseek-v4-pro
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-v4-pro
+    api_key_env: DEEPSEEK_API_KEY
+    thinking: false
+    extra_body: {thinking: {type: disabled}}
+    price_usd_per_mtok: &pro
+      offpeak: {input_hit: 0.022, input_miss: 0.66, output: 1.98}
+      peak: {input_hit: 0.044, input_miss: 1.32, output: 3.96}
+
+  - name: deepseek-v4-pro-thinking
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-v4-pro
+    api_key_env: DEEPSEEK_API_KEY
+    thinking: true
+    extra_body: {thinking: {type: enabled}}
+    price_usd_per_mtok: *pro

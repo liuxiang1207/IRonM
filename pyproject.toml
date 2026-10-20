@@ -45,7 +45,7 @@ ignore = ["RUF001", "RUF002", "RUF003"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
-files = ["ironm", "tests"]
+files = ["ironm", "tests", "evals"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
