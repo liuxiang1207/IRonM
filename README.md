@@ -11,7 +11,7 @@ make schemas   # 契约改动后重新导出 JSON Schema（make check 会比对�
 make migrate   # 执行尚未执行的数据库迁移（migrations/NNNN_说明.sql）
 make sim       # 快进模拟：5 类模拟用户各 8 周，输出汇总
 make eval-models  # 模型选型评测（调用真实接口、产生费用；密钥放 .env）
-make run       # 本地启动，/healthz 存活检查
+make run       # 本地启动（启动时自动执行迁移）；/healthz 存活检查
 ```
 
 需要 [uv](https://docs.astral.sh/uv/)；Python 3.13 由 uv 自动管理。
@@ -34,6 +34,13 @@ make run       # 本地启动，/healthz 存活检查
 | `IRONM_RULES_DIR` | 规则表目录 | `rules` |
 
 出现未知的 `IRONM_` 变量、非法取值或规则表格式错误时，启动失败。
+
+## 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/healthz` | 存活检查 |
+| POST | `/events` | 提交一条记录：201 已创建、200 重复（只存一次）、409 冲突、422 不合法（只给字段位置与原因，不回显内容） |
 
 ## 目录
 
