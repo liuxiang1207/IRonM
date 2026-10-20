@@ -66,6 +66,37 @@ ORDINARY = [
 ]
 
 
+# 否定说法与以前发生过（spec §22）
+NEGATIONS = [
+    ("没有胸痛", "none"),
+    ("今天不头晕", "none"),
+    ("没有心慌也没有胸闷", "none"),
+    ("怀孕五个月，运动后未见红", "none"),
+    ("胸口不疼了", "none"),
+    ("没有心慌，但是胸口还在疼", "emergency"),
+    ("胸口不闷但是很疼", "red_flag"),  # 同一分句里另一处没被否定
+    ("差点没晕倒", "emergency"),
+    ("大太阳下跑步，不出汗了", "emergency"),  # 说法本身带否定字
+    ("跑完喘不上气，嘴唇发紫", "emergency"),
+    ("爬楼梯胸闷，坐下也不缓解", "emergency"),
+    ("我朋友以前晕倒过", "none"),
+    ("上周胸口疼过，查了没问题", "none"),
+    ("以前胸口疼过，今天又疼了", "red_flag"),  # 再次发生：以前发生过的照常算
+    ("晕倒过去了", "emergency"),  # “过去”不是以前发生过
+    ("没有胸痛。胸口很闷", "red_flag"),  # 否定只影响所在分句
+    ("没头痛，血压190/120", "red_flag"),
+    (
+        "说没有胸闷其实也胸闷",
+        "red_flag",
+    ),  # 同一说法出现两处，第一处被否定、第二处没有  # 血压数值不受否定影响；头痛被否定，不升为急症
+]
+
+
+@pytest.mark.parametrize(("text", "expect"), NEGATIONS)
+def test_negation_and_past(text: str, expect: str) -> None:
+    assert assess(text).level == expect
+
+
 @pytest.mark.parametrize(("text", "expect"), PARAPHRASES)
 def test_paraphrases(text: str, expect: str) -> None:
     assert assess(text).level == expect
@@ -88,6 +119,15 @@ def test_combo_within_one_clause_only() -> None:
     assert assess("胸口有点酸，膝盖疼").level == "none"  # “胸口”与“疼”分在两个分句
 
 
+UNIFIED = [
+    "血压 190／120 ＭＭＨＧ，头痛",
+    "胸 口 痛",
+    "高压１９０",
+    "胸\u3000口\u00a0痛",
+    "胸\u200b闷",
+]
+
+
 def test_unified_text() -> None:
     assert clauses("血压 190／120 mmHg，头痛！") == ["血压190/120mmhg", "头痛"]
     assert assess("血压 190／120 ＭＭＨＧ，头痛").level == "emergency"
@@ -95,20 +135,20 @@ def test_unified_text() -> None:
     assert assess("高压１９０").level == "red_flag"
 
 
-@pytest.mark.parametrize(
-    ("text", "expect"),
-    [
-        ("血压179/119", "none"),
-        ("血压180/90", "red_flag"),
-        ("血压150/120", "red_flag"),
-        ("血压190/120", "red_flag"),
-        ("血压190/120，头痛", "emergency"),
-        ("190/120，头痛", "none"),  # 没有“血压”等字样，不当作血压
-        ("低压125", "red_flag"),
-        ("血压1900/120", "red_flag"),  # 收缩压位数不合理被忽略，舒张压仍达阈值
-        ("血压1900/80", "none"),
-    ],
-)
+BLOOD_PRESSURE = [
+    ("血压179/119", "none"),
+    ("血压180/90", "red_flag"),
+    ("血压150/120", "red_flag"),
+    ("血压190/120", "red_flag"),
+    ("血压190/120，头痛", "emergency"),
+    ("190/120，头痛", "none"),  # 没有“血压”等字样，不当作血压
+    ("低压125", "red_flag"),
+    ("血压1900/120", "red_flag"),  # 收缩压位数不合理被忽略，舒张压仍达阈值
+    ("血压1900/80", "none"),
+]
+
+
+@pytest.mark.parametrize(("text", "expect"), BLOOD_PRESSURE)
 def test_blood_pressure(text: str, expect: str) -> None:
     assert assess(text).level == expect
 
@@ -126,6 +166,7 @@ def _book() -> dict[str, Any]:
     return {
         "version": "t",
         "review": "pending_review",
+        "negation": {"before": ["没有"], "past_after": "过", "recurrence": ["又"]},
         "symptoms": [
             {"id": "chest_pain", "name": "胸痛", "terms": ["胸痛"]},
             {"id": "ongoing", "name": "持续", "combos": [[["还在"], ["疼", "痛"]]]},
@@ -178,6 +219,9 @@ def _symptom(data: dict[str, Any], **changes: Any) -> dict[str, Any]:
         (lambda d: d["rules"][0].update(level="red_flag"), "前缀"),
         (lambda d: d["rules"][0].update(all=["chest_pain", "chest_pain", "ongoing"]), "重复引用"),
         (lambda d: d["rules"][0].update(extra=1), "extra"),
+        (lambda d: d["negation"].update(before=["没 有"]), "统一后的写法"),
+        (lambda d: d["negation"].update(before=[]), "before"),
+        (lambda d: d.pop("negation"), "negation"),
     ],
 )
 def test_bad_book_rejected(tmp_path: Path, mutate: Any, message: str) -> None:

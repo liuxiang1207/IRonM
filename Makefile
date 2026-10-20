@@ -4,7 +4,7 @@ ifeq ($(strip $(UV)),)
 $(error 找不到 uv，请先安装：https://docs.astral.sh/uv/getting-started/installation/)
 endif
 
-.PHONY: setup check lock-check lint deps fmt type test run schemas migrate eval-models sim
+.PHONY: setup check lock-check lint deps fmt type test run schemas offline migrate eval-models sim
 
 setup:
 	$(UV) sync --locked
@@ -38,6 +38,10 @@ test:
 # 契约改动后重新导出 JSON Schema；make check 会比对，未导出即失败
 schemas:
 	$(UV) run python -m ironm.contracts.schema schemas
+
+# 急症词表改动后重新生成 App 离线版数据；make check 会比对，未生成即失败
+offline:
+	$(UV) run python -m ironm.safety.offline
 
 # 执行尚未执行的数据库迁移（路径取自 IRONM_DB_PATH）
 migrate:

@@ -8,13 +8,14 @@
 make setup     # 安装依赖与 pre-commit
 make check     # 提交前与 CI 都跑：锁文件 → ruff → 依赖方向 → mypy → pytest
 make schemas   # 契约改动后重新导出 JSON Schema（make check 会比对）
+make offline   # 急症词表改动后重新生成 App 离线版数据（make check 会比对）
 make migrate   # 执行尚未执行的数据库迁移（migrations/NNNN_说明.sql）
 make sim       # 快进模拟：5 类模拟用户各 8 周，输出汇总与第 8 周末的指标（精度、趋势与可信范围、真实趋势、状态、还差什么）
 make eval-models  # 模型选型评测（调用真实接口、产生费用；密钥放 .env）
 make run       # 本地启动（启动时自动执行迁移）；/healthz 存活检查
 ```
 
-需要 [uv](https://docs.astral.sh/uv/)；Python 3.13 由 uv 自动管理。
+需要 [uv](https://docs.astral.sh/uv/)；Python 3.13 由 uv 自动管理。检查 App 离线版需要 Node.js 22.18 以上。
 
 ## 约定
 
@@ -60,6 +61,7 @@ ironm/
 migrations/    按编号的数据库迁移脚本
 rules/         规则表（YAML，每条带编号、审定状态、来源、参数）
 schemas/       契约导出的 JSON Schema
+app/           手机 App（React Native + Expo，TypeScript）；目前只有离线急症判定 src/safety/
 sim/           快进模拟：模拟用户（隐藏真值 + 陷阱）、按天生成记录、快进运行器
 evals/         模型选型评测：题目、模型配置、判分
 spec/          需求与验证清单

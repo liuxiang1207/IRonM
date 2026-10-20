@@ -24,3 +24,7 @@ theta-onboarding/
 # 设计文档与脚本：待确认后再决定是否提交
 docs/
 scripts/
+
+# App（React Native + Expo）
+app/node_modules/
+app/.expo/

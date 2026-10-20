@@ -1,0 +1,1304 @@
+{
+ "format": 1,
+ "separators": ",。!?;、\n\r~",
+ "whitespace": " \t\f\u000b             ​    　﻿",
+ "version": "0.2",
+ "review": "pending_review",
+ "negation": {
+  "before": [
+   "没有",
+   "没",
+   "不",
+   "无",
+   "未",
+   "不再",
+   "不太",
+   "不怎么",
+   "没怎么",
+   "没感觉",
+   "不觉得",
+   "没觉得"
+  ],
+  "exceptions": [
+   "差点没",
+   "差一点没",
+   "险些没",
+   "差点儿没"
+  ],
+  "past_after": "过",
+  "past_not_followed_by": [
+   "去"
+  ],
+  "recurrence": [
+   "又",
+   "再次",
+   "还是",
+   "刚才",
+   "刚刚",
+   "这次",
+   "还在",
+   "再一次",
+   "又开始"
+  ]
+ },
+ "symptoms": [
+  {
+   "id": "chest_pain",
+   "name": "胸痛或胸闷",
+   "terms": [
+    "胸痛",
+    "胸闷",
+    "心绞痛",
+    "心口疼",
+    "心口痛",
+    "胸部疼",
+    "胸部痛",
+    "胸部闷"
+   ],
+   "combos": [
+    [
+     [
+      "胸口",
+      "胸前",
+      "前胸",
+      "心口",
+      "胸骨"
+     ],
+     [
+      "痛",
+      "疼",
+      "闷",
+      "压",
+      "紧",
+      "憋",
+      "堵",
+      "难受",
+      "绞",
+      "揪"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "radiating",
+   "name": "疼痛或麻木放射到左臂、下巴、后背",
+   "terms": [
+    "左胳膊",
+    "左臂",
+    "左手臂",
+    "左肩",
+    "下巴",
+    "下颌",
+    "后背",
+    "牙也疼"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "cold_sweat",
+   "name": "出冷汗",
+   "terms": [
+    "冷汗",
+    "虚汗",
+    "大汗淋漓"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "ongoing",
+   "name": "正在持续、休息不缓解或加重",
+   "terms": [
+    "还在疼",
+    "还在痛",
+    "还疼",
+    "还痛",
+    "还在",
+    "到现在",
+    "不缓解",
+    "没缓解",
+    "不见好",
+    "没好转",
+    "越来越厉害",
+    "越来越重",
+    "越来越疼",
+    "停不下来",
+    "止不住",
+    "休息也",
+    "歇了也",
+    "坐下也",
+    "躺下也"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "sudden",
+   "name": "突然发生",
+   "terms": [
+    "突然",
+    "一下子",
+    "猛地",
+    "突发"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "collapse",
+   "name": "晕倒或意识丧失",
+   "terms": [
+    "晕倒",
+    "昏倒",
+    "晕过去",
+    "昏过去",
+    "倒下",
+    "倒地",
+    "晕厥",
+    "昏厥",
+    "失去意识",
+    "没了意识",
+    "不省人事",
+    "叫不醒",
+    "没反应了",
+    "没有反应"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "seizure",
+   "name": "抽搐",
+   "terms": [
+    "抽搐",
+    "抽风",
+    "口吐白沫"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "presyncope",
+   "name": "眼前发黑",
+   "terms": [
+    "眼前一黑",
+    "眼前发黑",
+    "黑朦"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "cyanosis",
+   "name": "嘴唇或脸色发紫",
+   "terms": [
+    "发绀"
+   ],
+   "combos": [
+    [
+     [
+      "嘴唇",
+      "嘴巴",
+      "脸色",
+      "脸"
+     ],
+     [
+      "发紫",
+      "紫了",
+      "发青",
+      "青紫",
+      "紫色"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "dyspnea",
+   "name": "呼吸困难",
+   "terms": [
+    "喘不上气",
+    "喘不过气",
+    "上不来气",
+    "呼吸困难",
+    "透不过气",
+    "吸不上气",
+    "喘得厉害",
+    "气短",
+    "憋得慌"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "change_worse",
+   "name": "比以前明显变差",
+   "terms": [
+    "以前不会",
+    "以前不这样",
+    "以前没有",
+    "比以前",
+    "越来越",
+    "最近总",
+    "最近老",
+    "最近经常"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "fast_heart",
+   "name": "心跳很快",
+   "terms": [
+    "心跳特别快",
+    "心跳很快",
+    "心跳太快",
+    "心跳飞快",
+    "心跳得很快",
+    "心跳过速",
+    "心动过速"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "palpitation",
+   "name": "心慌、心律不齐",
+   "terms": [
+    "心慌",
+    "心悸",
+    "心跳乱",
+    "心跳不齐",
+    "心律不齐",
+    "一下快一下慢",
+    "漏跳",
+    "早搏",
+    "心脏乱跳"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "dizziness",
+   "name": "头晕",
+   "terms": [
+    "头晕",
+    "眩晕",
+    "头昏",
+    "发晕",
+    "晕乎乎",
+    "天旋地转",
+    "站不稳",
+    "头重脚轻",
+    "眼花"
+   ],
+   "combos": [
+    [
+     [
+      "头"
+     ],
+     [
+      "很晕",
+      "好晕",
+      "有点晕",
+      "特别晕",
+      "晕得"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "headache",
+   "name": "头痛",
+   "terms": [
+    "头痛",
+    "头疼",
+    "脑袋疼",
+    "脑袋痛",
+    "头要炸",
+    "头像要炸"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "severe",
+   "name": "程度剧烈",
+   "terms": [
+    "剧烈",
+    "炸开",
+    "要炸",
+    "从来没有这么",
+    "从没这么",
+    "受不了",
+    "很厉害",
+    "特别厉害",
+    "非常厉害",
+    "剧痛"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "speech",
+   "name": "说话不清",
+   "terms": [
+    "说话不清",
+    "说话说不清",
+    "说话也说不清",
+    "说不出话",
+    "口齿不清",
+    "吐字不清",
+    "说话含糊",
+    "讲话含糊",
+    "舌头发硬",
+    "舌头不听使唤"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "one_side_weak",
+   "name": "一侧脸或肢体麻木无力",
+   "terms": [
+    "嘴歪",
+    "口角歪",
+    "口眼歪斜",
+    "半身不遂",
+    "偏瘫"
+   ],
+   "combos": [
+    [
+     [
+      "一边",
+      "半边",
+      "一侧",
+      "单侧"
+     ],
+     [
+      "脸",
+      "手",
+      "胳膊",
+      "腿",
+      "身子",
+      "身体"
+     ],
+     [
+      "麻",
+      "没力",
+      "无力",
+      "没劲",
+      "不听使唤",
+      "动不了",
+      "抬不起"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "dark_urine",
+   "name": "尿色像酱油或浓茶",
+   "terms": [
+    "酱油色",
+    "茶色尿",
+    "可乐色"
+   ],
+   "combos": [
+    [
+     [
+      "尿",
+      "小便"
+     ],
+     [
+      "酱油",
+      "茶色",
+      "可乐",
+      "深褐",
+      "发黑",
+      "黑色",
+      "咖啡色",
+      "浓茶"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "confusion",
+   "name": "意识不清",
+   "terms": [
+    "迷迷糊糊",
+    "意识模糊",
+    "神志不清",
+    "意识不清",
+    "糊里糊涂",
+    "胡言乱语",
+    "认不出人",
+    "答非所问"
+   ],
+   "combos": [
+    [
+     [
+      "脑子",
+      "意识",
+      "神志",
+      "头脑"
+     ],
+     [
+      "不清",
+      "迷糊",
+      "模糊",
+      "糊涂",
+      "发懵"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "heat_exposure",
+   "name": "高温或暴晒环境",
+   "terms": [
+    "大太阳",
+    "太阳下",
+    "烈日",
+    "高温",
+    "暴晒",
+    "中暑",
+    "天很热",
+    "天太热",
+    "天气热",
+    "闷热",
+    "桑拿天",
+    "三伏天"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "no_sweat_hot",
+   "name": "不再出汗或体温很高",
+   "terms": [
+    "不出汗",
+    "不怎么出汗",
+    "不太出汗",
+    "没有汗",
+    "没汗了",
+    "停止出汗",
+    "皮肤很烫",
+    "体温很高",
+    "身上发烫"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "diabetes",
+   "name": "糖尿病或用降糖药",
+   "terms": [
+    "糖尿病",
+    "降糖药",
+    "胰岛素",
+    "低血糖",
+    "血糖低",
+    "血糖很低",
+    "二甲双胍"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "hypo_signs",
+   "name": "低血糖表现",
+   "terms": [
+    "发抖",
+    "手抖",
+    "冷汗",
+    "虚汗",
+    "心慌",
+    "头晕",
+    "眼前发黑",
+    "饿得发慌",
+    "浑身无力"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "back_pain",
+   "name": "腰背痛",
+   "terms": [
+    "腰疼",
+    "腰痛",
+    "腰椎"
+   ],
+   "combos": [
+    [
+     [
+      "腰",
+      "下背"
+     ],
+     [
+      "疼",
+      "痛"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "bladder_loss",
+   "name": "大小便失控或排不出",
+   "terms": [
+    "尿失禁",
+    "大小便失禁",
+    "便失禁",
+    "尿不出来",
+    "尿不出",
+    "排尿困难",
+    "解不出小便"
+   ],
+   "combos": [
+    [
+     [
+      "控制不住",
+      "憋不住",
+      "失禁",
+      "管不住"
+     ],
+     [
+      "尿",
+      "便"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "saddle_numb",
+   "name": "会阴、臀部、大腿内侧发麻",
+   "terms": [
+    "会阴麻",
+    "鞍区麻"
+   ],
+   "combos": [
+    [
+     [
+      "屁股",
+      "臀部",
+      "会阴",
+      "肛门",
+      "大腿内侧",
+      "裆"
+     ],
+     [
+      "麻",
+      "没知觉",
+      "没感觉"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "leg_numb",
+   "name": "腿脚发麻或放射痛",
+   "terms": [
+    "坐骨神经"
+   ],
+   "combos": [
+    [
+     [
+      "腿",
+      "脚"
+     ],
+     [
+      "麻",
+      "窜",
+      "放射",
+      "过电"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "pregnancy",
+   "name": "怀孕",
+   "terms": [
+    "怀孕",
+    "孕期",
+    "孕妇",
+    "怀着孕",
+    "孕周",
+    "孕早期",
+    "孕中期",
+    "孕晚期",
+    "怀了宝宝",
+    "怀二胎"
+   ],
+   "combos": [
+    [
+     [
+      "孕"
+     ],
+     [
+      "周"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "pregnancy_warning",
+   "name": "孕期危险信号",
+   "terms": [
+    "见红",
+    "出血",
+    "流血",
+    "破水",
+    "阴道流液",
+    "肚子疼",
+    "肚子痛",
+    "腹痛",
+    "宫缩",
+    "肚子发紧",
+    "胎动少",
+    "胎动减少",
+    "胎动变少",
+    "头痛",
+    "视物模糊",
+    "看东西模糊"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "bp_crisis",
+   "name": "血压极高",
+   "terms": [],
+   "combos": [],
+   "blood_pressure": {
+    "context": [
+     "血压",
+     "高压",
+     "低压",
+     "mmhg"
+    ],
+    "systolic_at_least": 180,
+    "diastolic_at_least": 120
+   }
+  },
+  {
+   "id": "calf_swelling",
+   "name": "小腿肿",
+   "terms": [],
+   "combos": [
+    [
+     [
+      "小腿",
+      "腿肚",
+      "腓肠肌"
+     ],
+     [
+      "肿"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "unilateral",
+   "name": "只有一侧",
+   "terms": [
+    "一侧",
+    "单侧",
+    "左小腿",
+    "右小腿",
+    "左腿",
+    "右腿",
+    "一条腿"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "red_hot",
+   "name": "局部发红发烫",
+   "terms": [
+    "发烫",
+    "发红",
+    "红肿",
+    "烫手",
+    "摸着烫",
+    "发热",
+    "又红又肿"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "joint_swelling",
+   "name": "关节肿",
+   "terms": [],
+   "combos": [
+    [
+     [
+      "膝",
+      "踝",
+      "肘",
+      "关节",
+      "手腕",
+      "肩"
+     ],
+     [
+      "肿"
+     ]
+    ]
+   ],
+   "blood_pressure": null
+  },
+  {
+   "id": "fever",
+   "name": "发烧",
+   "terms": [
+    "发烧",
+    "高烧",
+    "低烧",
+    "体温高",
+    "体温升高",
+    "烧到"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "cant_bear",
+   "name": "不能走路或负重",
+   "terms": [
+    "没法走路",
+    "走不了路",
+    "不能走路",
+    "走不了",
+    "站不起来",
+    "不能着地",
+    "不敢着地",
+    "没法着地",
+    "不能负重",
+    "一瘸一拐",
+    "瘸了"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "injury",
+   "name": "扭伤、拉伤、摔伤",
+   "terms": [
+    "扭了",
+    "扭伤",
+    "崴了",
+    "崴脚",
+    "拉伤",
+    "撕裂",
+    "摔了",
+    "摔倒",
+    "撞了",
+    "咔的一声",
+    "啪的一声",
+    "听到响声"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "fracture_signs",
+   "name": "疑似骨折或脱位",
+   "terms": [
+    "骨折",
+    "骨头变形",
+    "畸形",
+    "脱臼",
+    "错位"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "night_pain",
+   "name": "夜间疼醒",
+   "terms": [
+    "疼醒",
+    "痛醒",
+    "疼得睡不着",
+    "痛得睡不着",
+    "半夜疼",
+    "夜间痛",
+    "夜里疼",
+    "夜里痛"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "purge",
+   "name": "催吐或用泻药",
+   "terms": [
+    "催吐",
+    "抠喉",
+    "抠嗓子",
+    "吐掉",
+    "吐出来",
+    "故意吐",
+    "吃完就吐",
+    "吃了就吐",
+    "吃完就去吐",
+    "吃了就去吐",
+    "吃完去吐",
+    "吃完饭就吐",
+    "吃泻药",
+    "用泻药"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  },
+  {
+   "id": "purge_complication",
+   "name": "催吐后的电解质紊乱表现",
+   "terms": [
+    "心慌",
+    "头晕",
+    "抽筋",
+    "手脚麻",
+    "没力气",
+    "浑身无力",
+    "心跳乱",
+    "晕"
+   ],
+   "combos": [],
+   "blood_pressure": null
+  }
+ ],
+ "rules": [
+  {
+   "id": "EM-CHEST-ONGOING",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "胸痛正在持续或休息不缓解",
+   "all": [
+    "chest_pain",
+    "ongoing"
+   ]
+  },
+  {
+   "id": "EM-CHEST-SUDDEN",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "突发胸痛",
+   "all": [
+    "chest_pain",
+    "sudden"
+   ]
+  },
+  {
+   "id": "EM-CHEST-RADIATE",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "胸痛放射到左臂、下巴或后背",
+   "all": [
+    "chest_pain",
+    "radiating"
+   ]
+  },
+  {
+   "id": "EM-CHEST-SWEAT",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "胸痛伴出冷汗",
+   "all": [
+    "chest_pain",
+    "cold_sweat"
+   ]
+  },
+  {
+   "id": "EM-CHEST-DYSPNEA",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "胸痛伴呼吸困难",
+   "all": [
+    "chest_pain",
+    "dyspnea"
+   ]
+  },
+  {
+   "id": "RF-CHEST",
+   "level": "red_flag",
+   "category": "cardiovascular",
+   "title": "胸痛或胸闷",
+   "all": [
+    "chest_pain"
+   ]
+  },
+  {
+   "id": "EM-TACHY-ONGOING",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "心跳很快停不下来",
+   "all": [
+    "fast_heart",
+    "ongoing"
+   ]
+  },
+  {
+   "id": "EM-TACHY-DIZZY",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "心跳很快伴头晕",
+   "all": [
+    "fast_heart",
+    "dizziness"
+   ]
+  },
+  {
+   "id": "RF-PALPITATION",
+   "level": "red_flag",
+   "category": "cardiovascular",
+   "title": "心慌或心律不齐",
+   "all": [
+    "palpitation"
+   ]
+  },
+  {
+   "id": "EM-BP-HEADACHE",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "血压极高伴头痛",
+   "all": [
+    "bp_crisis",
+    "headache"
+   ]
+  },
+  {
+   "id": "EM-BP-CHEST",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "血压极高伴胸痛",
+   "all": [
+    "bp_crisis",
+    "chest_pain"
+   ]
+  },
+  {
+   "id": "EM-BP-DIZZY",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "血压极高伴头晕",
+   "all": [
+    "bp_crisis",
+    "dizziness"
+   ]
+  },
+  {
+   "id": "RF-BP",
+   "level": "red_flag",
+   "category": "cardiovascular",
+   "title": "血压极高",
+   "all": [
+    "bp_crisis"
+   ]
+  },
+  {
+   "id": "EM-DVT-UNILATERAL",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "一侧小腿肿（疑似深静脉血栓）",
+   "all": [
+    "calf_swelling",
+    "unilateral"
+   ]
+  },
+  {
+   "id": "EM-DVT-HOT",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "小腿红肿发烫（疑似深静脉血栓）",
+   "all": [
+    "calf_swelling",
+    "red_hot"
+   ]
+  },
+  {
+   "id": "EM-COLLAPSE",
+   "level": "emergency",
+   "category": "syncope",
+   "title": "晕倒或意识丧失",
+   "all": [
+    "collapse"
+   ]
+  },
+  {
+   "id": "RF-PRESYNCOPE",
+   "level": "red_flag",
+   "category": "syncope",
+   "title": "眼前发黑",
+   "all": [
+    "presyncope"
+   ]
+  },
+  {
+   "id": "RF-DIZZY",
+   "level": "red_flag",
+   "category": "syncope",
+   "title": "头晕",
+   "all": [
+    "dizziness"
+   ]
+  },
+  {
+   "id": "EM-CYANOSIS",
+   "level": "emergency",
+   "category": "respiratory",
+   "title": "嘴唇或脸色发紫",
+   "all": [
+    "cyanosis"
+   ]
+  },
+  {
+   "id": "EM-DYSPNEA-ONGOING",
+   "level": "emergency",
+   "category": "respiratory",
+   "title": "呼吸困难休息不缓解",
+   "all": [
+    "dyspnea",
+    "ongoing"
+   ]
+  },
+  {
+   "id": "RF-DYSPNEA-WORSE",
+   "level": "red_flag",
+   "category": "respiratory",
+   "title": "气短比以前明显加重",
+   "all": [
+    "dyspnea",
+    "change_worse"
+   ]
+  },
+  {
+   "id": "EM-SEIZURE",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "抽搐",
+   "all": [
+    "seizure"
+   ]
+  },
+  {
+   "id": "EM-THUNDERCLAP",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "突发剧烈头痛",
+   "all": [
+    "headache",
+    "sudden",
+    "severe"
+   ]
+  },
+  {
+   "id": "RF-HEADACHE-SEVERE",
+   "level": "red_flag",
+   "category": "neuro",
+   "title": "剧烈头痛",
+   "all": [
+    "headache",
+    "severe"
+   ]
+  },
+  {
+   "id": "EM-STROKE-SPEECH",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "说话不清（卒中征象）",
+   "all": [
+    "speech"
+   ]
+  },
+  {
+   "id": "EM-STROKE-WEAK",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "一侧脸或肢体麻木无力（卒中征象）",
+   "all": [
+    "one_side_weak"
+   ]
+  },
+  {
+   "id": "EM-CONFUSION",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "意识不清",
+   "all": [
+    "confusion"
+   ]
+  },
+  {
+   "id": "EM-CAUDA-BLADDER",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "腰痛伴大小便失控（马尾综合征征象）",
+   "all": [
+    "back_pain",
+    "bladder_loss"
+   ]
+  },
+  {
+   "id": "EM-CAUDA-SADDLE",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "腰痛伴会阴发麻（马尾综合征征象）",
+   "all": [
+    "back_pain",
+    "saddle_numb"
+   ]
+  },
+  {
+   "id": "RF-SCIATICA",
+   "level": "red_flag",
+   "category": "neuro",
+   "title": "腰痛伴腿脚发麻",
+   "all": [
+    "back_pain",
+    "leg_numb"
+   ]
+  },
+  {
+   "id": "EM-DARK-URINE",
+   "level": "emergency",
+   "category": "musculoskeletal",
+   "title": "尿色像酱油（疑似横纹肌溶解）",
+   "all": [
+    "dark_urine"
+   ]
+  },
+  {
+   "id": "EM-JOINT-FEVER",
+   "level": "emergency",
+   "category": "musculoskeletal",
+   "title": "关节肿伴发烧（疑似关节感染）",
+   "all": [
+    "joint_swelling",
+    "fever"
+   ]
+  },
+  {
+   "id": "RF-JOINT-HOT",
+   "level": "red_flag",
+   "category": "musculoskeletal",
+   "title": "关节红肿发烫",
+   "all": [
+    "joint_swelling",
+    "red_hot"
+   ]
+  },
+  {
+   "id": "RF-JOINT-CANT-BEAR",
+   "level": "red_flag",
+   "category": "musculoskeletal",
+   "title": "关节肿且不能负重",
+   "all": [
+    "joint_swelling",
+    "cant_bear"
+   ]
+  },
+  {
+   "id": "RF-INJURY-CANT-BEAR",
+   "level": "red_flag",
+   "category": "musculoskeletal",
+   "title": "受伤后不能负重",
+   "all": [
+    "injury",
+    "cant_bear"
+   ]
+  },
+  {
+   "id": "RF-FRACTURE",
+   "level": "red_flag",
+   "category": "musculoskeletal",
+   "title": "疑似骨折或脱位",
+   "all": [
+    "fracture_signs"
+   ]
+  },
+  {
+   "id": "RF-NIGHT-PAIN",
+   "level": "red_flag",
+   "category": "musculoskeletal",
+   "title": "夜间疼醒",
+   "all": [
+    "night_pain"
+   ]
+  },
+  {
+   "id": "EM-HEAT-NOSWEAT",
+   "level": "emergency",
+   "category": "heat",
+   "title": "高温下不再出汗或体温很高",
+   "all": [
+    "heat_exposure",
+    "no_sweat_hot"
+   ]
+  },
+  {
+   "id": "RF-HEAT-DIZZY",
+   "level": "red_flag",
+   "category": "heat",
+   "title": "高温下头晕",
+   "all": [
+    "heat_exposure",
+    "dizziness"
+   ]
+  },
+  {
+   "id": "EM-HYPOGLYCEMIA",
+   "level": "emergency",
+   "category": "metabolic",
+   "title": "糖尿病人出现低血糖表现",
+   "all": [
+    "diabetes",
+    "hypo_signs"
+   ]
+  },
+  {
+   "id": "EM-PREGNANCY",
+   "level": "emergency",
+   "category": "pregnancy",
+   "title": "孕期出血、腹痛等危险信号",
+   "all": [
+    "pregnancy",
+    "pregnancy_warning"
+   ]
+  },
+  {
+   "id": "EM-PURGE-COMPLICATION",
+   "level": "emergency",
+   "category": "eating_disorder",
+   "title": "催吐后心慌、头晕、抽筋（电解质紊乱）",
+   "all": [
+    "purge",
+    "purge_complication"
+   ]
+  },
+  {
+   "id": "RF-PURGE",
+   "level": "red_flag",
+   "category": "eating_disorder",
+   "title": "催吐或用泻药",
+   "all": [
+    "purge"
+   ]
+  }
+ ]
+}

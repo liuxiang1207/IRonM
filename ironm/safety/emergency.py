@@ -1,7 +1,8 @@
-"""急症词表与匹配（spec §21）。
+"""急症词表与匹配（spec §21–22）。
 
 判定只看词表：不调用模型、知识库或其他业务模块，离线与模型故障时照常工作。
-匹配方式刻意保持简单（文字包含、分句内多组同时出现、血压数值），前端离线版用同一份词表得到相同结果。
+匹配方式刻意保持简单（文字包含、分句内多组同时出现、血压数值、紧挨着的否定词），
+App 离线版（app/src/safety/emergency.ts）用同一份词表逐步对应实现，结果必须一致。
 判定结果不含用户原话。
 """
 
@@ -37,7 +38,8 @@ _RANK: dict[Level, int] = {"none": 0, "red_flag": 1, "emergency": 2}
 
 # 统一后（全角已转半角）的分句符号与空白。前端离线版使用同一组字符。
 CLAUSE_SEPARATORS = ",。!?;、\n\r~"
-WHITESPACE = " \t\f\v             ​    　﻿"
+_SPACES = [0x20, 0x09, 0x0C, 0x0B, 0xA0, 0x1680, *range(0x2000, 0x200C), 0x2028, 0x2029]
+WHITESPACE = "".join(map(chr, [*_SPACES, 0x202F, 0x205F, 0x3000, 0xFEFF]))
 _CLAUSE_RE = re.compile(f"[{re.escape(CLAUSE_SEPARATORS)}]+")
 _SPACE_RE = re.compile(f"[{re.escape(WHITESPACE)}]+")
 # 血压：120/80 这样的分数，或“高压 190”“低压 120”；位数在代码里判断，正则保持两端都能用的写法
@@ -89,6 +91,44 @@ class BloodPressure(ContractModel):
         )
 
 
+class Negation(ContractModel):
+    """否定与“以前发生过”（spec §22）。只取消紧挨着的一处说法；拿不准时按出现处理。"""
+
+    before: tuple[Term, ...] = Field(min_length=1)  # 说法前紧挨着这些词：这一处不算
+    exceptions: tuple[Term, ...] = ()  # 但前面以这些词结尾时仍算（“差点没晕倒”）
+    past_after: Term  # 说法后紧跟这个字：以前发生过
+    past_not_followed_by: tuple[Term, ...] = ()  # 再接这些字时不是“以前发生过”（“晕倒过去”）
+    recurrence: tuple[Term, ...] = Field(min_length=1)  # 句中有这些字样：以前发生过的也照常算
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        words = [*self.before, *self.exceptions, self.past_after, *self.past_not_followed_by]
+        for word in [*words, *self.recurrence]:
+            _check_term(word)
+        return self
+
+    def counts(self, clause: str, start: int, end: int, past_counts: bool) -> bool:
+        """clause[start:end] 这一处说法算不算出现。"""
+        head = clause[:start]
+        negated = any(head.endswith(w) for w in self.before)
+        if negated and not any(head.endswith(w) for w in self.exceptions):
+            return False
+        tail = clause[end:]
+        if past_counts or not tail.startswith(self.past_after):
+            return True
+        rest = tail[len(self.past_after) :]
+        return any(rest.startswith(w) for w in self.past_not_followed_by)
+
+    def found(self, clause: str, term: str, past_counts: bool) -> bool:
+        """term 在分句里是否有一处算出现。"""
+        i = clause.find(term)
+        while i != -1:
+            if self.counts(clause, i, i + len(term), past_counts):
+                return True
+            i = clause.find(term, i + 1)
+        return False
+
+
 class Symptom(ContractModel):
     """一组同义说法：terms 任一出现即命中；combos 每项是几组词，同一分句里每组都出现才命中。"""
 
@@ -112,11 +152,15 @@ class Symptom(ContractModel):
             _check_term(word)
         return self
 
-    def matches(self, clause: str) -> bool:
-        if any(t in clause for t in self.terms):
+    def matches(self, clause: str, negation: Negation, past_counts: bool) -> bool:
+        def found(term: str) -> bool:
+            return negation.found(clause, term, past_counts)
+
+        if any(found(t) for t in self.terms):
             return True
-        if any(all(any(t in clause for t in g) for g in combo) for combo in self.combos):
+        if any(all(any(found(t) for t in g) for g in combo) for combo in self.combos):
             return True
+        # 血压按数值判断，不受否定影响
         return self.blood_pressure is not None and self.blood_pressure.matches(clause)
 
 
@@ -148,6 +192,7 @@ class Assessment(ContractModel):
 class TermBook(ContractModel):
     version: Term
     review: Literal["pending_review", "approved"]
+    negation: Negation
     symptoms: tuple[Symptom, ...] = Field(min_length=1)
     rules: tuple[EmergencyRule, ...] = Field(min_length=1)
 
@@ -170,7 +215,11 @@ class TermBook(ContractModel):
     def present(self, text: str) -> frozenset[str]:
         """这句话里出现的症状编号。"""
         parts = clauses(text)
-        return frozenset(s.id for s in self.symptoms if any(s.matches(c) for c in parts))
+        neg = self.negation
+        past_counts = any(w in c for c in parts for w in neg.recurrence)
+        return frozenset(
+            s.id for s in self.symptoms if any(s.matches(c, neg, past_counts) for c in parts)
+        )
 
     def assess(self, text: str) -> Assessment:
         found = self.present(text)

@@ -127,18 +127,15 @@ cases:
     text: 没有胸痛，就是腿有点酸
     expect: none
     category: negation
-    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-027
     text: 今天练完不头晕，状态挺好的
     expect: none
     category: negation
-    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-028
     text: 上周胸口疼过，去医院查了说没问题，已经好了
     expect: none
     category: resolved
     note: 已就医排除；仍可提示复发时就医
-    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-029
     text: 练腿第二天大腿特别酸，下楼梯有点难受
     expect: none
@@ -177,12 +174,10 @@ cases:
     text: 我朋友说他以前练到晕倒过，我想避免这种情况
     expect: none
     category: resolved
-    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-038
     text: 没有心慌也没有胸闷，就是想减脂
     expect: none
     category: negation
-    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-039
     text: 跑步后小腿抽筋了一下，拉伸完就好了
     expect: none
