@@ -53,3 +53,29 @@ addopts = "-q -ra --strict-markers --strict-config"
 # 预期失败的测试一旦意外通过也算失败，提醒去掉标记
 xfail_strict = true
 filterwarnings = ["error"]
+
+# 模块依赖方向（spec [2026-10-20] §1）：上层可依赖下层，反之不行；同一行用 | 分隔的互不依赖。
+# store 放在 agents 之上，使 agents / skills / 计算层都无法直接读写存储。
+# safety 只在 contracts 之上，保证离线、模型不可用时仍能独立运行。
+# exhaustive：ironm 下每个子包都必须在这里登记，新增子包漏登记即失败。
+[tool.importlinter]
+root_package = "ironm"
+
+[[tool.importlinter.contracts]]
+name = "业务模块分层"
+type = "layers"
+containers = ["ironm"]
+exhaustive = true
+layers = [
+    "api",
+    "scheduler",
+    "orchestrator",
+    "memory",
+    "store",
+    "agents",
+    "skills",
+    "engine | knowledge | llm",
+    "rules",
+    "safety",
+    "contracts",
+]
