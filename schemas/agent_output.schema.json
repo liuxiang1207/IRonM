@@ -1,0 +1,329 @@
+{
+  "$defs": {
+    "AgentId": {
+      "enum": [
+        "assessor",
+        "safety_officer",
+        "data_analyst",
+        "recovery",
+        "training_planner",
+        "exercise_coach",
+        "nutritionist",
+        "behavior_coach",
+        "evidence_reviewer",
+        "quality_reviewer"
+      ],
+      "title": "AgentId",
+      "type": "string"
+    },
+    "Constraint": {
+      "additionalProperties": false,
+      "description": "边界，如“热量不得低于 1200 千卡”“禁止跳跃类动作”。",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/PlanField"
+        },
+        "op": {
+          "enum": [
+            "max",
+            "min",
+            "exclude"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/Text"
+        },
+        "rule_id": {
+          "$ref": "#/$defs/Text"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "field",
+        "op",
+        "value",
+        "rule_id",
+        "reason_code"
+      ],
+      "title": "Constraint",
+      "type": "object"
+    },
+    "ConstraintOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentId"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Constraint"
+          },
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "constraint",
+          "title": "Kind",
+          "type": "string"
+        },
+        "skill": {
+          "$ref": "#/$defs/VersionedName"
+        }
+      },
+      "required": [
+        "agent",
+        "skill",
+        "kind",
+        "items"
+      ],
+      "title": "ConstraintOutput",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "NoOpinionOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentId"
+        },
+        "kind": {
+          "const": "no_opinion",
+          "title": "Kind",
+          "type": "string"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "skill": {
+          "$ref": "#/$defs/VersionedName"
+        }
+      },
+      "required": [
+        "agent",
+        "skill",
+        "kind"
+      ],
+      "title": "NoOpinionOutput",
+      "type": "object"
+    },
+    "PlanField": {
+      "enum": [
+        "training_days_per_week",
+        "session_slots",
+        "weekly_cardio_minutes",
+        "daily_steps_target",
+        "exercise_selection",
+        "minimum_task",
+        "diet_mode",
+        "daily_kcal_target",
+        "daily_protein_g_target",
+        "weekly_habit_step",
+        "reminder_schedule"
+      ],
+      "title": "PlanField",
+      "type": "string"
+    },
+    "Proposal": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_ids": {
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "title": "Evidence Ids",
+          "type": "array"
+        },
+        "expected_effect": {
+          "$ref": "#/$defs/Text"
+        },
+        "field": {
+          "$ref": "#/$defs/PlanField"
+        },
+        "from_value": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "proposal_id": {
+          "$ref": "#/$defs/Text"
+        },
+        "reason_facts": {
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 1,
+          "title": "Reason Facts",
+          "type": "array"
+        },
+        "review_date": {
+          "format": "date",
+          "title": "Review Date",
+          "type": "string"
+        },
+        "rollback_condition": {
+          "$ref": "#/$defs/Text"
+        },
+        "rule_id": {
+          "$ref": "#/$defs/Text"
+        },
+        "to_value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "field",
+        "from_value",
+        "to_value",
+        "reason_facts",
+        "rule_id",
+        "expected_effect",
+        "rollback_condition",
+        "review_date",
+        "evidence_ids"
+      ],
+      "title": "Proposal",
+      "type": "object"
+    },
+    "ProposalOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentId"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Proposal"
+          },
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "proposal",
+          "title": "Kind",
+          "type": "string"
+        },
+        "skill": {
+          "$ref": "#/$defs/VersionedName"
+        }
+      },
+      "required": [
+        "agent",
+        "skill",
+        "kind",
+        "items"
+      ],
+      "title": "ProposalOutput",
+      "type": "object"
+    },
+    "Text": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "Verdict": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "$ref": "#/$defs/Text"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "reject",
+            "warn"
+          ],
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "result"
+      ],
+      "title": "Verdict",
+      "type": "object"
+    },
+    "VerdictOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentId"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Verdict"
+          },
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "verdict",
+          "title": "Kind",
+          "type": "string"
+        },
+        "skill": {
+          "$ref": "#/$defs/VersionedName"
+        }
+      },
+      "required": [
+        "agent",
+        "skill",
+        "kind",
+        "items"
+      ],
+      "title": "VerdictOutput",
+      "type": "object"
+    },
+    "VersionedName": {
+      "pattern": "^[a-z][a-z0-9_]*@\\d+\\.\\d+\\.\\d+$",
+      "type": "string"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "constraint": "#/$defs/ConstraintOutput",
+      "no_opinion": "#/$defs/NoOpinionOutput",
+      "proposal": "#/$defs/ProposalOutput",
+      "verdict": "#/$defs/VerdictOutput"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ConstraintOutput"
+    },
+    {
+      "$ref": "#/$defs/ProposalOutput"
+    },
+    {
+      "$ref": "#/$defs/VerdictOutput"
+    },
+    {
+      "$ref": "#/$defs/NoOpinionOutput"
+    }
+  ]
+}

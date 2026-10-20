@@ -20,6 +20,7 @@ PAYLOADS: dict[str, dict[str, Any]] = {
     "meal": {"slot": "lunch", "kcal": 650, "protein_g": {"unknown": "not_recorded"}},
     "symptom": {"text": "右膝训练后有点酸", "severity": 2},
     "baseline_test": {"test_id": "pushup_max", "value": 18, "unit": "reps"},
+    "circumference": {"waist_cm": 86.5},
 }
 
 
@@ -126,3 +127,17 @@ def test_events_are_immutable() -> None:
     assert isinstance(event, WeightEvent)
     with pytest.raises(ValidationError):
         event.user_id = "u2"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"hip_cm": 98},  # 缺腰围
+        {"waist_cm": 20},
+        {"waist_cm": 300},
+        {"waist_cm": 86, "neck_cm": 38},  # 未定义部位
+    ],
+)
+def test_invalid_circumference_rejected(payload: dict[str, Any]) -> None:
+    with pytest.raises(ValidationError):
+        _parse(_event("circumference", payload=payload))

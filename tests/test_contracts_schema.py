@@ -22,4 +22,12 @@ def test_no_stale_schema_files() -> None:
 
 
 def test_expected_contracts_exported() -> None:
-    assert {"event", "metric_result", "unknown"} <= set(SCHEMAS)
+    assert {
+        "event",
+        "metric_result",
+        "unknown",
+        "agent_output",
+        "snapshot",
+        "plan_version",
+        "model_call",
+    } <= set(SCHEMAS)

@@ -7,14 +7,22 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
+from ironm.contracts.agents import AGENT_OUTPUT_ADAPTER
 from ironm.contracts.events import EVENT_ADAPTER
 from ironm.contracts.metrics import MetricResult
+from ironm.contracts.model_call import ModelCall
+from ironm.contracts.plan import PlanVersion
+from ironm.contracts.snapshot import Snapshot
 from ironm.contracts.unknown import Unknown
 
 SCHEMAS: dict[str, TypeAdapter[Any]] = {
     "event": EVENT_ADAPTER,
     "metric_result": TypeAdapter(MetricResult),
     "unknown": TypeAdapter(Unknown),
+    "agent_output": AGENT_OUTPUT_ADAPTER,
+    "snapshot": TypeAdapter(Snapshot),
+    "plan_version": TypeAdapter(PlanVersion),
+    "model_call": TypeAdapter(ModelCall),
 }
 
 

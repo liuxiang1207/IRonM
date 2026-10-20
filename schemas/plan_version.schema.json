@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "FieldChange": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/PlanField"
+        },
+        "from_value": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "to_value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "field",
+        "from_value",
+        "to_value"
+      ],
+      "title": "FieldChange",
+      "type": "object"
+    },
+    "FrozenMap_PlanField_JsonValue_": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/PlanField"
+      },
+      "type": "object"
+    },
+    "FrozenMap_str_str_": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "JsonValue": {},
+    "PlanField": {
+      "enum": [
+        "training_days_per_week",
+        "session_slots",
+        "weekly_cardio_minutes",
+        "daily_steps_target",
+        "exercise_selection",
+        "minimum_task",
+        "diet_mode",
+        "daily_kcal_target",
+        "daily_protein_g_target",
+        "weekly_habit_step",
+        "reminder_schedule"
+      ],
+      "title": "PlanField",
+      "type": "string"
+    },
+    "UtcDatetime": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "计划版本只增不改；回退也是生成一个新版本。",
+  "properties": {
+    "created_at": {
+      "$ref": "#/$defs/UtcDatetime"
+    },
+    "diff": {
+      "items": {
+        "$ref": "#/$defs/FieldChange"
+      },
+      "title": "Diff",
+      "type": "array"
+    },
+    "fields": {
+      "$ref": "#/$defs/FrozenMap_PlanField_JsonValue_"
+    },
+    "parent": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Parent"
+    },
+    "rule_set_versions": {
+      "$ref": "#/$defs/FrozenMap_str_str_"
+    },
+    "skill_versions": {
+      "$ref": "#/$defs/FrozenMap_str_str_"
+    },
+    "version": {
+      "minimum": 1,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "version",
+    "parent",
+    "fields",
+    "diff",
+    "rule_set_versions",
+    "skill_versions",
+    "created_at"
+  ],
+  "title": "PlanVersion",
+  "type": "object"
+}

@@ -337,6 +337,172 @@
       "title": "CheckinPayload",
       "type": "object"
     },
+    "CircumferenceEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/CircumferencePayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "circumference",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "CircumferenceEvent",
+      "type": "object"
+    },
+    "CircumferencePayload": {
+      "additionalProperties": false,
+      "description": "围度，单位厘米。腰围必填，其他部位可选。",
+      "properties": {
+        "chest_cm": {
+          "anyOf": [
+            {
+              "maximum": 250,
+              "minimum": 50,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Chest Cm"
+        },
+        "hip_cm": {
+          "anyOf": [
+            {
+              "maximum": 250,
+              "minimum": 50,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Hip Cm"
+        },
+        "thigh_cm": {
+          "anyOf": [
+            {
+              "maximum": 150,
+              "minimum": 20,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Thigh Cm"
+        },
+        "upper_arm_cm": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 10,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Upper Arm Cm"
+        },
+        "waist_cm": {
+          "maximum": 250,
+          "minimum": 40,
+          "title": "Waist Cm",
+          "type": "number"
+        }
+      },
+      "required": [
+        "waist_cm"
+      ],
+      "title": "CircumferencePayload",
+      "type": "object"
+    },
     "MealEvent": {
       "additionalProperties": false,
       "properties": {
@@ -1083,6 +1249,7 @@
     "mapping": {
       "baseline_test": "#/$defs/BaselineTestEvent",
       "checkin": "#/$defs/CheckinEvent",
+      "circumference": "#/$defs/CircumferenceEvent",
       "meal": "#/$defs/MealEvent",
       "set_log": "#/$defs/SetLogEvent",
       "symptom": "#/$defs/SymptomEvent",
@@ -1112,6 +1279,9 @@
     },
     {
       "$ref": "#/$defs/BaselineTestEvent"
+    },
+    {
+      "$ref": "#/$defs/CircumferenceEvent"
     }
   ]
 }

@@ -1,0 +1,136 @@
+{
+  "$defs": {
+    "ModelStage": {
+      "enum": [
+        "intent_l3",
+        "capture",
+        "answer",
+        "review_semantic",
+        "reflect"
+      ],
+      "title": "ModelStage",
+      "type": "string"
+    },
+    "Text": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "Tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ]
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "description": "JSON 形如 {\"unknown\": \"not_recorded\"}。不能参与运算，也不能当真假值判断。",
+      "properties": {
+        "unknown": {
+          "$ref": "#/$defs/UnknownReason"
+        }
+      },
+      "required": [
+        "unknown"
+      ],
+      "title": "Unknown",
+      "type": "object"
+    },
+    "UnknownReason": {
+      "enum": [
+        "not_recorded",
+        "declined",
+        "unparseable",
+        "insufficient_data"
+      ],
+      "title": "UnknownReason",
+      "type": "string"
+    },
+    "UtcDatetime": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "VersionedName": {
+      "pattern": "^[a-z][a-z0-9_]*@\\d+\\.\\d+\\.\\d+$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "call_id": {
+      "$ref": "#/$defs/Text"
+    },
+    "duration_ms": {
+      "minimum": 0,
+      "title": "Duration Ms",
+      "type": "integer"
+    },
+    "error_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Text"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "fallback_used": {
+      "title": "Fallback Used",
+      "type": "boolean"
+    },
+    "input_tokens": {
+      "$ref": "#/$defs/Tokens"
+    },
+    "model": {
+      "$ref": "#/$defs/Text"
+    },
+    "output_tokens": {
+      "$ref": "#/$defs/Tokens"
+    },
+    "prompt_template": {
+      "$ref": "#/$defs/VersionedName"
+    },
+    "provider": {
+      "$ref": "#/$defs/Text"
+    },
+    "request_id": {
+      "$ref": "#/$defs/Text"
+    },
+    "stage": {
+      "$ref": "#/$defs/ModelStage"
+    },
+    "started_at": {
+      "$ref": "#/$defs/UtcDatetime"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "timeout",
+        "error",
+        "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "call_id",
+    "request_id",
+    "stage",
+    "provider",
+    "model",
+    "prompt_template",
+    "started_at",
+    "duration_ms",
+    "status",
+    "fallback_used"
+  ],
+  "title": "ModelCall",
+  "type": "object"
+}

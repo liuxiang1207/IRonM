@@ -77,6 +77,16 @@ class BaselineTestPayload(ContractModel):
     unit: Literal["reps", "s", "kg", "cm", "m"]
 
 
+class CircumferencePayload(ContractModel):
+    """围度，单位厘米。腰围必填，其他部位可选。"""
+
+    waist_cm: float = Field(ge=40, le=250)
+    hip_cm: Annotated[float, Field(ge=50, le=250)] | Unknown = NOT_RECORDED
+    chest_cm: Annotated[float, Field(ge=50, le=250)] | Unknown = NOT_RECORDED
+    upper_arm_cm: Annotated[float, Field(ge=10, le=100)] | Unknown = NOT_RECORDED
+    thigh_cm: Annotated[float, Field(ge=20, le=150)] | Unknown = NOT_RECORDED
+
+
 # ---- 记录 ----
 
 
@@ -138,6 +148,11 @@ class BaselineTestEvent(_EventBase):
     payload: BaselineTestPayload
 
 
+class CircumferenceEvent(_EventBase):
+    type: Literal["circumference"]
+    payload: CircumferencePayload
+
+
 type Event = Annotated[
     WorkoutCheckEvent
     | SetLogEvent
@@ -145,7 +160,8 @@ type Event = Annotated[
     | CheckinEvent
     | MealEvent
     | SymptomEvent
-    | BaselineTestEvent,
+    | BaselineTestEvent
+    | CircumferenceEvent,
     Field(discriminator="type"),
 ]
 

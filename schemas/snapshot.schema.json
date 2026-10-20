@@ -1,0 +1,487 @@
+{
+  "$defs": {
+    "ConfidenceInterval": {
+      "additionalProperties": false,
+      "properties": {
+        "high": {
+          "title": "High",
+          "type": "number"
+        },
+        "level": {
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Level",
+          "type": "number"
+        },
+        "low": {
+          "title": "Low",
+          "type": "number"
+        }
+      },
+      "required": [
+        "low",
+        "high",
+        "level"
+      ],
+      "title": "ConfidenceInterval",
+      "type": "object"
+    },
+    "Constraint": {
+      "additionalProperties": false,
+      "description": "边界，如“热量不得低于 1200 千卡”“禁止跳跃类动作”。",
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/PlanField"
+        },
+        "op": {
+          "enum": [
+            "max",
+            "min",
+            "exclude"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/Text"
+        },
+        "rule_id": {
+          "$ref": "#/$defs/Text"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "field",
+        "op",
+        "value",
+        "rule_id",
+        "reason_code"
+      ],
+      "title": "Constraint",
+      "type": "object"
+    },
+    "Domain": {
+      "enum": [
+        "training",
+        "body",
+        "diet",
+        "recovery"
+      ],
+      "title": "Domain",
+      "type": "string"
+    },
+    "FieldChange": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/PlanField"
+        },
+        "from_value": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "to_value": {
+          "$ref": "#/$defs/JsonValue"
+        }
+      },
+      "required": [
+        "field",
+        "from_value",
+        "to_value"
+      ],
+      "title": "FieldChange",
+      "type": "object"
+    },
+    "FrozenMap_Domain_Precision_": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Precision"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/Domain"
+      },
+      "type": "object"
+    },
+    "FrozenMap_PlanField_JsonValue_": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "propertyNames": {
+        "$ref": "#/$defs/PlanField"
+      },
+      "type": "object"
+    },
+    "FrozenMap_str_JsonValue_": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "FrozenMap_str_str_": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "JsonValue": {},
+    "MetricResult": {
+      "additionalProperties": false,
+      "properties": {
+        "ci": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ConfidenceInterval"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "computed_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "domain": {
+          "$ref": "#/$defs/Domain"
+        },
+        "formula_id": {
+          "minLength": 1,
+          "title": "Formula Id",
+          "type": "string"
+        },
+        "last_record_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UtcDatetime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "n_records": {
+          "minimum": 0,
+          "title": "N Records",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "needed": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Need"
+          },
+          "title": "Needed",
+          "type": "array"
+        },
+        "precision": {
+          "$ref": "#/$defs/Precision"
+        },
+        "status": {
+          "$ref": "#/$defs/MetricStatus"
+        },
+        "unit": {
+          "minLength": 1,
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Value"
+        },
+        "window_days": {
+          "minimum": 0,
+          "title": "Window Days",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "domain",
+        "value",
+        "unit",
+        "precision",
+        "n_records",
+        "window_days",
+        "status",
+        "last_record_at",
+        "computed_at",
+        "formula_id"
+      ],
+      "title": "MetricResult",
+      "type": "object"
+    },
+    "MetricStatus": {
+      "enum": [
+        "ok",
+        "insufficient",
+        "stale",
+        "pending_confirm"
+      ],
+      "title": "MetricStatus",
+      "type": "string"
+    },
+    "Need": {
+      "additionalProperties": false,
+      "description": "还差什么：如再称重 2 次。item 为稳定编码，由界面翻译成文字。",
+      "properties": {
+        "count": {
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "item": {
+          "minLength": 1,
+          "title": "Item",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item",
+        "count"
+      ],
+      "title": "Need",
+      "type": "object"
+    },
+    "PlanField": {
+      "enum": [
+        "training_days_per_week",
+        "session_slots",
+        "weekly_cardio_minutes",
+        "daily_steps_target",
+        "exercise_selection",
+        "minimum_task",
+        "diet_mode",
+        "daily_kcal_target",
+        "daily_protein_g_target",
+        "weekly_habit_step",
+        "reminder_schedule"
+      ],
+      "title": "PlanField",
+      "type": "string"
+    },
+    "PlanVersion": {
+      "additionalProperties": false,
+      "description": "计划版本只增不改；回退也是生成一个新版本。",
+      "properties": {
+        "created_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "diff": {
+          "items": {
+            "$ref": "#/$defs/FieldChange"
+          },
+          "title": "Diff",
+          "type": "array"
+        },
+        "fields": {
+          "$ref": "#/$defs/FrozenMap_PlanField_JsonValue_"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Parent"
+        },
+        "rule_set_versions": {
+          "$ref": "#/$defs/FrozenMap_str_str_"
+        },
+        "skill_versions": {
+          "$ref": "#/$defs/FrozenMap_str_str_"
+        },
+        "version": {
+          "minimum": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "parent",
+        "fields",
+        "diff",
+        "rule_set_versions",
+        "skill_versions",
+        "created_at"
+      ],
+      "title": "PlanVersion",
+      "type": "object"
+    },
+    "Precision": {
+      "description": "数据精度等级：P3 精确、P2 结构化、P1 粗略、P0 感受。",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "title": "Precision",
+      "type": "string"
+    },
+    "Text": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "Tier": {
+      "description": "安全分层。",
+      "enum": [
+        "a",
+        "a_prime",
+        "b",
+        "collaborative",
+        "c",
+        "d",
+        "paused"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "description": "JSON 形如 {\"unknown\": \"not_recorded\"}。不能参与运算，也不能当真假值判断。",
+      "properties": {
+        "unknown": {
+          "$ref": "#/$defs/UnknownReason"
+        }
+      },
+      "required": [
+        "unknown"
+      ],
+      "title": "Unknown",
+      "type": "object"
+    },
+    "UnknownReason": {
+      "enum": [
+        "not_recorded",
+        "declined",
+        "unparseable",
+        "insufficient_data"
+      ],
+      "title": "UnknownReason",
+      "type": "string"
+    },
+    "UtcDatetime": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "Verdict": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "$ref": "#/$defs/Text"
+        },
+        "reason_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "result": {
+          "enum": [
+            "pass",
+            "reject",
+            "warn"
+          ],
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "result"
+      ],
+      "title": "Verdict",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "as_of": {
+      "$ref": "#/$defs/UtcDatetime"
+    },
+    "constraints": {
+      "items": {
+        "$ref": "#/$defs/Constraint"
+      },
+      "title": "Constraints",
+      "type": "array"
+    },
+    "current_plan": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PlanVersion"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "metrics": {
+      "items": {
+        "$ref": "#/$defs/MetricResult"
+      },
+      "title": "Metrics",
+      "type": "array"
+    },
+    "precision_by_domain": {
+      "$ref": "#/$defs/FrozenMap_Domain_Precision_"
+    },
+    "prior_verdicts": {
+      "items": {
+        "$ref": "#/$defs/Verdict"
+      },
+      "title": "Prior Verdicts",
+      "type": "array"
+    },
+    "profile": {
+      "$ref": "#/$defs/FrozenMap_str_JsonValue_"
+    },
+    "snapshot_id": {
+      "minLength": 1,
+      "title": "Snapshot Id",
+      "type": "string"
+    },
+    "tier": {
+      "$ref": "#/$defs/Tier"
+    },
+    "user_id": {
+      "minLength": 1,
+      "title": "User Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "snapshot_id",
+    "user_id",
+    "as_of",
+    "tier",
+    "precision_by_domain",
+    "profile",
+    "metrics",
+    "current_plan",
+    "constraints",
+    "prior_verdicts"
+  ],
+  "title": "Snapshot",
+  "type": "object"
+}
