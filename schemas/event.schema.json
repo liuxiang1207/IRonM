@@ -1,0 +1,1117 @@
+{
+  "$defs": {
+    "BaselineTestEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/BaselineTestPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "baseline_test",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "BaselineTestEvent",
+      "type": "object"
+    },
+    "BaselineTestPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "test_id": {
+          "minLength": 1,
+          "title": "Test Id",
+          "type": "string"
+        },
+        "unit": {
+          "enum": [
+            "reps",
+            "s",
+            "kg",
+            "cm",
+            "m"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "maximum": 100000,
+          "minimum": 0,
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "test_id",
+        "value",
+        "unit"
+      ],
+      "title": "BaselineTestPayload",
+      "type": "object"
+    },
+    "CheckinEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/CheckinPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "checkin",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "CheckinEvent",
+      "type": "object"
+    },
+    "CheckinPayload": {
+      "additionalProperties": false,
+      "description": "每周签到。",
+      "properties": {
+        "clothes_fit": {
+          "anyOf": [
+            {
+              "enum": [
+                "looser",
+                "same",
+                "tighter"
+              ],
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Clothes Fit"
+        },
+        "diet_adherence_days": {
+          "anyOf": [
+            {
+              "maximum": 7,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Diet Adherence Days"
+        },
+        "energy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Score"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Energy"
+        },
+        "fatigue": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Score"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Fatigue"
+        },
+        "hunger": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Score"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Hunger"
+        },
+        "menstruation": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Menstruation"
+        },
+        "record_completeness": {
+          "anyOf": [
+            {
+              "enum": [
+                "full",
+                "partial",
+                "followed_plan_unrecorded",
+                "elsewhere"
+              ],
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Record Completeness"
+        },
+        "sleep_quality": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Score"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Sleep Quality"
+        }
+      },
+      "title": "CheckinPayload",
+      "type": "object"
+    },
+    "MealEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/MealPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "meal",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "MealEvent",
+      "type": "object"
+    },
+    "MealPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "kcal": {
+          "anyOf": [
+            {
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Kcal"
+        },
+        "protein_g": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Protein G"
+        },
+        "slot": {
+          "enum": [
+            "breakfast",
+            "lunch",
+            "dinner",
+            "snack"
+          ],
+          "title": "Slot",
+          "type": "string"
+        }
+      },
+      "required": [
+        "slot"
+      ],
+      "title": "MealPayload",
+      "type": "object"
+    },
+    "Precision": {
+      "description": "数据精度等级：P3 精确、P2 结构化、P1 粗略、P0 感受。",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "title": "Precision",
+      "type": "string"
+    },
+    "Score": {
+      "maximum": 5,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "SetLogEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/SetLogPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "set_log",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "SetLogEvent",
+      "type": "object"
+    },
+    "SetLogPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "exercise_id": {
+          "minLength": 1,
+          "title": "Exercise Id",
+          "type": "string"
+        },
+        "load_kg": {
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Load Kg",
+          "type": "number"
+        },
+        "reps": {
+          "maximum": 1000,
+          "minimum": 0,
+          "title": "Reps",
+          "type": "integer"
+        },
+        "rir": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Rir"
+        },
+        "rpe": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 1,
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Rpe"
+        },
+        "set_index": {
+          "minimum": 1,
+          "title": "Set Index",
+          "type": "integer"
+        },
+        "workout_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Workout Id"
+        }
+      },
+      "required": [
+        "exercise_id",
+        "set_index",
+        "reps",
+        "load_kg"
+      ],
+      "title": "SetLogPayload",
+      "type": "object"
+    },
+    "Source": {
+      "enum": [
+        "user",
+        "device",
+        "estimate"
+      ],
+      "title": "Source",
+      "type": "string"
+    },
+    "SymptomEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/SymptomPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "symptom",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "SymptomEvent",
+      "type": "object"
+    },
+    "SymptomPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Score"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Severity"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "title": "SymptomPayload",
+      "type": "object"
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "description": "JSON 形如 {\"unknown\": \"not_recorded\"}。不能参与运算，也不能当真假值判断。",
+      "properties": {
+        "unknown": {
+          "$ref": "#/$defs/UnknownReason"
+        }
+      },
+      "required": [
+        "unknown"
+      ],
+      "title": "Unknown",
+      "type": "object"
+    },
+    "UnknownReason": {
+      "enum": [
+        "not_recorded",
+        "declined",
+        "unparseable",
+        "insufficient_data"
+      ],
+      "title": "UnknownReason",
+      "type": "string"
+    },
+    "UtcDatetime": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "WeightEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/WeightPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "weight",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "WeightEvent",
+      "type": "object"
+    },
+    "WeightPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "weight_kg": {
+          "maximum": 400,
+          "minimum": 20,
+          "title": "Weight Kg",
+          "type": "number"
+        }
+      },
+      "required": [
+        "weight_kg"
+      ],
+      "title": "WeightPayload",
+      "type": "object"
+    },
+    "WorkoutCheckEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "corrects": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Corrects"
+        },
+        "event_id": {
+          "format": "uuid",
+          "title": "Event Id",
+          "type": "string"
+        },
+        "occurred_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "payload": {
+          "$ref": "#/$defs/WorkoutCheckPayload"
+        },
+        "precision_hint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Precision"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "raw": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Raw"
+        },
+        "recorded_at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "source": {
+          "$ref": "#/$defs/Source"
+        },
+        "stream_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Key"
+        },
+        "type": {
+          "const": "workout_check",
+          "title": "Type",
+          "type": "string"
+        },
+        "user_id": {
+          "minLength": 1,
+          "title": "User Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "user_id",
+        "occurred_at",
+        "recorded_at",
+        "source",
+        "confirmed",
+        "type",
+        "payload"
+      ],
+      "title": "WorkoutCheckEvent",
+      "type": "object"
+    },
+    "WorkoutCheckPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Score"
+            },
+            {
+              "$ref": "#/$defs/Unknown"
+            }
+          ],
+          "title": "Effort"
+        },
+        "plan_session_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plan Session Id"
+        },
+        "status": {
+          "enum": [
+            "done",
+            "half",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "WorkoutCheckPayload",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "baseline_test": "#/$defs/BaselineTestEvent",
+      "checkin": "#/$defs/CheckinEvent",
+      "meal": "#/$defs/MealEvent",
+      "set_log": "#/$defs/SetLogEvent",
+      "symptom": "#/$defs/SymptomEvent",
+      "weight": "#/$defs/WeightEvent",
+      "workout_check": "#/$defs/WorkoutCheckEvent"
+    },
+    "propertyName": "type"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/WorkoutCheckEvent"
+    },
+    {
+      "$ref": "#/$defs/SetLogEvent"
+    },
+    {
+      "$ref": "#/$defs/WeightEvent"
+    },
+    {
+      "$ref": "#/$defs/CheckinEvent"
+    },
+    {
+      "$ref": "#/$defs/MealEvent"
+    },
+    {
+      "$ref": "#/$defs/SymptomEvent"
+    },
+    {
+      "$ref": "#/$defs/BaselineTestEvent"
+    }
+  ]
+}

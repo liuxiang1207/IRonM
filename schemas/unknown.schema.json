@@ -1,0 +1,26 @@
+{
+  "$defs": {
+    "UnknownReason": {
+      "enum": [
+        "not_recorded",
+        "declined",
+        "unparseable",
+        "insufficient_data"
+      ],
+      "title": "UnknownReason",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "JSON 形如 {\"unknown\": \"not_recorded\"}。不能参与运算，也不能当真假值判断。",
+  "properties": {
+    "unknown": {
+      "$ref": "#/$defs/UnknownReason"
+    }
+  },
+  "required": [
+    "unknown"
+  ],
+  "title": "Unknown",
+  "type": "object"
+}

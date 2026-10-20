@@ -4,7 +4,7 @@ ifeq ($(strip $(UV)),)
 $(error 找不到 uv，请先安装：https://docs.astral.sh/uv/getting-started/installation/)
 endif
 
-.PHONY: setup check lock-check lint deps fmt type test run
+.PHONY: setup check lock-check lint deps fmt type test run schemas
 
 setup:
 	$(UV) sync --locked
@@ -34,6 +34,10 @@ type:
 
 test:
 	$(UV) run pytest
+
+# 契约改动后重新导出 JSON Schema；make check 会比对，未导出即失败
+schemas:
+	$(UV) run python -m ironm.contracts.schema schemas
 
 run:
 	$(UV) run uvicorn ironm.api.app:app --reload

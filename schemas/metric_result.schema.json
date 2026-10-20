@@ -1,0 +1,206 @@
+{
+  "$defs": {
+    "ConfidenceInterval": {
+      "additionalProperties": false,
+      "properties": {
+        "high": {
+          "title": "High",
+          "type": "number"
+        },
+        "level": {
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Level",
+          "type": "number"
+        },
+        "low": {
+          "title": "Low",
+          "type": "number"
+        }
+      },
+      "required": [
+        "low",
+        "high",
+        "level"
+      ],
+      "title": "ConfidenceInterval",
+      "type": "object"
+    },
+    "Domain": {
+      "enum": [
+        "training",
+        "body",
+        "diet",
+        "recovery"
+      ],
+      "title": "Domain",
+      "type": "string"
+    },
+    "MetricStatus": {
+      "enum": [
+        "ok",
+        "insufficient",
+        "stale",
+        "pending_confirm"
+      ],
+      "title": "MetricStatus",
+      "type": "string"
+    },
+    "Need": {
+      "additionalProperties": false,
+      "description": "还差什么：如再称重 2 次。item 为稳定编码，由界面翻译成文字。",
+      "properties": {
+        "count": {
+          "minimum": 1,
+          "title": "Count",
+          "type": "integer"
+        },
+        "item": {
+          "minLength": 1,
+          "title": "Item",
+          "type": "string"
+        }
+      },
+      "required": [
+        "item",
+        "count"
+      ],
+      "title": "Need",
+      "type": "object"
+    },
+    "Precision": {
+      "description": "数据精度等级：P3 精确、P2 结构化、P1 粗略、P0 感受。",
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "title": "Precision",
+      "type": "string"
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "description": "JSON 形如 {\"unknown\": \"not_recorded\"}。不能参与运算，也不能当真假值判断。",
+      "properties": {
+        "unknown": {
+          "$ref": "#/$defs/UnknownReason"
+        }
+      },
+      "required": [
+        "unknown"
+      ],
+      "title": "Unknown",
+      "type": "object"
+    },
+    "UnknownReason": {
+      "enum": [
+        "not_recorded",
+        "declined",
+        "unparseable",
+        "insufficient_data"
+      ],
+      "title": "UnknownReason",
+      "type": "string"
+    },
+    "UtcDatetime": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "ci": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ConfidenceInterval"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "computed_at": {
+      "$ref": "#/$defs/UtcDatetime"
+    },
+    "domain": {
+      "$ref": "#/$defs/Domain"
+    },
+    "formula_id": {
+      "minLength": 1,
+      "title": "Formula Id",
+      "type": "string"
+    },
+    "last_record_at": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "n_records": {
+      "minimum": 0,
+      "title": "N Records",
+      "type": "integer"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "needed": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Need"
+      },
+      "title": "Needed",
+      "type": "array"
+    },
+    "precision": {
+      "$ref": "#/$defs/Precision"
+    },
+    "status": {
+      "$ref": "#/$defs/MetricStatus"
+    },
+    "unit": {
+      "minLength": 1,
+      "title": "Unit",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Value"
+    },
+    "window_days": {
+      "minimum": 0,
+      "title": "Window Days",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "name",
+    "domain",
+    "value",
+    "unit",
+    "precision",
+    "n_records",
+    "window_days",
+    "status",
+    "last_record_at",
+    "computed_at",
+    "formula_id"
+  ],
+  "title": "MetricResult",
+  "type": "object"
+}
