@@ -1,5 +1,6 @@
 """黄金用例：tests/golden/*.yaml 驱动（spec [2026-10-20] §7）。"""
 
+import math
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,16 @@ FILES = {
 }
 CASES = [(f, c) for f in FILES.values() for c in f.cases]
 BOOK = load_rules(RULES_DIR)
+
+
+def _close(a: object, b: object) -> bool:
+    if isinstance(a, bool) or isinstance(b, bool) or a is None or b is None:
+        return a == b and type(a) is type(b)
+    if isinstance(a, int | float) and isinstance(b, int | float):
+        return math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-6)
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_close(a[k], b[k]) for k in a)
+    return a == b
 
 
 def test_golden_files_consistent() -> None:
@@ -35,5 +46,6 @@ def test_golden(file: GoldenFile, case: GoldenCase, request: pytest.FixtureReque
     if isinstance(result, BaseModel):
         result = result.model_dump(mode="json")
     assert isinstance(result, dict)
-    # 只比对用例写明的字段；结果可以多带信息（如规则编号）
-    assert {k: result.get(k) for k in case.expect} == case.expect
+    # 只比对用例写明的字段；结果可以多带信息（如规则编号）。小数允许 1e-6 的误差
+    actual = {k: result.get(k) for k in case.expect}
+    assert _close(actual, case.expect), f"{actual} != {case.expect}"

@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../schemas/rule_set.schema.json
+# 指标计算的统计参数。改动任何一条规则，都要同时改对应测试。
+rule_set: metrics
+version: 2026.10.1
+rules:
+  - id: R-MT-WEIGHT-TREND
+    title: 体重趋势回归的置信水平与最少读数
+    status: pending_review
+    source:
+      kind: design
+    params:
+      ci_level: 0.95
+      min_readings: 3
+    note: 可信范围按 t 分布计算，读数少时自然变宽；少于 3 次无法估计残差，不给趋势。
