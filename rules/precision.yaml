@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../schemas/rule_set.schema.json
+# 精度判定：按近 4 周实际记录，判定各领域 P0–P3。改动任何一条规则，都要同时改黄金用例。
+rule_set: precision
+version: 2026.10.1
+rules:
+  - id: R-PR-BODY
+    title: 体重领域精度
+    status: pending_review
+    source: {kind: design}
+    params:
+      window_days: 28
+      p3_total_days: 14  # 每天或隔天称重
+      p3_weekly_days: 3
+      p2_weekly_days: 2  # 每周 2–3 次
+      p1_weekly_days: 1  # 每周 1 次
+      weeks_required: 3  # 4 周中至少几周达标；容许出差等漏掉一周
+    note: 按当地日期计称重天数，同一天多次只算一天；“待确认”的读数仍算称过重（精度衡量记录习惯）。
+
+  - id: R-PR-TRAINING
+    title: 训练领域精度
+    status: pending_review
+    source: {kind: design}
+    params:
+      window_days: 28
+      min_training_days: 4
+      share_required: 0.75
+    note: 训练日记录程度：3 按组且每组有 RIR/RPE；2 按组缺 RIR/RPE 或打卡带用力；1 只有打卡。

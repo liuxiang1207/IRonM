@@ -1,0 +1,33 @@
+# 黄金用例：训练精度（R-PR-TRAINING）。day_levels 为每个训练日的记录程度：
+# 3 = 按组记录且每组有 RIR/RPE；2 = 按组记录缺 RIR/RPE 或打卡填了用力；1 = 只有打卡状态。
+# 规则：领域精度为最高的 L，使“程度 ≥ L 的训练日占比”≥ 75%；训练日少于 4 天为 P0。
+target: ironm.engine.precision:training_precision_from_levels
+status: active
+inject: [rulebook]
+rules: [R-PR-TRAINING]
+cases:
+  - id: G-PR-T-001
+    title: 4 个训练日、程度 3 的恰好占 75% → P3
+    given: {day_levels: [3, 3, 3, 1]}
+    expect: {precision: P3}
+  - id: G-PR-T-002
+    title: 程度 3 只占 60%，程度 ≥ 2 占 100% → P2
+    given: {day_levels: [3, 3, 3, 2, 2]}
+    expect: {precision: P2}
+  - id: G-PR-T-003
+    title: 程度 ≥ 2 只占 50%，程度 ≥ 1 占 100% → P1
+    given: {day_levels: [1, 1, 2, 3]}
+    expect: {precision: P1}
+  - id: G-PR-T-004
+    title: 只有 3 个训练日 → P0
+    given: {day_levels: [3, 3, 3]}
+    expect: {precision: P0}
+  - id: G-PR-T-005
+    title: 程度 3 占 50%、≥ 2 占 50%、全部 ≥ 1 → P1
+    twin_of: G-PR-T-001
+    given: {day_levels: [3, 3, 1, 1]}
+    expect: {precision: P1}
+  - id: G-PR-T-006
+    title: 没有训练日 → P0
+    given: {day_levels: []}
+    expect: {precision: P0}

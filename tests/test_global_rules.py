@@ -20,6 +20,7 @@ from ironm.engine.completeness import training_completion, weight_freshness
 from ironm.engine.data_quality import daily_kcal, pending_weights
 from ironm.engine.effective import CorrectionForkError, resolve
 from ironm.engine.energy import energy_today
+from ironm.engine.precision import body_precision, training_precision
 from ironm.engine.trend import weight_trend
 from ironm.rules.loader import RULES_DIR, load_rules
 
@@ -38,6 +39,8 @@ REGISTERED = {
     "weight_freshness",
     "weight_trend",
     "energy_today",
+    "body_precision",
+    "training_precision",
 }
 
 
@@ -206,3 +209,20 @@ def test_order_independent(seed: int) -> None:
         weight_trend(ws, as_of=as_of, window_days=14, rulebook=BOOK).model_dump()
         == weight_trend(shuffled, as_of=as_of, window_days=14, rulebook=BOOK).model_dump()
     )
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_precision_order_independent_and_uses_corrections(seed: int) -> None:
+    ws = _weights(10)
+    moved = _fix(
+        ws[0], {"weight_kg": 80.0}, at="2026-10-05T00:00:00+00:00"
+    )  # 1 日的读数更正到 5 日
+    shuffled = [*ws, moved]
+    random.Random(seed).shuffle(shuffled)
+    as_of = datetime(2026, 10, 28, tzinfo=UTC)
+    a = body_precision([*ws, moved], as_of=as_of, tz=SH, rulebook=BOOK)
+    b = body_precision(shuffled, as_of=as_of, tz=SH, rulebook=BOOK)
+    assert a == b
+    assert a.basis["weigh_days"] == 9  # 1 日不再算
+    t = training_precision([], as_of=as_of, tz=SH, rulebook=BOOK)
+    assert t.precision == "P0"
