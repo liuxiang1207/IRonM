@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=../schemas/rule_set.schema.json
+# 热量计算（spec §25）。改动任何一条规则，都要同时改黄金用例 tests/golden/calories.yaml。
+rule_set: calories
+version: 2026.10.1
+rules:
+  - id: R-CAL-REE
+    title: 静息能量消耗（Mifflin-St Jeor）
+    status: pending_review
+    source: {kind: guideline, ref: "Mifflin MD et al. Am J Clin Nutr 1990;51:241-247"}
+    params:
+      weight_coef: 10.0  # × 体重（千克）
+      height_coef: 6.25  # × 身高（厘米）
+      age_coef: 5.0  # − × 年龄
+      male_const: 5.0
+      female_const: -161.0
+
+  - id: R-CAL-PAL
+    title: 身体活动水平（三档取区间中间值）
+    status: pending_review
+    source: {kind: guideline, ref: "FAO/WHO/UNU《Human energy requirements》2001：久坐或轻度 1.40–1.69、中度 1.70–1.99、重度 2.00–2.40"}
+    params:
+      sedentary: 1.55
+      moderate: 1.85
+      vigorous: 2.20
+
+  - id: R-CAL-DEFICIT
+    title: 按分层的每日能量缺口（千卡）
+    status: pending_review
+    source: {kind: design}
+    params:
+      a: 500  # 国家卫健委《体重管理指导原则（2024年版）》每日减少 500–1000 的下限
+      a_prime: 300  # 体态减脂上限【设计】
+      b: 500  # 保守层固定 500【设计】
+      collaborative: 300  # 用药协作层更保守【设计，准入与参数待医学顾问审定】
+    note: 同时满足多层时取最小的缺口；未列出的分层不给热量目标。
+
+  - id: R-CAL-FLOOR
+    title: 热量底线（千卡）
+    status: pending_review
+    source: {kind: design}
+    params:
+      female: 1200
+      male: 1500
+      absolute: 800
+    note: 取 AHA/ACC/TOS 2013 推荐区间的下端作为底线，是本项目的设计；任何情况不低于绝对底线。
+
+  - id: R-CAL-MACRO
+    title: 营养素热量占比与三餐分配（%）
+    status: pending_review
+    source: {kind: guideline, ref: "国家卫健委《体重管理指导原则（2024年版）》碳水 50–60、脂肪 20–30、蛋白质 15–20；《中国居民膳食指南（2022）》三餐分配"}
+    params:
+      carb: 55
+      fat: 25
+      protein: 20
+      high_protein_carb: 50
+      high_protein_fat: 25
+      high_protein_protein: 25
+      kcal_per_g_carb: 4
+      kcal_per_g_fat: 9
+      kcal_per_g_protein: 4
+      meals: [30, 40, 30]  # 早、中、晚

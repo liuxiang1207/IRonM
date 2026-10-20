@@ -6,7 +6,7 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Protocol, Self, runtime_checkable
 from zoneinfo import ZoneInfo
@@ -24,6 +24,7 @@ from ironm.contracts.screening import (
     TierResult,
 )
 from ironm.contracts.unknown import Unknown, UnknownReason, is_known
+from ironm.core.clock import age_on
 from ironm.safety.emergency import Assessment
 
 __all__ = [
@@ -106,13 +107,6 @@ def _any(parts: Sequence[_Check]) -> _Check:
     return _Check(False)
 
 
-def _age(birth: date, today: date) -> int | None:
-    """周岁；生日当天算满岁（2 月 29 日出生的，平年在 3 月 1 日满岁）。出生日期晚于今天视为无效。"""
-    if birth > today:
-        return None
-    return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))
-
-
 def _bmi(height_cm: float, weight_kg: float) -> float:
     """BMI，按一位小数四舍五入（用十进制计算，避免二进制小数在界值处出错）。"""
     metres = Decimal(str(height_cm)) / 100
@@ -175,7 +169,7 @@ def classify(
     clearances = [c for c in s.clearances if c <= as_of]
     today = as_of.astimezone(tz).date()
 
-    age = _age(s.birth_date, today) if is_known(s.birth_date) else None
+    age = age_on(s.birth_date, today) if is_known(s.birth_date) else None
     bmi = (
         _bmi(s.height_cm, s.weight_kg) if is_known(s.height_cm) and is_known(s.weight_kg) else None
     )

@@ -49,3 +49,10 @@ def local_day_bounds(day: date, tz: tzinfo) -> tuple[datetime, datetime]:
     start = datetime.combine(day, time.min, tz)
     end = datetime.combine(day + timedelta(days=1), time.min, tz)
     return start.astimezone(UTC), end.astimezone(UTC)
+
+
+def age_on(birth: date, today: date) -> int | None:
+    """周岁；生日当天算满岁（2 月 29 日出生的，平年 3 月 1 日满岁）。出生日期晚于今天返回 None。"""
+    if birth > today:
+        return None
+    return today.year - birth.year - ((today.month, today.day) < (birth.month, birth.day))

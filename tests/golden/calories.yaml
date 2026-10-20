@@ -1,0 +1,493 @@
+# 黄金用例：热量计算（spec §25）。每条标题写明手算过程；改规则必须同时改这里。
+target: ironm.engine.calories:calorie_target
+status: active
+inject:
+- rulebook
+rules:
+- R-CAL-REE
+- R-CAL-PAL
+- R-CAL-DEFICIT
+- R-CAL-FLOOR
+- R-CAL-MACRO
+cases:
+- id: G-CAL-001
+  title: 女 30 岁 165 厘米 70 千克、久坐、A：静息 1420.25 → 1420；×1.55 = 2201.39 → 2201；−500 → 1701；碳水 233.89、脂肪 47.25、蛋白质 85.05 克；三餐 510.3 / 680.4 / 差额
+  given:
+    screening: &id001
+      birth_date: '1996-01-01'
+      sex: female
+      height_cm: 165.0
+      weight_kg: 70.0
+      conditions: &id003 []
+    activity: sedentary
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: ok
+    ree_kcal: 1420
+    pal: 1.55
+    tdee_kcal: 2201
+    deficit_kcal: 500
+    target_kcal: 1701
+    floor_kcal: 1200
+    floor_applied: false
+    macros:
+      carb_g: 234
+      fat_g: 47
+      protein_g: 85
+      high_protein: false
+    meals_kcal:
+    - 510
+    - 680
+    - 511
+    reasons: []
+- id: G-CAL-002
+  title: 同上、中度活动：×1.85 = 2627.46 → 2627；目标 2127.46 → 2127
+  given:
+    screening: *id001
+    activity: moderate
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tdee_kcal: 2627
+    target_kcal: 2127
+    pal: 1.85
+  twin_of: G-CAL-001
+- id: G-CAL-003
+  title: 同上、重度活动：×2.2 = 3124.55 → 3125；目标 2624.55 → 2625
+  given:
+    screening: *id001
+    activity: vigorous
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tdee_kcal: 3125
+    target_kcal: 2625
+    deficit_kcal: 500
+  twin_of: G-CAL-001
+- id: G-CAL-004
+  title: 男 40 岁（生日当天）180 厘米 90 千克、久坐、A：静息 1830；×1.55 = 2836.5 → 2837（0.5 进位）；目标 2336.5 → 2337；碳水 321.34、脂肪 64.92、蛋白质 116.85 克；三餐 701.1 / 934.8 / 差额
+  given:
+    screening: &id002
+      birth_date: '1986-10-20'
+      sex: male
+      height_cm: 180.0
+      weight_kg: 90.0
+      conditions: []
+    activity: sedentary
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: ok
+    ree_kcal: 1830
+    tdee_kcal: 2837
+    deficit_kcal: 500
+    target_kcal: 2337
+    floor_kcal: 1500
+    macros:
+      carb_g: 321
+      fat_g: 65
+      protein_g: 117
+      high_protein: false
+    meals_kcal:
+    - 701
+    - 935
+    - 701
+- id: G-CAL-005
+  title: 同上、高蛋白：碳水 292.13、脂肪 64.92、蛋白质 146.06 克
+  given:
+    screening: *id002
+    activity: sedentary
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+    high_protein: true
+  expect:
+    target_kcal: 2337
+    macros:
+      carb_g: 292
+      fat_g: 65
+      protein_g: 146
+      high_protein: true
+- id: G-CAL-010
+  title: A′：缺口 300 → 1901
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: a_prime
+      status: ok
+      matched:
+      - a_prime
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    deficit_kcal: 300
+    target_kcal: 1901
+  twin_of: G-CAL-001
+- id: G-CAL-011
+  title: B：缺口 500 → 1701
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: b
+      status: ok
+      matched:
+      - b
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    deficit_kcal: 500
+    target_kcal: 1701
+- id: G-CAL-012
+  title: 协作：缺口 300 → 1901
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: collaborative
+      status: ok
+      matched:
+      - collaborative
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    deficit_kcal: 300
+    target_kcal: 1901
+- id: G-CAL-013
+  title: 主层 B、同时满足 A′ → 取较小缺口 300
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: b
+      status: ok
+      matched:
+      - b
+      - a_prime
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    deficit_kcal: 300
+    target_kcal: 1901
+  twin_of: G-CAL-011
+- id: G-CAL-014
+  title: A′ 为保守假设（满足的层为空）→ 仍按 A′ 缺口 300
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: a_prime
+      status: assumed
+      matched: []
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    deficit_kcal: 300
+    target_kcal: 1901
+- id: G-CAL-020
+  title: 女 70 岁 150 厘米 50 千克、B：静息 926.5，×1.55 = 1436.08 → 1436；−500 = 936 低于 1200 → 目标 1200，实际缺口 236
+  given:
+    screening:
+      birth_date: '1956-01-01'
+      sex: female
+      height_cm: 150.0
+      weight_kg: 50.0
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: b
+      status: ok
+      matched:
+      - b
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    ree_kcal: 927
+    tdee_kcal: 1436
+    target_kcal: 1200
+    deficit_kcal: 236
+    floor_applied: true
+    reasons:
+    - floor_applied
+- id: G-CAL-021
+  title: 女 80 岁 140 厘米 40 千克：每日总消耗 1106.7 → 1107 低于底线 → 目标 1200，实际缺口 0，提示靠增加活动
+  given:
+    screening:
+      birth_date: '1946-01-01'
+      sex: female
+      height_cm: 140.0
+      weight_kg: 40.0
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: b
+      status: ok
+      matched:
+      - b
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tdee_kcal: 1107
+    target_kcal: 1200
+    deficit_kcal: 0
+    floor_applied: true
+    reasons:
+    - floor_applied
+    - no_deficit_possible
+- id: G-CAL-030
+  title: paused 层 → 不给热量目标
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: paused
+      status: ok
+      matched:
+      - paused
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: no_plan
+    target_kcal:
+      unknown: insufficient_data
+    reasons:
+    - tier_no_plan:paused
+- id: G-CAL-031
+  title: d 层 → 不给热量目标
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: d
+      status: ok
+      matched:
+      - d
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: no_plan
+    target_kcal:
+      unknown: insufficient_data
+    reasons:
+    - tier_no_plan:d
+- id: G-CAL-032
+  title: c 层 → 不给热量目标
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: c
+      status: ok
+      matched:
+      - c
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: no_plan
+    target_kcal:
+      unknown: insufficient_data
+    reasons:
+    - tier_no_plan:c
+- id: G-CAL-033
+  title: not_applicable 层 → 不给热量目标
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier: not_applicable
+      status: ok
+      matched:
+      - not_applicable
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: no_plan
+    target_kcal:
+      unknown: insufficient_data
+    reasons:
+    - tier_no_plan:not_applicable
+- id: G-CAL-034
+  title: 分层未知 → 不给热量目标
+  given:
+    screening: *id001
+    activity: sedentary
+    tier:
+      tier:
+        unknown: insufficient_data
+      status: insufficient
+      matched: []
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: no_plan
+    reasons:
+    - tier_unknown
+- id: G-CAL-040
+  title: 性别未知 → 信息不全，还差性别
+  given:
+    screening:
+      birth_date: '1996-01-01'
+      sex: &id004
+        unknown: not_recorded
+      height_cm: 165.0
+      weight_kg: 70.0
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: insufficient
+    missing:
+    - sex
+    target_kcal:
+      unknown: insufficient_data
+  twin_of: G-CAL-001
+- id: G-CAL-041
+  title: 活动水平未知 → 信息不全，还差活动水平
+  given:
+    screening: *id001
+    activity: *id004
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: insufficient
+    missing:
+    - activity
+- id: G-CAL-042
+  title: 出生日期与体重都未知 → 一并列出
+  given:
+    screening:
+      birth_date: *id004
+      sex: female
+      height_cm: 165.0
+      weight_kg: *id004
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    status: insufficient
+    missing:
+    - birth_date
+    - weight_kg

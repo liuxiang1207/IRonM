@@ -8,7 +8,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
-from pydantic import BaseModel, ConfigDict, validate_call
+from pydantic import BaseModel, ConfigDict, TypeAdapter, validate_call
 
 from ironm.rules.loader import RULES_DIR, load_rules
 from tests.casefiles import GoldenCase, GoldenFile, check_golden, load_case_file, resolve
@@ -36,8 +36,8 @@ def _convert(fn: Callable[..., object], given: dict[str, object]) -> dict[str, o
     out: dict[str, object] = {}
     for name, value in given.items():
         kind = hints.get(name)
-        if isinstance(kind, type) and issubclass(kind, BaseModel) and isinstance(value, dict):
-            out[name] = kind.model_validate_json(json.dumps(value))
+        if kind is not None and isinstance(value, dict):  # 契约对象，或“契约 | 未知”这类联合
+            out[name] = TypeAdapter(kind).validate_json(json.dumps(value))
         elif kind is ZoneInfo and isinstance(value, str):
             out[name] = ZoneInfo(value)
         else:

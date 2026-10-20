@@ -26,7 +26,7 @@ from ironm.safety.replies import (
     refusal_sections,
 )
 
-__all__ = ["SafetyDecision", "SafetyKit", "decide", "default_kit", "load_kit"]
+__all__ = ["SafetyDecision", "SafetyKit", "decide", "default_kit", "load_kit", "plan_allowed"]
 
 type Mode = Literal["full", "conservative", "pause_refer"]
 
@@ -41,6 +41,11 @@ _BY_TIER: dict[Tier, tuple[Mode, bool, tuple[NoticeCode, ...]]] = {
     Tier.D: ("conservative", False, ("tier_d",)),
     Tier.PAUSED: ("pause_refer", False, ("paused_until_clearance",)),
 }
+
+
+def plan_allowed(tier: Tier) -> bool:
+    """这一分层是否可以给训练或饮食计划（热量目标等计算以此为准）。"""
+    return _BY_TIER[tier][1]
 
 
 @dataclass(frozen=True)

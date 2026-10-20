@@ -2,6 +2,18 @@
 
 from pydantic import BaseModel
 
+from ironm.engine.calories import (
+    DEFICIT,
+    FLOOR,
+    MACRO,
+    PAL,
+    REE,
+    DeficitParams,
+    FloorParams,
+    MacroParams,
+    PalParams,
+    ReeParams,
+)
 from ironm.engine.completeness import (
     TRAINING_COMPLETION,
     WEIGHT_STALE,
@@ -38,6 +50,11 @@ RULE_PARAMS: dict[str, type[BaseModel]] = {
     RECOVERY: RecoveryParams,
     JUDGEMENT_WINDOW: WindowParams,
     TIER_RULE: TierParams,
+    REE: ReeParams,
+    PAL: PalParams,
+    DEFICIT: DeficitParams,
+    FLOOR: FloorParams,
+    MACRO: MacroParams,
     DIET_MIN_DATA: DietMinDataParams,
     **{rule_id_for(level): EnergyParams for level in range(1, 6)},
 }
