@@ -46,7 +46,7 @@ class MetricResult(ContractModel):
     window_days: int = Field(ge=0)
     status: MetricStatus
     needed: tuple[Need, ...] = ()
-    last_record_at: UtcDatetime | None
+    last_record_at: UtcDatetime | Unknown  # 缺失时为“未知”，不用空值
     computed_at: UtcDatetime
     formula_id: str = Field(min_length=1)
 

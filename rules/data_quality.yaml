@@ -12,6 +12,8 @@ rules:
     params:
       max_change_kg: 2.0
       window_days: 7
+      baseline_readings: 3  # 近期水平取最近几次正常读数的中位数
+      rebaseline_after: 2  # 基准只有 1 条时，其后几次一致的读数可推翻它
     note: 拦住单位写错、换秤、单次尖峰，避免进入趋势计算；用户确认后才参与计算。
 
   - id: R-DQ-KCAL-RANGE

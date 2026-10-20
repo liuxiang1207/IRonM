@@ -42,7 +42,12 @@ NEED = [{"item": "weight_record", "count": 2}]
     [
         {},
         {"status": "insufficient", "value": UNKNOWN, "ci": None, "needed": NEED},
-        {"status": "stale", "value": UNKNOWN, "ci": None, "last_record_at": None},
+        {
+            "status": "stale",
+            "value": UNKNOWN,
+            "ci": None,
+            "last_record_at": {"unknown": "not_recorded"},
+        },
         {"status": "insufficient", "ci": None, "needed": NEED},  # 有估计但不够确定
     ],
 )
@@ -67,6 +72,7 @@ def test_status_enum() -> None:
         ({"precision": "P4"}, "精度等级越界"),
         ({"n_records": -1}, "记录条数为负"),
         ({"value": None}, "空值代替未知"),
+        ({"last_record_at": None}, "最近记录时间用空值代替未知"),
     ],
 )
 def test_inconsistent_metrics_rejected(overrides: dict[str, Any], why: str) -> None:

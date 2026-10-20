@@ -17,9 +17,10 @@ rules: []
 cases:
   - id: G-TR-001
     title: 手算样例（5 次读数）
-    given: {points: [[0, 80], [1, 79], [2, 79], [3, 78], [4, 77]], ci_level: 0.95, min_readings: 3}
+    given: {points: [[0, 80], [1, 79], [2, 79], [3, 78], [4, 77]], ci_level: 0.95, min_readings: 3, min_span_days: 3}
     expect:
-      sufficient: true
+      status: ok
+      needed: []
       n: 5
       span_days: 4
       slope_kg_per_week: -4.9
@@ -30,9 +31,10 @@ cases:
       residual_sd_kg: 0.316228
   - id: G-TR-002
     title: 两周、5 次读数的实际样例
-    given: {points: [[0, 82.4], [3, 82.1], [7, 81.6], [10, 81.7], [14, 81.0]], ci_level: 0.95, min_readings: 3}
+    given: {points: [[0, 82.4], [3, 82.1], [7, 81.6], [10, 81.7], [14, 81.0]], ci_level: 0.95, min_readings: 3, min_span_days: 3}
     expect:
-      sufficient: true
+      status: ok
+      needed: []
       n: 5
       span_days: 14
       slope_kg_per_week: -0.646417
@@ -43,9 +45,29 @@ cases:
       residual_sd_kg: 0.168131
   - id: G-TR-003
     title: 只有 2 次读数，数据不足，还差 1 次
-    given: {points: [[0, 80], [3, 79.6]], ci_level: 0.95, min_readings: 3}
-    expect: {sufficient: false, needed_readings: 1, slope_kg_per_week: {unknown: insufficient_data}}
+    given: {points: [[0, 80], [3, 79.6]], ci_level: 0.95, min_readings: 3, min_span_days: 3}
+    expect:
+      status: insufficient
+      needed: [{item: weight_record, count: 1}]
+      slope_kg_per_week: {unknown: insufficient_data}
   - id: G-TR-004
-    title: 3 次读数但都在同一时刻，无法估计趋势
-    given: {points: [[0, 80], [0, 79.8], [0, 80.2]], ci_level: 0.95, min_readings: 3}
-    expect: {sufficient: false, needed_readings: 1, slope_kg_per_week: {unknown: insufficient_data}}
+    title: 3 次读数但都在同一时刻，覆盖天数为 0，还需覆盖 3 天
+    given: {points: [[0, 80], [0, 79.8], [0, 80.2]], ci_level: 0.95, min_readings: 3, min_span_days: 3}
+    expect:
+      status: insufficient
+      needed: [{item: span_days, count: 3}]
+      slope_kg_per_week: {unknown: insufficient_data}
+  - id: G-TR-005
+    title: 3 次读数在 2 秒内，覆盖不足 3 天
+    given: {points: [[0, 80], [0.00001, 79], [0.00002, 78]], ci_level: 0.95, min_readings: 3, min_span_days: 3}
+    expect:
+      status: insufficient
+      needed: [{item: span_days, count: 3}]
+      slope_kg_per_week: {unknown: insufficient_data}
+  - id: G-TR-006
+    title: 覆盖 2.5 天，还需覆盖到 3 天（向上取整为 1 天）
+    given: {points: [[0, 80], [1, 79.8], [2.5, 79.7]], ci_level: 0.95, min_readings: 3, min_span_days: 3}
+    expect:
+      status: insufficient
+      needed: [{item: span_days, count: 1}]
+

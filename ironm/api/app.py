@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import IO, Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -21,6 +21,7 @@ from ironm.core.clock import Clock, SystemClock, local_day_bounds
 from ironm.core.config import Settings, load_settings
 from ironm.core.log import configure_logging, get_logger
 from ironm.engine.energy import EnergyAdjustment, energy_today
+from ironm.engine.rule_params import validate_rule_params
 from ironm.rules.loader import load_rules
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
@@ -37,6 +38,9 @@ def _safe_loc(loc: tuple[int | str, ...]) -> list[int | str]:
 
 
 MAX_BATCH = 500
+MAX_BODY_BYTES = 2 * 1024 * 1024
+_USER_RE = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
+_NOT_OWNER = {"loc": ["user_id"], "msg": "记录不属于当前用户", "type": "forbidden_user"}
 _STATUS_CODES = {"created": 201, "duplicate": 200, "conflict": 409}
 
 
@@ -44,11 +48,21 @@ def _invalid(errors: list[dict[str, Any]]) -> JSONResponse:
     return JSONResponse(status_code=422, content={"status": "invalid", "errors": errors})
 
 
+def _safe_msg(err: Any) -> str:
+    """原因说明里若带出了提交的取值（如类型名写成一句话、标识里的字符），改用通用说明。"""
+    msg = str(err["msg"])
+    value = err.get("input")
+    echoed = isinstance(value, str) and value != "" and value in msg
+    if echoed or not msg.isascii():
+        return f"取值不合规（{err['type']}）"
+    return msg
+
+
 def _errors(e: ValidationError) -> list[dict[str, Any]]:
     """校验错误：只给字段位置、原因与类型，不带取值。"""
     return [
-        {"loc": _safe_loc(err["loc"]), "msg": err["msg"], "type": err["type"]}
-        for err in e.errors(include_input=False, include_context=False, include_url=False)
+        {"loc": _safe_loc(err["loc"]), "msg": _safe_msg(err), "type": err["type"]}
+        for err in e.errors(include_context=False, include_url=False)
     ]
 
 
@@ -69,6 +83,7 @@ def create_app(
     """配置或规则表有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
     configure_logging(settings, clock, log_stream)
     rulebook = load_rules(settings.rules_dir)
+    validate_rule_params(rulebook)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -84,7 +99,16 @@ def create_app(
             yield EventStore(conn, clock)
 
     async def raw_body(request: Request) -> bytes:
-        return await request.body()
+        body = await request.body()
+        if len(body) > MAX_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="请求过大")
+        return body
+
+    def current_user(x_ironm_user: Annotated[str | None, Header()] = None) -> str:
+        """当前用户。登录功能完成前由请求头 X-IronM-User 给出；之后改为由登录身份决定。"""
+        if x_ironm_user is None or not _USER_RE.fullmatch(x_ironm_user):
+            raise HTTPException(status_code=401, detail="缺少当前用户")
+        return x_ironm_user
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -94,6 +118,7 @@ def create_app(
     @app.post("/events")
     def submit_event(
         body: Annotated[bytes, Depends(raw_body)],
+        user: Annotated[str, Depends(current_user)],
         store: Annotated[EventStore, Depends(event_store)],
     ) -> JSONResponse:
         start = time.perf_counter()
@@ -102,6 +127,11 @@ def create_app(
         except ValidationError as e:
             log.info("events.submitted", status="invalid", duration_ms=_ms(start))
             return _invalid(_errors(e))
+        if event.user_id != user:
+            log.info("events.submitted", status="forbidden", duration_ms=_ms(start))
+            return JSONResponse(
+                status_code=403, content={"status": "forbidden", "errors": [_NOT_OWNER]}
+            )
         [result] = store.append_many([event])
         log.info(
             "events.submitted",
@@ -117,13 +147,14 @@ def create_app(
     @app.post("/events/batch")
     def submit_batch(
         body: Annotated[bytes, Depends(raw_body)],
+        user: Annotated[str, Depends(current_user)],
         store: Annotated[EventStore, Depends(event_store)],
     ) -> JSONResponse:
         """离线队列上传：逐条处理、逐条返回；只有整批格式不对时才整批拒绝。"""
         start = time.perf_counter()
         try:
             doc = json.loads(body)
-        except ValueError:
+        except (ValueError, RecursionError):
             return _invalid([{"loc": [], "msg": "请求体不是合法 JSON", "type": "json_invalid"}])
         if (
             not isinstance(doc, dict)
@@ -141,7 +172,7 @@ def create_app(
         parsed: list[tuple[int, Event]] = []
         for i, item in enumerate(items):
             try:
-                parsed.append((i, EVENT_ADAPTER.validate_json(json.dumps(item))))
+                event = EVENT_ADAPTER.validate_json(json.dumps(item))
             except ValidationError as e:
                 results[i] = {
                     "index": i,
@@ -149,6 +180,16 @@ def create_app(
                     "status": "invalid",
                     "errors": _errors(e),
                 }
+                continue
+            if event.user_id != user:
+                results[i] = {
+                    "index": i,
+                    "event_id": str(event.event_id),
+                    "status": "invalid",
+                    "errors": [_NOT_OWNER],
+                }
+                continue
+            parsed.append((i, event))
         outcomes = store.append_many([e for _, e in parsed])
         for (i, _), res in zip(parsed, outcomes, strict=True):
             results[i] = {"index": i, "event_id": str(res.event_id), "status": res.status}
@@ -162,7 +203,9 @@ def create_app(
 
     @app.get("/energy/today")
     def energy_today_view(
-        user_id: str, tz: str, store: Annotated[EventStore, Depends(event_store)]
+        tz: str,
+        user_id: Annotated[str, Depends(current_user)],
+        store: Annotated[EventStore, Depends(event_store)],
     ) -> JSONResponse:
         """用户所在时区今天的精力选择与训练量调整；未选择时 selected 为 false，不给调整。"""
         try:

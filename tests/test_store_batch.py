@@ -96,7 +96,8 @@ def test_conflict_and_invalid_reported_per_item(tmp_path: Path) -> None:
         changed = EVENTS[0].model_copy(update={"raw": "改过"})
         orphan = _ev(9, corrects=99)
         results = store.append_many([EVENTS[0], changed, orphan, EVENTS[1]])
-    assert [r.status for r in results] == ["created", "conflict", "invalid", "created"]
+    # 同一批中同一标识内容不一致：两条都判冲突（与先后无关，spec §11 澄清）
+    assert [r.status for r in results] == ["conflict", "conflict", "invalid", "created"]
     assert results[2].reason is not None
 
 

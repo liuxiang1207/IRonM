@@ -138,9 +138,10 @@
           "$ref": "#/$defs/UtcDatetime"
         },
         {
-          "type": "null"
+          "$ref": "#/$defs/Unknown"
         }
-      ]
+      ],
+      "title": "Last Record At"
     },
     "n_records": {
       "minimum": 0,

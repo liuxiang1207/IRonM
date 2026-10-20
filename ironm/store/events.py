@@ -158,12 +158,35 @@ class EventStore:
             raise InvalidCorrectionError("更正记录必须与原记录属于同一用户")
         if target.type != event.type:
             raise InvalidCorrectionError(f"更正记录类型 {event.type} 与原记录 {target.type} 不同")
+        already = self._conn.execute(
+            "SELECT event_id FROM events WHERE corrects = ?", (str(event.corrects),)
+        ).fetchone()
+        if already is not None:
+            raise InvalidCorrectionError(
+                f"记录 {event.corrects} 已被更正（{already['event_id']}），请更正最新版本"
+            )
 
     @_exclusive
     def append_many(self, events: Sequence[Event]) -> list[AppendResult]:
         """逐条入库，单条出错不影响其他；结果与输入顺序一一对应。失败可安全重传。"""
         results: dict[int, AppendResult] = {}
+        # 同一批中同一记录标识内容不一致：这些条都不入库，与库中内容相同的判重复、其余判冲突，
+        # 结果与它们在批内的先后无关
+        versions: dict[UUID, set[str]] = {}
+        for e in events:
+            versions.setdefault(e.event_id, set()).add(e.model_dump_json())
+        inconsistent = {eid for eid, v in versions.items() if len(v) > 1}
+        for i, e in enumerate(events):
+            if e.event_id in inconsistent:
+                stored = self.get(e.event_id)
+                if stored == e:
+                    results[i] = AppendResult(e.event_id, "duplicate")
+                else:
+                    reason = f"同一批中记录 {e.event_id} 的内容不一致"
+                    results[i] = AppendResult(e.event_id, "conflict", reason)
         for i in _dependency_order(events):
+            if i in results:
+                continue
             e = events[i]
             try:
                 created = self.append(e)

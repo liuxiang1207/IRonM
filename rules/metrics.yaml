@@ -11,7 +11,8 @@ rules:
     params:
       ci_level: 0.95
       min_readings: 3
-    note: 可信范围按 t 分布计算，读数少时自然变宽；少于 3 次无法估计残差，不给趋势。
+      min_span_days: 3
+    note: 可信范围按 t 分布计算，读数少时自然变宽；少于 3 次无法估计残差、覆盖不足 3 天时斜率不可靠，都不给趋势。
 
   - id: R-MT-TRAINING-COMPLETION
     title: 训练完成度的计分

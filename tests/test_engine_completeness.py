@@ -72,18 +72,19 @@ def _w(at: datetime, kg: float, **extra: Any) -> WeightEvent:
 
 @pytest.mark.parametrize(
     ("age", "state"),
-    [(timedelta(days=10), "fresh"), (timedelta(days=10, minutes=1), "stale")],
+    [(timedelta(days=10), "ok"), (timedelta(days=10, minutes=1), "stale")],
 )
 def test_freshness_boundary(age: timedelta, state: str) -> None:
     f = weight_freshness([_w(NOW - age, 80.0)], as_of=NOW, rulebook=BOOK)
-    assert f.state == state
+    assert f.status == state
     assert f.rule_id == "R-DQ-WEIGHT-STALE"
     assert f.last_record_at == NOW - age
 
 
 def test_freshness_no_data() -> None:
     f = weight_freshness([], as_of=NOW, rulebook=BOOK)
-    assert f.state == "no_data"
+    assert f.status == "insufficient"
+    assert [(n.item, n.count) for n in f.needed] == [("weight_record", 1)]
     assert isinstance(f.last_record_at, Unknown)
 
 
@@ -94,7 +95,7 @@ def test_freshness_ignores_untrusted_readings() -> None:
     wrong = _w(NOW - timedelta(days=1), 60.0)
     fix = _w(NOW - timedelta(days=13), 80.1, corrects=str(wrong.event_id))  # 更正取代了 wrong
     f = weight_freshness([old, base, spike, wrong, fix], as_of=NOW, rulebook=BOOK)
-    assert f.state == "stale"
+    assert f.status == "stale"
     assert f.last_record_at == base.occurred_at
 
 
@@ -175,3 +176,8 @@ def test_daily_kcal() -> None:
 def test_pending_kcal_days_only_known_totals() -> None:
     totals: dict[date, float | Unknown] = {D1: 450.0, D2: U, D3: 1800.0}
     assert pending_kcal_days(totals, BOOK) == {D1: "R-DQ-KCAL-RANGE"}
+
+
+def test_coverage_unknown_without_planned_days() -> None:
+    c = training_completion([], planned_days=[], tz=SH, rulebook=BOOK)
+    assert isinstance(c.coverage, Unknown)

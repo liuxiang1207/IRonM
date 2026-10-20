@@ -191,3 +191,47 @@ def test_params_as_is_strict(tmp_path: Path, override: str) -> None:
     rule = _load_one(tmp_path, text).get("R-DEMO-ONE")
     with pytest.raises(RuleParamError):
         rule.params_as(StrictParams)
+
+
+def test_rule_params_validated_at_startup(tmp_path: Path) -> None:
+    d = tmp_path / "rules"
+    d.mkdir()
+    for f in RULES_DIR.glob("*.yaml"):
+        text = f.read_text(encoding="utf-8")
+        if f.name == "recovery.yaml":
+            text = text.replace("volume_factor: 0.8", "volume_factor: 很多", 1)
+        (d / f.name).write_text(text, encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if not k.startswith("IRONM_")}
+    env["IRONM_RULES_DIR"] = str(d)
+    result = subprocess.run(
+        [sys.executable, "-c", "import ironm.api.app"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "R-RC-ENERGY-3" in result.stderr
+
+
+def test_every_consumed_rule_registered() -> None:
+    from ironm.engine.rule_params import RULE_PARAMS, validate_rule_params
+
+    book = load_rules(RULES_DIR)
+    validate_rule_params(book)
+    assert {"R-DQ-WEIGHT-JUMP", "R-MT-WEIGHT-TREND", "R-RC-ENERGY-1"} <= set(RULE_PARAMS)
+
+
+def test_ci_level_out_of_range_fails(tmp_path: Path) -> None:
+    from ironm.contracts.rules import RuleParamError
+    from ironm.engine.rule_params import validate_rule_params
+
+    d = tmp_path / "rules"
+    d.mkdir()
+    for f in RULES_DIR.glob("*.yaml"):
+        (d / f.name).write_text(
+            f.read_text(encoding="utf-8").replace("ci_level: 0.95", "ci_level: 1.5"),
+            encoding="utf-8",
+        )
+    with pytest.raises(RuleParamError, match="R-MT-WEIGHT-TREND"):
+        validate_rule_params(load_rules(d))

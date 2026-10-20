@@ -51,7 +51,7 @@ def logs() -> io.StringIO:
 @pytest.fixture
 def client(tmp_path: Path, logs: io.StringIO) -> Iterator[TestClient]:
     app = create_app(_settings(tmp_path), FixedClock(NOW), log_stream=logs)
-    with TestClient(app) as c:
+    with TestClient(app, headers={"X-IronM-User": "u1"}) as c:
         yield c
 
 
@@ -271,7 +271,7 @@ def test_batch_logging(client: TestClient, logs: io.StringIO) -> None:
 
 
 def test_energy_today_flow(client: TestClient) -> None:
-    url = "/energy/today?user_id=u1&tz=Asia/Shanghai"
+    url = "/energy/today?tz=Asia/Shanghai"
     assert client.get(url).json() == {"selected": False}
     at = "2026-10-20T08:00:00+08:00"
     _post(client, _event(type="energy_check", occurred_at=at, recorded_at=at, payload={"level": 3}))
@@ -281,6 +281,71 @@ def test_energy_today_flow(client: TestClient) -> None:
     assert body["adjustment"]["rule_id"] == "R-RC-ENERGY-3"
 
 
-@pytest.mark.parametrize("query", ["user_id=u1", "user_id=u1&tz=Mars/Base"])
+@pytest.mark.parametrize("query", ["", "tz=Mars/Base"])
 def test_energy_today_needs_valid_tz(client: TestClient, query: str) -> None:
     assert client.get(f"/energy/today?{query}").status_code == 422
+
+
+# ---- 第 3 周复盘后补充 ----
+
+
+def test_batch_same_id_different_content_all_conflict(client: TestClient, tmp_path: Path) -> None:
+    a, b = _event(), _event(payload={"weight_kg": 81.0})
+    for order in ([a, b], [b, a]):
+        r = _batch(client, order)
+        assert [x["status"] for x in r.json()["results"]] == ["conflict", "conflict"]
+    assert _count(tmp_path) == 0
+
+
+def test_batch_same_id_one_matches_stored(client: TestClient, tmp_path: Path) -> None:
+    _post(client, _event())
+    r = _batch(client, [_event(payload={"weight_kg": 81.0}), _event()])
+    assert [x["status"] for x in r.json()["results"]] == ["conflict", "duplicate"]
+    assert _count(tmp_path) == 1
+
+
+@pytest.mark.parametrize("path", ["/events", "/events/batch"])
+def test_body_too_large(client: TestClient, path: str) -> None:
+    body = json.dumps({"events": [_event(raw="x" * 3_000_000)]})
+    r = client.post(path, content=body, headers={"Content-Type": "application/json"})
+    assert r.status_code == 413
+
+
+@pytest.mark.parametrize("path", ["/events", "/events/batch"])
+def test_deeply_nested_json_is_422(client: TestClient, path: str) -> None:
+    body = "[" * 100_000 + "]" * 100_000
+    r = client.post(path, content=body, headers={"Content-Type": "application/json"})
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("overrides", "secret"),
+    [({"type": "我体重85公斤"}, "85"), ({"event_id": "6f1c2a3e-胸口-4d5e"}, "胸")],
+)
+def test_error_message_does_not_echo_value(
+    client: TestClient, overrides: dict[str, Any], secret: str
+) -> None:
+    r = _post(client, _event(**overrides))
+    assert r.status_code == 422
+    assert secret not in r.text
+
+
+def test_missing_current_user_is_401(tmp_path: Path) -> None:
+    app = create_app(_settings(tmp_path), FixedClock(NOW), log_stream=io.StringIO())
+    with TestClient(app) as c:
+        assert _post(c, _event()).status_code == 401
+        assert c.get("/energy/today?tz=Asia/Shanghai").status_code == 401
+
+
+def test_event_of_another_user_rejected(client: TestClient, tmp_path: Path) -> None:
+    assert _post(client, _event(user_id="u2")).status_code == 403
+    r = _batch(client, [_event(event_id=E2, user_id="u2"), _event()])
+    assert [x["status"] for x in r.json()["results"]] == ["invalid", "created"]
+    assert _count(tmp_path) == 1
+
+
+def test_energy_query_user_param_ignored(client: TestClient) -> None:
+    at = "2026-10-20T08:00:00+08:00"
+    _post(client, _event(type="energy_check", occurred_at=at, recorded_at=at, payload={"level": 2}))
+    body = client.get("/energy/today?tz=Asia/Shanghai&user_id=u2").json()
+    assert body["selected"] is True and body["level"] == 2  # 用的是当前用户 u1

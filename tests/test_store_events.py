@@ -259,3 +259,15 @@ def test_concurrent_use_of_one_connection_is_an_error(conn: sqlite3.Connection) 
         clock.release.set()
         writer.join()
     assert len(store.list_for_user("u1")) == 1
+
+
+def test_correction_fork_rejected(store: EventStore) -> None:
+    original = _event()
+    store.append(original)
+    first = _event(corrects=str(original.event_id), payload={"weight_kg": 81.0})
+    store.append(first)
+    fork = _event(corrects=str(original.event_id), payload={"weight_kg": 82.0})
+    with pytest.raises(InvalidCorrectionError, match="已被更正"):
+        store.append(fork)
+    chained = _event(corrects=str(first.event_id), payload={"weight_kg": 82.0})
+    assert store.append(chained) is True

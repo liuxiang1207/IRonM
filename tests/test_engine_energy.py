@@ -132,3 +132,7 @@ def test_never_above_plan(tmp_path: Path) -> None:
 def test_rpe_cap_never_raised(tmp_path: Path) -> None:
     book = _rules_with(tmp_path, "rpe_cap_delta: -1", "rpe_cap_delta: 1")
     assert adjust_item(planned_sets=4, planned_rpe_cap=8, adjustment=_adj(3, book)).rpe_cap == 8
+
+
+def test_rounding_half_up() -> None:
+    assert adjust_item(planned_sets=5, planned_rpe_cap=8, adjustment=_adj(2)).sets == 3

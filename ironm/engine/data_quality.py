@@ -7,24 +7,28 @@
 from collections.abc import Iterable, Mapping
 from datetime import date, datetime, timedelta, tzinfo
 from statistics import median
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ironm.contracts.events import MealEvent, WeightEvent
 from ironm.contracts.unknown import Unknown, UnknownReason, not_recorded
+from ironm.engine.effective import resolve
 from ironm.rules.loader import RuleBook
 
 WEIGHT_JUMP = "R-DQ-WEIGHT-JUMP"
 KCAL_RANGE = "R-DQ-KCAL-RANGE"
 
 
-class _WeightJumpParams(BaseModel):
+class WeightJumpParams(BaseModel):
     max_change_kg: float
     window_days: int
+    baseline_readings: Annotated[int, Field(ge=1)]
+    rebaseline_after: Annotated[int, Field(ge=1)]
 
 
-class _KcalRangeParams(BaseModel):
+class KcalRangeParams(BaseModel):
     min_kcal: float
     max_kcal: float
 
@@ -45,7 +49,7 @@ def weight_jump_pending(
     current_at: datetime,
 ) -> PendingCheck:
     """规定天数内（含）体重变化超过规定幅度 → 待确认。没有可比读数时不标。"""
-    p = rulebook.get(WEIGHT_JUMP).params_as(_WeightJumpParams)
+    p = rulebook.get(WEIGHT_JUMP).params_as(WeightJumpParams)
     if previous_kg is None or previous_at is None:
         return PendingCheck(pending_confirm=False, rule_id=WEIGHT_JUMP)
     within = abs(current_at - previous_at) <= timedelta(days=p.window_days)
@@ -56,39 +60,37 @@ def weight_jump_pending(
 
 def kcal_out_of_range(*, rulebook: RuleBook, day_kcal: float) -> PendingCheck:
     """单日热量低于下限或高于上限 → 待确认。"""
-    p = rulebook.get(KCAL_RANGE).params_as(_KcalRangeParams)
+    p = rulebook.get(KCAL_RANGE).params_as(KcalRangeParams)
     return PendingCheck(
         pending_confirm=day_kcal < p.min_kcal or day_kcal > p.max_kcal, rule_id=KCAL_RANGE
     )
 
 
-def effective_weights(events: Iterable[WeightEvent]) -> list[WeightEvent]:
-    """去掉已被更正的读数（含更正链中的中间版本），按发生时间、记录标识排序。"""
-    items = list(events)
-    superseded = {e.corrects for e in items if e.corrects is not None}
-    effective = [e for e in items if e.event_id not in superseded]
-    return sorted(effective, key=lambda e: (e.occurred_at, str(e.event_id)))
-
-
-_BASELINE_READINGS = 3  # 近期水平取最近至多 3 次正常读数的中位数
+def effective_weights(
+    events: Iterable[WeightEvent], *, as_of: datetime | None = None
+) -> list[WeightEvent]:
+    """有效体重读数（见有效记录层），按发生时间、记录标识排序。"""
+    return resolve(events, as_of=as_of)
 
 
 def pending_weights(events: Iterable[WeightEvent], rulebook: RuleBook) -> dict[UUID, str]:
     """逐次判定，返回 {待确认的记录标识: 规则编号}。
 
-    每次称重与“近期水平”比较：同一数据流中、规定天数内最近至多 3 次未待确认的有效读数的中位数。
+    每次称重与“近期水平”比较：同一数据流中、规定天数内最近几次未待确认的有效读数的中位数。
     不和单一的上一次读数比：上一次读数带噪声时尖峰会漏判，漏判的尖峰又会让其后的正常读数被误标。
-    规定天数内没有可比读数时不标；不同数据流（换秤）之间不比较。
+    基准只有 1 条（没有其他读数印证）、而其后几次读数彼此一致又与当前读数一致时，判定基准那条有误：
+    改为标记它，以新读数为准。规定天数内没有可比读数时不标；不同数据流（换秤）之间不比较。
     更正记录视为用户已确认，不判定，并计入近期水平。
     """
-    window = timedelta(days=rulebook.get(WEIGHT_JUMP).params_as(_WeightJumpParams).window_days)
+    p = rulebook.get(WEIGHT_JUMP).params_as(WeightJumpParams)
+    window = timedelta(days=p.window_days)
+    items = effective_weights(events)
     pending: dict[UUID, str] = {}
     ok: dict[str | None, list[WeightEvent]] = {}
-    for e in effective_weights(events):
+    for idx, e in enumerate(items):
         history = ok.setdefault(e.stream_key, [])
-        recent = [r for r in history if e.occurred_at - r.occurred_at <= window][
-            -_BASELINE_READINGS:
-        ]
+        recent = [r for r in history if e.occurred_at - r.occurred_at <= window]
+        recent = recent[-p.baseline_readings :]
         if e.corrects is None and recent:
             check = weight_jump_pending(
                 rulebook=rulebook,
@@ -98,10 +100,29 @@ def pending_weights(events: Iterable[WeightEvent], rulebook: RuleBook) -> dict[U
                 current_at=e.occurred_at,
             )
             if check.pending_confirm:
-                pending[e.event_id] = check.rule_id
+                if len(recent) == 1 and _followers_agree(items[idx + 1 :], e, p):
+                    wrong = recent[0]
+                    pending[wrong.event_id] = check.rule_id
+                    history.remove(wrong)
+                    history.append(e)
+                else:
+                    pending[e.event_id] = check.rule_id
                 continue
         history.append(e)
     return pending
+
+
+def _followers_agree(later: list[WeightEvent], e: WeightEvent, p: WeightJumpParams) -> bool:
+    """e 之后同一数据流、规定天数内的若干次读数是否彼此一致、且与 e 一致。"""
+    window = timedelta(days=p.window_days)
+    same = [
+        f for f in later if f.stream_key == e.stream_key and f.occurred_at - e.occurred_at <= window
+    ]
+    followers = same[: p.rebaseline_after]
+    if len(followers) < p.rebaseline_after:
+        return False
+    values = [e.payload.weight_kg, *(f.payload.weight_kg for f in followers)]
+    return max(values) - min(values) <= p.max_change_kg
 
 
 def daily_kcal(
@@ -112,7 +133,7 @@ def daily_kcal(
     当天任一餐热量未知、或当天没有饮食记录时，当天总量为“未知”：部分记录会让总量偏低，空白优于部分记录。
     """
     by_day: dict[date, list[MealEvent]] = {}
-    for m in meals:
+    for m in resolve(meals):
         by_day.setdefault(m.occurred_at.astimezone(tz).date(), []).append(m)
     totals: dict[date, float | Unknown] = {}
     for day in days:

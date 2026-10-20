@@ -139,3 +139,19 @@ def test_baseline_is_recent_level_not_last_reading() -> None:
 def test_no_baseline_outside_window() -> None:
     series = [_w(1, 80.0), _w(12, 82.5)]  # 相隔 11 天，窗口内没有可比读数
     assert pending_weights(series, BOOK) == {}
+
+
+def test_wrong_first_reading_is_the_one_flagged() -> None:
+    series = [_w(1, 88.0), _w(3, 80.1), _w(5, 80.0), _w(7, 79.9), _w(9, 79.8)]
+    assert pending_weights(series, BOOK) == {series[0].event_id: "R-DQ-WEIGHT-JUMP"}
+
+
+def test_real_shift_against_corroborated_baseline_still_flagged() -> None:
+    # 基准由两条彼此一致的读数构成：之后的整体跳变是“真实的水平变化”还是错误，要用户确认
+    series = [_w(1, 80.0), _w(2, 80.2), _w(4, 83.0), _w(5, 83.1), _w(6, 83.0)]
+    assert set(pending_weights(series, BOOK)) == {e.event_id for e in series[2:]}
+
+
+def test_single_baseline_not_overturned_without_enough_followers() -> None:
+    series = [_w(1, 88.0), _w(3, 80.1)]  # 只有 1 条后续读数，不足以推翻基准
+    assert pending_weights(series, BOOK) == {series[1].event_id: "R-DQ-WEIGHT-JUMP"}

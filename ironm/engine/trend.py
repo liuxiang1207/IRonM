@@ -3,10 +3,12 @@
 import math
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timedelta
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ironm.contracts.events import WeightEvent
+from ironm.contracts.metrics import Need
 from ironm.contracts.unknown import Unknown, UnknownReason
 from ironm.engine.data_quality import effective_weights, pending_weights
 from ironm.engine.stats import t_quantile
@@ -16,20 +18,21 @@ WEIGHT_TREND = "R-MT-WEIGHT-TREND"
 _INSUFFICIENT = Unknown(unknown=UnknownReason.INSUFFICIENT_DATA)
 
 
-class _TrendParams(BaseModel):
-    ci_level: float
-    min_readings: int
+class TrendParams(BaseModel):
+    ci_level: Annotated[float, Field(gt=0, lt=1)]
+    min_readings: Annotated[int, Field(ge=3)]  # 少于 3 次无法估计残差
+    min_span_days: Annotated[float, Field(ge=0)]
 
 
 class TrendFit(BaseModel):
-    """回归结果。数据不足时数值字段为“未知（数据不足）”，needed_readings 说明还差几次称重。"""
+    """回归结果。数据不足时数值字段为“未知（数据不足）”，needed 说明还差什么。"""
 
     model_config = ConfigDict(frozen=True)
 
-    sufficient: bool
+    status: Literal["ok", "insufficient"]
+    needed: tuple[Need, ...]
     n: int
     span_days: float
-    needed_readings: int
     ci_level: float
     slope_kg_per_week: float | Unknown
     intercept_kg: float | Unknown  # 第一次读数时刻的拟合体重
@@ -40,22 +43,28 @@ class TrendFit(BaseModel):
 
 
 def fit_trend(
-    points: Sequence[tuple[float, float]], *, ci_level: float, min_readings: int
+    points: Sequence[tuple[float, float]],
+    *,
+    ci_level: float,
+    min_readings: int,
+    min_span_days: float,
 ) -> TrendFit:
     """points：(天数, 千克)。天数的起点无关紧要，截距取第一次读数时刻的拟合值。"""
     n = len(points)
     xs = [float(x) for x, _ in points]
     ys = [float(y) for _, y in points]
     span = max(xs) - min(xs) if xs else 0.0
-    x_mean = sum(xs) / n if n else 0.0
-    sxx = sum((x - x_mean) ** 2 for x in xs)
-    if n < max(min_readings, 3) or sxx == 0.0:
-        needed = max(min_readings, 3) - n if n < max(min_readings, 3) else 1
+    needed: list[Need] = []
+    if n < min_readings:
+        needed.append(Need(item="weight_record", count=min_readings - n))
+    if span < min_span_days:
+        needed.append(Need(item="span_days", count=max(1, math.ceil(min_span_days - span))))
+    if needed:
         return TrendFit(
-            sufficient=False,
+            status="insufficient",
+            needed=tuple(needed),
             n=n,
             span_days=span,
-            needed_readings=needed,
             ci_level=ci_level,
             slope_kg_per_week=_INSUFFICIENT,
             intercept_kg=_INSUFFICIENT,
@@ -64,6 +73,8 @@ def fit_trend(
             ci_high=_INSUFFICIENT,
             residual_sd_kg=_INSUFFICIENT,
         )
+    x_mean = sum(xs) / n
+    sxx = sum((x - x_mean) ** 2 for x in xs)
     y_mean = sum(ys) / n
     slope = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys, strict=True)) / sxx
     intercept = y_mean - slope * x_mean
@@ -73,10 +84,10 @@ def fit_trend(
     half = t_quantile(0.5 + ci_level / 2, n - 2) * se
     week = 7.0
     return TrendFit(
-        sufficient=True,
+        status="ok",
+        needed=(),
         n=n,
         span_days=span,
-        needed_readings=0,
         ci_level=ci_level,
         slope_kg_per_week=slope * week,
         intercept_kg=intercept + slope * min(xs),
@@ -94,10 +105,10 @@ def weight_trend(
 
     只用有效、非待确认、与最近一次读数同一数据流的读数（不同的秤不混算）。
     """
-    p = rulebook.get(WEIGHT_TREND).params_as(_TrendParams)
-    items = list(events)
+    p = rulebook.get(WEIGHT_TREND).params_as(TrendParams)
+    items = effective_weights(events, as_of=as_of)
     pending = pending_weights(items, rulebook)
-    eligible = [e for e in effective_weights(items) if e.event_id not in pending]
+    eligible = [e for e in items if e.event_id not in pending]
     start = as_of - timedelta(days=window_days)
     in_window = [e for e in eligible if start <= e.occurred_at <= as_of]
     if in_window:
@@ -106,4 +117,6 @@ def weight_trend(
     points = [
         ((e.occurred_at - start).total_seconds() / 86400, e.payload.weight_kg) for e in in_window
     ]
-    return fit_trend(points, ci_level=p.ci_level, min_readings=p.min_readings)
+    return fit_trend(
+        points, ci_level=p.ci_level, min_readings=p.min_readings, min_span_days=p.min_span_days
+    )

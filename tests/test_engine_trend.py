@@ -70,7 +70,10 @@ def test_only_eligible_readings_used() -> None:
     events = [too_old, a, b, spike, wrong, fixed, c, d, old_scale_late]
     fit = weight_trend(events, as_of=START + timedelta(days=24), window_days=14, rulebook=BOOK)
     expected = fit_trend(
-        [(10, 82.4), (13, 82.1), (17, 81.6), (20, 81.7), (24, 81.0)], ci_level=0.95, min_readings=3
+        [(10, 82.4), (13, 82.1), (17, 81.6), (20, 81.7), (24, 81.0)],
+        ci_level=0.95,
+        min_readings=3,
+        min_span_days=3,
     )
     # 天数起点不同只带来 1e-12 级的浮点差异
     assert fit.model_dump() == pytest.approx(expected.model_dump())
@@ -84,7 +87,7 @@ def test_latest_stream_wins() -> None:
         _w(11, 80.3, stream="scale:gym"),
     ]
     fit = weight_trend(events, as_of=START + timedelta(days=12), window_days=14, rulebook=BOOK)
-    assert fit.n == 2 and not fit.sufficient  # 只用新秤的 2 次读数
+    assert fit.n == 2 and fit.status == "insufficient"  # 只用新秤的 2 次读数
 
 
 def test_ci_level_from_rule_table(tmp_path: Path) -> None:
