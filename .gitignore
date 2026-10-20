@@ -1,0 +1,24 @@
+# 环境与缓存
+.venv/
+.venv-*/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.DS_Store
+
+# 本地数据与工具
+data/
+.tools/
+*.sqlite
+*.sqlite3
+.env
+
+# 与本项目无关、含团队内部信息，不进公开仓库
+theta-onboarding/
+
+# 设计文档与脚本：待确认后再决定是否提交
+docs/
+scripts/

@@ -1,0 +1,48 @@
+[project]
+name = "ironm"
+version = "0.1.0"
+description = "IronM - 你的健身AI管家"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.115",
+    "pydantic>=2.9",
+    "pyyaml>=6.0",
+    "uvicorn>=0.32",
+]
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.100",
+    "import-linter>=2.1",
+    "mypy>=1.13",
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "types-pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ironm"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+# 项目以中文书写注释与文档，全角标点不是易混淆字符
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+packages = ["ironm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
