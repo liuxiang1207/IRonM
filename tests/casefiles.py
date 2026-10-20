@@ -112,6 +112,7 @@ class GoldenFile(_Model):
     target: Text
     status: Status
     reason: Text | None = None
+    inject: tuple[Literal["rulebook"], ...] = ()  # 运行时额外传给被测函数的参数
     rules: tuple[Text, ...]
     cases: tuple[GoldenCase, ...] = Field(min_length=1)
 

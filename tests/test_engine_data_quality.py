@@ -1,0 +1,141 @@
+"""异常值“待确认”的逐次判定（spec [2026-10-20] §12）。
+
+成对判定的边界见黄金用例 tests/golden/data_quality_*.yaml。
+"""
+
+import json
+from datetime import timedelta
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from ironm.contracts.events import EVENT_ADAPTER, WeightEvent
+from ironm.engine.data_quality import effective_weights, pending_weights, weight_jump_pending
+from ironm.rules.loader import RULES_DIR, RuleBook, load_rules
+from sim.generate import generate
+from sim.persona import PERSONAS_DIR, load_personas
+
+BOOK = load_rules(RULES_DIR)
+_n = 0
+
+
+def _w(
+    day: int, kg: float, stream: str | None = None, corrects: WeightEvent | None = None
+) -> WeightEvent:
+    global _n
+    _n += 1
+    data: dict[str, Any] = {
+        "event_id": f"00000000-0000-4000-8000-{_n:012d}",
+        "user_id": "u1",
+        "type": "weight",
+        "occurred_at": f"2026-10-{day:02d}T07:30:00+08:00",
+        "recorded_at": f"2026-10-{day:02d}T07:31:00+08:00",
+        "source": "user",
+        "confirmed": True,
+        "payload": {"weight_kg": kg},
+    }
+    if stream is not None:
+        data |= {"source": "device", "stream_key": stream}
+    if corrects is not None:
+        data["corrects"] = str(corrects.event_id)
+    e = EVENT_ADAPTER.validate_json(json.dumps(data))
+    assert isinstance(e, WeightEvent)
+    return e
+
+
+def test_result_carries_rule_id() -> None:
+    a, b = _w(1, 80.0), _w(3, 83.0)
+    r = weight_jump_pending(
+        rulebook=BOOK,
+        previous_kg=80.0,
+        previous_at=a.occurred_at,
+        current_kg=83.0,
+        current_at=b.occurred_at,
+    )
+    assert r.pending_confirm and r.rule_id == "R-DQ-WEIGHT-JUMP"
+
+
+def test_threshold_comes_from_rule_table(tmp_path: Path) -> None:
+    rules = tmp_path / "rules"
+    rules.mkdir()
+    text = (RULES_DIR / "data_quality.yaml").read_text(encoding="utf-8")
+    (rules / "data_quality.yaml").write_text(
+        text.replace("max_change_kg: 2.0", "max_change_kg: 3.0")
+    )
+    a, b = _w(1, 80.0), _w(3, 82.5)
+
+    def check(book: RuleBook) -> bool:
+        return weight_jump_pending(
+            rulebook=book,
+            previous_kg=80.0,
+            previous_at=a.occurred_at,
+            current_kg=82.5,
+            current_at=b.occurred_at,
+        ).pending_confirm
+
+    assert check(BOOK)
+    assert not check(load_rules(rules))
+
+
+def test_spike_flags_only_itself() -> None:
+    series = [_w(1, 80.0), _w(4, 79.8), _w(7, 82.6), _w(10, 79.5), _w(13, 79.3)]
+    assert pending_weights(series, BOOK) == {series[2].event_id: "R-DQ-WEIGHT-JUMP"}
+
+
+def test_streams_not_compared() -> None:
+    series = [_w(1, 80.0, stream="scale:home"), _w(3, 82.8, stream="scale:gym")]
+    assert pending_weights(series, BOOK) == {}
+
+
+def test_correction_supersedes_and_counts_as_confirmed() -> None:
+    a = _w(1, 80.0)
+    spike = _w(3, 83.0)
+    fix = _w(3, 83.0, corrects=spike)  # 用户确认这次读数没错
+    effective = effective_weights([a, spike, fix])
+    assert [e.event_id for e in effective] == [a.event_id, fix.event_id]
+    assert pending_weights([a, spike, fix], BOOK) == {}
+
+
+def test_correction_chain() -> None:
+    a = _w(1, 80.0)
+    first_fix = _w(1, 81.0, corrects=a)
+    second_fix = _w(1, 80.5, corrects=first_fix)
+    assert [e.event_id for e in effective_weights([second_fix, a, first_fix])] == [
+        second_fix.event_id
+    ]
+
+
+PERSONAS = load_personas(PERSONAS_DIR)
+
+
+@pytest.mark.parametrize("pid", sorted(PERSONAS))
+def test_sim_traps_flagged_and_nothing_else(pid: str) -> None:
+    sim = generate(PERSONAS[pid])
+    weights = [e for d in sim.days for e in d.events if isinstance(e, WeightEvent)]
+    fake = {i for t in sim.truth.traps if t.kind in {"spike", "unit_error"} for i in t.event_ids}
+    assert set(pending_weights(weights, BOOK)) == fake
+
+
+def test_window_boundary_uses_days() -> None:
+    a = _w(1, 80.0)
+    later = a.occurred_at + timedelta(days=7)
+    assert weight_jump_pending(
+        rulebook=BOOK,
+        previous_kg=80.0,
+        previous_at=a.occurred_at,
+        current_kg=77.5,
+        current_at=later,
+    ).pending_confirm
+
+
+def test_baseline_is_recent_level_not_last_reading() -> None:
+    # 第 4 天读数带正噪声（80.4）：只和上一次比，尖峰 82.3 只高 1.9 会漏判，
+    # 而随后的正常读数 80.0 又会和尖峰比而被误标。和近期水平（中位数 80.0）比则都对。
+    series = [_w(1, 79.6), _w(4, 80.4), _w(6, 82.3), _w(8, 80.0)]
+    assert pending_weights(series, BOOK) == {series[2].event_id: "R-DQ-WEIGHT-JUMP"}
+
+
+def test_no_baseline_outside_window() -> None:
+    series = [_w(1, 80.0), _w(12, 82.5)]  # 相隔 11 天，窗口内没有可比读数
+    assert pending_weights(series, BOOK) == {}

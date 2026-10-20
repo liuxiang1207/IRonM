@@ -1,0 +1,103 @@
+"""数据质量：异常值“待确认”判定。阈值一律取自规则表（data_quality 规则集），代码里不写数字。
+
+“待确认”不修改记录本身。用户确认或修正一条读数，是追加一条指向它的更正记录：
+被更正的记录不再是有效读数，更正记录视为用户已确认。
+"""
+
+from collections.abc import Iterable
+from datetime import datetime, timedelta
+from statistics import median
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
+
+from ironm.contracts.events import WeightEvent
+from ironm.rules.loader import RuleBook
+
+WEIGHT_JUMP = "R-DQ-WEIGHT-JUMP"
+KCAL_RANGE = "R-DQ-KCAL-RANGE"
+
+
+class _WeightJumpParams(BaseModel):
+    max_change_kg: float
+    window_days: int
+
+
+class _KcalRangeParams(BaseModel):
+    min_kcal: float
+    max_kcal: float
+
+
+class PendingCheck(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    pending_confirm: bool
+    rule_id: str
+
+
+def weight_jump_pending(
+    *,
+    rulebook: RuleBook,
+    previous_kg: float | None,
+    previous_at: datetime | None,
+    current_kg: float,
+    current_at: datetime,
+) -> PendingCheck:
+    """规定天数内（含）体重变化超过规定幅度 → 待确认。没有可比读数时不标。"""
+    p = rulebook.get(WEIGHT_JUMP).params_as(_WeightJumpParams)
+    if previous_kg is None or previous_at is None:
+        return PendingCheck(pending_confirm=False, rule_id=WEIGHT_JUMP)
+    within = abs(current_at - previous_at) <= timedelta(days=p.window_days)
+    # 四舍五入到微克级，避免 82.0 - 80.0 这类浮点误差让“恰好等于”变成“超过”
+    jumped = round(abs(current_kg - previous_kg), 6) > p.max_change_kg
+    return PendingCheck(pending_confirm=within and jumped, rule_id=WEIGHT_JUMP)
+
+
+def kcal_out_of_range(*, rulebook: RuleBook, day_kcal: float) -> PendingCheck:
+    """单日热量低于下限或高于上限 → 待确认。"""
+    p = rulebook.get(KCAL_RANGE).params_as(_KcalRangeParams)
+    return PendingCheck(
+        pending_confirm=day_kcal < p.min_kcal or day_kcal > p.max_kcal, rule_id=KCAL_RANGE
+    )
+
+
+def effective_weights(events: Iterable[WeightEvent]) -> list[WeightEvent]:
+    """去掉已被更正的读数（含更正链中的中间版本），按发生时间、记录标识排序。"""
+    items = list(events)
+    superseded = {e.corrects for e in items if e.corrects is not None}
+    effective = [e for e in items if e.event_id not in superseded]
+    return sorted(effective, key=lambda e: (e.occurred_at, str(e.event_id)))
+
+
+_BASELINE_READINGS = 3  # 近期水平取最近至多 3 次正常读数的中位数
+
+
+def pending_weights(events: Iterable[WeightEvent], rulebook: RuleBook) -> dict[UUID, str]:
+    """逐次判定，返回 {待确认的记录标识: 规则编号}。
+
+    每次称重与“近期水平”比较：同一数据流中、规定天数内最近至多 3 次未待确认的有效读数的中位数。
+    不和单一的上一次读数比：上一次读数带噪声时尖峰会漏判，漏判的尖峰又会让其后的正常读数被误标。
+    规定天数内没有可比读数时不标；不同数据流（换秤）之间不比较。
+    更正记录视为用户已确认，不判定，并计入近期水平。
+    """
+    window = timedelta(days=rulebook.get(WEIGHT_JUMP).params_as(_WeightJumpParams).window_days)
+    pending: dict[UUID, str] = {}
+    ok: dict[str | None, list[WeightEvent]] = {}
+    for e in effective_weights(events):
+        history = ok.setdefault(e.stream_key, [])
+        recent = [r for r in history if e.occurred_at - r.occurred_at <= window][
+            -_BASELINE_READINGS:
+        ]
+        if e.corrects is None and recent:
+            check = weight_jump_pending(
+                rulebook=rulebook,
+                previous_kg=median(r.payload.weight_kg for r in recent),
+                previous_at=recent[-1].occurred_at,
+                current_kg=e.payload.weight_kg,
+                current_at=e.occurred_at,
+            )
+            if check.pending_confirm:
+                pending[e.event_id] = check.rule_id
+                continue
+        history.append(e)
+    return pending

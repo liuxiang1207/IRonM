@@ -1,7 +1,7 @@
 # 黄金用例：单日热量异常标“待确认”（R-DQ-KCAL-RANGE：低于 500 或高于 6000 千卡）
 target: ironm.engine.data_quality:kcal_out_of_range
-status: pending
-reason: 异常值判定随 T1.2 实现
+status: active
+inject: [rulebook]
 rules: [R-DQ-KCAL-RANGE]
 cases:
   - id: G-DQ-KC-001

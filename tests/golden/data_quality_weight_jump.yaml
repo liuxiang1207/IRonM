@@ -1,7 +1,7 @@
 # 黄金用例：体重短期跳变标“待确认”（R-DQ-WEIGHT-JUMP：7 天内变化超过 2 千克）
 target: ironm.engine.data_quality:weight_jump_pending
-status: pending
-reason: 异常值判定随 T1.2 实现
+status: active
+inject: [rulebook]
 rules: [R-DQ-WEIGHT-JUMP]
 cases:
   - id: G-DQ-WJ-001
