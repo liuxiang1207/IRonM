@@ -15,6 +15,7 @@ from ironm.contracts.events import EVENT_ADAPTER, Event
 from ironm.core.clock import FixedClock
 from ironm.store.db import connect
 from ironm.store.events import (
+    ConcurrentUseError,
     EventConflictError,
     EventStore,
     FutureEventError,
@@ -229,3 +230,32 @@ def test_quotes_are_matched_as_text(store: EventStore) -> None:
     store.append(plain)
     assert store.search("u1", '"训练后"') == [quoted]
     assert store.search("u1", '"训练后" OR 酸') == []
+
+
+class _BlockingClock(FixedClock):
+    """now() 被调用时停住，直到放行；用来让一个线程停在写入过程中。"""
+
+    def __init__(self) -> None:
+        super().__init__(NOW)
+        self.entered = threading.Event()
+        self.release = threading.Event()
+
+    def now(self) -> datetime:
+        self.entered.set()
+        self.release.wait(5)
+        return super().now()
+
+
+def test_concurrent_use_of_one_connection_is_an_error(conn: sqlite3.Connection) -> None:
+    clock = _BlockingClock()
+    store = EventStore(conn, clock)
+    writer = threading.Thread(target=store.append, args=(_event(),))
+    writer.start()
+    assert clock.entered.wait(5)
+    try:
+        with pytest.raises(ConcurrentUseError):
+            store.list_for_user("u1")
+    finally:
+        clock.release.set()
+        writer.join()
+    assert len(store.list_for_user("u1")) == 1

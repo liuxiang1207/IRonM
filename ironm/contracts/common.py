@@ -9,6 +9,7 @@ from typing import Annotated, cast
 from pydantic import (
     AfterValidator,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     JsonValue,
@@ -66,14 +67,21 @@ def _thaw(value: object, handler: SerializerFunctionWrapHandler) -> object:
     return handler(deep_thaw(value))
 
 
-# 只读映射：模型本身 frozen 只防重新赋值，映射及其嵌套内容也要防改
+# 只读映射：模型本身 frozen 只防重新赋值，映射及其嵌套内容也要防改。
+# 校验前先还原成普通结构，使从快照取出的只读值可以直接用来构造新的契约对象。
 type FrozenMap[K, V] = Annotated[
-    Mapping[K, V], AfterValidator(_freeze_map), WrapSerializer(_thaw, when_used="always")
+    Mapping[K, V],
+    BeforeValidator(deep_thaw),
+    AfterValidator(_freeze_map),
+    WrapSerializer(_thaw, when_used="always"),
 ]
 
 # 只读的任意 JSON 值（嵌套的列表与对象同样不可改）
 type FrozenJson = Annotated[
-    JsonValue, AfterValidator(deep_freeze), WrapSerializer(_thaw, when_used="always")
+    JsonValue,
+    BeforeValidator(deep_thaw),
+    AfterValidator(deep_freeze),
+    WrapSerializer(_thaw, when_used="always"),
 ]
 
 # 带版本的名称，如 diet_review@1.0.0

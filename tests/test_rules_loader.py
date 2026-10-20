@@ -176,3 +176,18 @@ def test_standard_literals_still_parsed(tmp_path: Path) -> None:
         -0.5,
         1000.0,
     )
+
+
+class StrictParams(BaseModel):
+    days: int
+    flag: bool
+
+
+@pytest.mark.parametrize("override", ["days: 010", "flag: yes"])
+def test_params_as_is_strict(tmp_path: Path, override: str) -> None:
+    text = GOOD.replace("days: 7", "days: 7\n      flag: true").replace(
+        override.split(":")[0] + ": " + ("7" if override.startswith("days") else "true"), override
+    )
+    rule = _load_one(tmp_path, text).get("R-DEMO-ONE")
+    with pytest.raises(RuleParamError):
+        rule.params_as(StrictParams)

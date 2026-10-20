@@ -1,12 +1,14 @@
 """快照与计划版本（spec [2026-10-20] §4）。"""
 
 import json
+from datetime import date
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-from ironm.contracts.plan import PlanVersion
+from ironm.contracts.agents import Proposal
+from ironm.contracts.plan import PlanField, PlanVersion
 from ironm.contracts.snapshot import Snapshot
 
 PLAN_V2: dict[str, Any] = {
@@ -152,3 +154,40 @@ def test_diff_bool_and_number_differ() -> None:
             fields={"daily_kcal_target": True},
             diff=[{"field": "daily_kcal_target", "from_value": 1900, "to_value": 1}],
         )
+
+
+def test_frozen_values_can_be_reused() -> None:
+    snap = _snap(
+        _snapshot(
+            current_plan=PLAN_V2
+            | {
+                "fields": {"session_slots": [{"slot": "squat"}], "daily_kcal_target": 1750},
+                "diff": [],
+            }
+        )
+    )
+    plan = snap.current_plan
+    assert plan is not None
+    # 用只读的旧值直接构造第 3 版与提案
+    v3 = PlanVersion(
+        version=3,
+        parent=2,
+        fields=plan.fields,
+        diff=(),
+        rule_set_versions=plan.rule_set_versions,
+        skill_versions=plan.skill_versions,
+        created_at=plan.created_at,
+    )
+    assert v3.fields == plan.fields
+    Proposal(
+        proposal_id="p1",
+        field=PlanField.SESSION_SLOTS,
+        from_value=plan.fields[PlanField.SESSION_SLOTS],
+        to_value=[{"slot": "lunge"}],
+        reason_facts=("metric:x",),
+        rule_id="R-X",
+        expected_effect="e",
+        rollback_condition="r",
+        review_date=date(2026, 11, 3),
+        evidence_ids=(),
+    )

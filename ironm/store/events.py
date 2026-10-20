@@ -2,8 +2,10 @@
 
 import json
 import sqlite3
-from collections.abc import Collection
+import threading
+from collections.abc import Callable, Collection
 from datetime import datetime, timedelta
+from typing import Any, Concatenate
 from uuid import UUID
 
 from ironm.contracts.events import EVENT_ADAPTER, Event
@@ -20,6 +22,10 @@ class EventConflictError(ValueError):
 
 class InvalidCorrectionError(ValueError):
     pass
+
+
+class ConcurrentUseError(RuntimeError):
+    """同一连接被两个线程同时使用。每个请求应使用自己的连接。"""
 
 
 class FutureEventError(ValueError):
@@ -48,11 +54,29 @@ def _to_event(row: sqlite3.Row) -> Event:
     return EVENT_ADAPTER.validate_json(json.dumps(data))
 
 
+def _exclusive[**P, R](
+    method: Callable[Concatenate[Any, P], R],
+) -> Callable[Concatenate[Any, P], R]:
+    """连接一次只能被一个线程使用；被并发使用时直接报错，不等待、不排队。"""
+
+    def wrapper(self: Any, /, *args: P.args, **kwargs: P.kwargs) -> R:
+        if not self._busy.acquire(blocking=False):
+            raise ConcurrentUseError("同一连接被并发使用；每个请求应使用自己的连接")
+        try:
+            return method(self, *args, **kwargs)
+        finally:
+            self._busy.release()
+
+    return wrapper
+
+
 class EventStore:
     def __init__(self, conn: sqlite3.Connection, clock: Clock) -> None:
         self._conn = conn
         self._clock = clock
+        self._busy = threading.RLock()  # 可重入：append 内部会调用 get
 
+    @_exclusive
     def append(self, event: Event) -> bool:
         """写入一条记录。返回 False 表示同一记录已存在（内容相同），未重复写入。"""
         received = self._clock.now()
@@ -99,18 +123,21 @@ class EventStore:
         if target.type != event.type:
             raise InvalidCorrectionError(f"更正记录类型 {event.type} 与原记录 {target.type} 不同")
 
+    @_exclusive
     def get(self, event_id: UUID) -> Event | None:
         row = self._conn.execute(
             "SELECT * FROM events WHERE event_id = ?", (str(event_id),)
         ).fetchone()
         return None if row is None else _to_event(row)
 
+    @_exclusive
     def received_at(self, event_id: UUID) -> datetime | None:
         row = self._conn.execute(
             "SELECT received_at FROM events WHERE event_id = ?", (str(event_id),)
         ).fetchone()
         return None if row is None else from_db_time(row["received_at"])
 
+    @_exclusive
     def list_for_user(
         self,
         user_id: str,
@@ -136,6 +163,7 @@ class EventStore:
         sql += " ORDER BY occurred_at, seq"
         return [_to_event(r) for r in self._conn.execute(sql, params)]
 
+    @_exclusive
     def search(self, user_id: str, text: str) -> list[Event]:
         """在原文与身体不适描述中按子串检索；检索词整体作为一个短语，符号按普通文字处理。"""
         text = text.strip()

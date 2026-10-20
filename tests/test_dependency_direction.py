@@ -107,3 +107,14 @@ def test_store_ban_covers_every_other_package() -> None:
     packages = {n.strip() for layer in layers["layers"] for n in layer.split("|")}
     banned = {m.removeprefix("ironm.") for m in ban["source_modules"]}
     assert banned == packages - {"api", "orchestrator", "store"}
+
+
+def test_indirect_store_use_through_orchestrator_allowed(tmp_path: Path) -> None:
+    result = _lint(
+        tmp_path,
+        {
+            "scheduler/__init__.py": "import ironm.orchestrator",
+            "orchestrator/__init__.py": "import ironm.store",
+        },
+    )
+    assert result.returncode == 0, result.stdout + result.stderr

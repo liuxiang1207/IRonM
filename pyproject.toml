@@ -100,4 +100,6 @@ source_modules = [
     "ironm.core",
 ]
 forbidden_modules = ["ironm.store"]
+# 只禁止直接引用；经由编排层间接使用存储（如调度 → 编排 → 存储）是允许的
+allow_indirect_imports = true
 

@@ -52,7 +52,8 @@ class Rule(ContractModel):
     def params_as[M: BaseModel](self, model: type[M]) -> M:
         """按使用方声明的类型读取参数，不符即报错。"""
         try:
-            return model.model_validate(dict(self.params))
+            # 严格校验：文字不会被转换成数字或真假值（如 "010" → 10、"yes" → True）
+            return model.model_validate(dict(self.params), strict=True)
         except ValidationError as e:
             raise RuleParamError(f"规则 {self.id} 的参数不符合 {model.__name__}：{e}") from e
 
