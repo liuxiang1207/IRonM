@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from ironm.contracts.agents import AGENT_OUTPUT_ADAPTER, AgentOutput
+from ironm.contracts.agents import AGENT_OUTPUT_ADAPTER, AgentOutput, ProposalOutput
 from ironm.contracts.plan import FIELD_OWNERS, PlanField
 from ironm.contracts.roles import AGENT_OUTPUT_KINDS, AgentId, OutputKind
 
@@ -179,3 +179,21 @@ def test_field_ownership_table() -> None:
     for field, owner in FIELD_OWNERS.items():
         actual.setdefault(owner, set()).add(field.value)
     assert actual == expected
+
+
+def test_proposal_values_read_only() -> None:
+    out = _parse(
+        _output(
+            "training_planner",
+            "proposal",
+            [_proposal(field="training_schedule", from_value=["mon"], to_value=["mon", "thu"])],
+        )
+    )
+    assert isinstance(out, ProposalOutput)
+    with pytest.raises(AttributeError):
+        out.items[0].to_value.append("sat")  # type: ignore[union-attr]
+    assert AGENT_OUTPUT_ADAPTER.validate_json(AGENT_OUTPUT_ADAPTER.dump_json(out)) == out
+
+
+def test_number_and_bool_are_different_values() -> None:
+    _parse(_output("nutritionist", "proposal", [_proposal(from_value=1, to_value=True)]))

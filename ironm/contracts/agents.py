@@ -3,9 +3,9 @@
 from datetime import date
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, JsonValue, TypeAdapter, model_validator
+from pydantic import Field, TypeAdapter, model_validator
 
-from ironm.contracts.common import ContractModel, VersionedName
+from ironm.contracts.common import ContractModel, FrozenJson, VersionedName, json_equal
 from ironm.contracts.plan import FIELD_OWNERS, PlanField
 from ironm.contracts.roles import AGENT_OUTPUT_KINDS, AgentId, OutputKind
 
@@ -17,7 +17,7 @@ class Constraint(ContractModel):
 
     field: PlanField
     op: Literal["max", "min", "exclude"]
-    value: JsonValue
+    value: FrozenJson
     rule_id: Text
     reason_code: Text
 
@@ -31,8 +31,8 @@ class Constraint(ContractModel):
 class Proposal(ContractModel):
     proposal_id: Text
     field: PlanField
-    from_value: JsonValue  # null 表示首次设定
-    to_value: JsonValue
+    from_value: FrozenJson  # null 表示首次设定
+    to_value: FrozenJson
     reason_facts: tuple[Text, ...] = Field(min_length=1)
     rule_id: Text
     # 调整三件套：缺一项即拒绝
@@ -45,7 +45,7 @@ class Proposal(ContractModel):
     def _check_change(self) -> Self:
         if self.to_value is None:
             raise ValueError("提案必须给出新值")
-        if self.to_value == self.from_value:
+        if json_equal(self.to_value, self.from_value):
             raise ValueError("新值与原值相同，不是提案")
         return self
 

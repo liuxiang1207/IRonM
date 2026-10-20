@@ -2,8 +2,10 @@
 
 import json
 import sqlite3
+import threading
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from contextlib import closing
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,7 @@ from ironm.store.db import connect
 from ironm.store.events import (
     EventConflictError,
     EventStore,
+    FutureEventError,
     InvalidCorrectionError,
     SearchQueryError,
 )
@@ -149,3 +152,80 @@ def test_search_too_short(store: EventStore) -> None:
 def test_search_special_characters_are_text(store: EventStore, query: str) -> None:
     store.append(_event("symptom"))
     store.search("u1", query)  # 不抛语法错误即可
+
+
+# ---- 独立审查后补充 ----
+
+
+def test_insert_or_replace_cannot_overwrite(store: EventStore, conn: sqlite3.Connection) -> None:
+    event = _event()
+    store.append(event)
+    row = conn.execute("SELECT * FROM events").fetchone()
+    values = list(row)
+    values[-1] = '{"weight_kg": 99.0}'
+    with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+        conn.execute(
+            f"INSERT OR REPLACE INTO events VALUES ({', '.join('?' * len(values))})", values
+        )
+    assert store.get(event.event_id) == event
+
+
+@pytest.mark.parametrize(("minutes", "accepted"), [(4, True), (6, False)])
+def test_recorded_at_not_in_future(store: EventStore, minutes: int, accepted: bool) -> None:
+    at = (NOW + timedelta(minutes=minutes)).isoformat()
+    event = _event(occurred_at=at, recorded_at=at)
+    if accepted:
+        assert store.append(event) is True
+    else:
+        with pytest.raises(FutureEventError):
+            store.append(event)
+        assert store.get(event.event_id) is None
+
+
+def test_types_must_be_a_collection(store: EventStore) -> None:
+    with pytest.raises(TypeError):
+        store.list_for_user("u1", types="weight")
+
+
+def test_connection_usable_from_another_thread(store: EventStore) -> None:
+    event = _event()
+    store.append(event)
+    result: list[object] = []
+    t = threading.Thread(target=lambda: result.append(store.get(event.event_id)))
+    t.start()
+    t.join()
+    assert result == [event]
+
+
+def test_concurrent_writers_queue(tmp_path: Path) -> None:
+    db = tmp_path / "db.sqlite"
+    with closing(connect(db)) as c:
+        migrate(c, MIGRATIONS_DIR, FixedClock(NOW))
+    errors: list[BaseException] = []
+
+    def writer(user: str) -> None:
+        with closing(connect(db)) as c:
+            s = EventStore(c, FixedClock(NOW))
+            try:
+                for _ in range(50):
+                    s.append(_event(user_id=user))
+            except BaseException as e:
+                errors.append(e)
+
+    threads = [threading.Thread(target=writer, args=(u,)) for u in ("a", "b")]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
+    with closing(connect(db)) as c:
+        assert c.execute("SELECT count(*) FROM events").fetchone()[0] == 100
+
+
+def test_quotes_are_matched_as_text(store: EventStore) -> None:
+    quoted = _event(raw='注意"训练后"别太累')
+    plain = _event(raw="今天训练后很累")
+    store.append(quoted)
+    store.append(plain)
+    assert store.search("u1", '"训练后"') == [quoted]
+    assert store.search("u1", '"训练后" OR 酸') == []

@@ -9,7 +9,7 @@ from typing import Self
 
 from pydantic import Field, JsonValue, model_validator
 
-from ironm.contracts.common import ContractModel, FrozenMap, UtcDatetime
+from ironm.contracts.common import ContractModel, FrozenJson, FrozenMap, UtcDatetime, json_equal
 from ironm.contracts.roles import AgentId
 
 
@@ -63,8 +63,8 @@ FIELD_OWNERS: dict[PlanField, AgentId] = {
 
 class FieldChange(ContractModel):
     field: PlanField
-    from_value: JsonValue  # null 表示首次设定
-    to_value: JsonValue
+    from_value: FrozenJson  # null 表示首次设定
+    to_value: FrozenJson
 
 
 class PlanVersion(ContractModel):
@@ -89,6 +89,8 @@ class PlanVersion(ContractModel):
         if len(changed) != len(set(changed)):
             raise ValueError("差异中同一字段出现多次")
         for change in self.diff:
-            if change.field not in self.fields or self.fields[change.field] != change.to_value:
+            if change.field not in self.fields or not json_equal(
+                self.fields[change.field], change.to_value
+            ):
                 raise ValueError(f"差异中 {change.field} 的新值与本版字段取值不一致")
         return self

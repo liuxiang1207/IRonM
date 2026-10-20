@@ -7,7 +7,10 @@
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 LINT_IMPORTS = Path(sys.executable).parent / "lint-imports"
@@ -79,3 +82,28 @@ def test_unregistered_package_fails(tmp_path: Path) -> None:
     out = result.stdout + result.stderr
     assert result.returncode != 0, out
     assert "ironm.newpkg" in out, out
+
+
+# ---- 独立审查后收紧：只有编排层与对外接口能直接用数据存储 ----
+
+
+@pytest.mark.parametrize("module", ["scheduler", "memory", "rules", "safety", "llm"])
+def test_only_orchestrator_and_api_use_store(tmp_path: Path, module: str) -> None:
+    result = _lint(tmp_path, {f"{module}/__init__.py": "import ironm.store"})
+    _assert_broken(result, f"ironm.{module}", "ironm.store")
+
+
+@pytest.mark.parametrize("module", ["orchestrator", "api"])
+def test_orchestrator_and_api_may_use_store(tmp_path: Path, module: str) -> None:
+    result = _lint(tmp_path, {f"{module}/__init__.py": "import ironm.store"})
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_store_ban_covers_every_other_package() -> None:
+    with (ROOT / "pyproject.toml").open("rb") as f:
+        contracts = tomllib.load(f)["tool"]["importlinter"]["contracts"]
+    [layers] = [c for c in contracts if c["type"] == "layers"]
+    [ban] = [c for c in contracts if c["type"] == "forbidden"]
+    packages = {n.strip() for layer in layers["layers"] for n in layer.split("|")}
+    banned = {m.removeprefix("ironm.") for m in ban["source_modules"]}
+    assert banned == packages - {"api", "orchestrator", "store"}

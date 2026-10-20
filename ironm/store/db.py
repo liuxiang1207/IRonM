@@ -13,7 +13,8 @@ _TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%fZ"
 
 def connect(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path, autocommit=True)
+    # 每个请求一个连接；同一请求可能先后在不同线程中处理，所以允许跨线程传递，但不在并发请求间共用
+    conn = sqlite3.connect(path, autocommit=True, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     mode = conn.execute("PRAGMA journal_mode = WAL").fetchone()[0]
     if mode != "wal":

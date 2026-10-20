@@ -17,14 +17,17 @@ from sim.runner import run
 DEFAULT_DB = Path("data/sim/sim.sqlite")
 
 
-def _row(sim: Simulation) -> str:
+def summary_row(sim: Simulation) -> str:
     counts = Counter(e.type for d in sim.days for e in d.events)
-    trap_ids = {i for t in sim.truth.traps for i in t.event_ids}
+    # 只剔除假读数；换秤后的读数是真实测量（带偏差），照常统计
+    fake_ids = {
+        i for t in sim.truth.traps if t.kind in {"spike", "unit_error"} for i in t.event_ids
+    }
     weights = [
         e.payload.weight_kg
         for d in sim.days
         for e in d.events
-        if isinstance(e, WeightEvent) and e.event_id not in trap_ids
+        if isinstance(e, WeightEvent) and e.event_id not in fake_ids
     ]
     truth = sim.truth.true_weight_kg
     measured = f"{weights[0]:.1f} → {weights[-1]:.1f}" if weights else "—"
@@ -53,7 +56,7 @@ def main(db_path: Path) -> str:
             sim = generate(p)
             clock.set(p.start_at())
             run(sim, store, clock)
-            lines.append(_row(sim))
+            lines.append(summary_row(sim))
     return "\n".join(lines) + "\n"
 
 

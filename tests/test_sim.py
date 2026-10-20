@@ -14,9 +14,9 @@ from ironm.core.clock import FixedClock
 from ironm.store.db import connect
 from ironm.store.events import EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
-from sim.__main__ import main
+from sim.__main__ import main, summary_row
 from sim.generate import Simulation, generate
-from sim.persona import PERSONAS_DIR, Persona, load_personas
+from sim.persona import PERSONAS_DIR, AdherencePhase, Persona, load_personas
 from sim.runner import run
 
 PERSONAS = load_personas(PERSONAS_DIR)
@@ -221,3 +221,41 @@ def test_command_runs_all_personas(tmp_path: Path) -> None:
     with closing(connect(db)) as c:
         users = {r[0] for r in c.execute("SELECT DISTINCT user_id FROM events")}
     assert users == {p.user_id for p in PERSONAS.values()}
+
+
+# ---- 独立审查后补充 ----
+
+
+@pytest.mark.parametrize(
+    "traps",
+    [
+        ({"kind": "spike", "day": 300, "delta_kg": 2},),
+        ({"kind": "spike", "day": 10, "delta_kg": 2}, {"kind": "unit_error", "day": 10}),
+        (
+            {"kind": "spike", "day": 29, "delta_kg": 2},
+            {"kind": "device_switch", "day": 29, "stream": "s:2", "offset_kg": 1},
+        ),
+        ({"kind": "gap", "from_day": 20, "to_day": 10},),
+        ({"kind": "stop_logging", "from_day": 99},),
+    ],
+)
+def test_invalid_traps_rejected(traps: tuple[dict[str, object], ...]) -> None:
+    data = PERSONAS["adherent"].model_dump(mode="json") | {"traps": list(traps)}
+    with pytest.raises(ValueError):
+        Persona.model_validate(data)
+
+
+def test_zero_adherence_generates_valid_records() -> None:
+    p = PERSONAS["low_completion"]
+    hidden = p.hidden.model_copy(
+        update={"adherence_phases": (AdherencePhase(from_week=1, p_done=0.0),)}
+    )
+    sim = generate(p.model_copy(update={"hidden": hidden}))
+    assert len(sim.days) == 56
+
+
+def test_summary_counts_device_switch_readings() -> None:
+    p = PERSONAS["low_completion"]
+    sim = generate(p)
+    last_weight = [e for d in sim.days for e in d.events if isinstance(e, WeightEvent)][-1]
+    assert f"→ {last_weight.payload.weight_kg:.1f} |" in summary_row(sim)

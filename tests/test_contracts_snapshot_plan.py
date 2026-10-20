@@ -121,3 +121,34 @@ def test_invalid_plan_versions_rejected(overrides: dict[str, Any]) -> None:
 def test_plan_fields_read_only() -> None:
     with pytest.raises(TypeError):
         _plan().fields["daily_kcal_target"] = 0  # type: ignore[index]
+
+
+# ---- 独立审查后补充：彻底只读 ----
+
+
+def test_nested_profile_read_only() -> None:
+    snap = _snap(_snapshot(profile={"injuries": ["knee"], "prefs": {"time": "evening"}}))
+    profile: Any = snap.profile  # 故意尝试修改只读内容
+    with pytest.raises(AttributeError):
+        profile["injuries"].append("back")
+    with pytest.raises(TypeError):
+        profile["prefs"]["time"] = "morning"
+    assert Snapshot.model_validate_json(snap.model_dump_json()) == snap
+
+
+def test_nested_plan_fields_read_only() -> None:
+    plan = _plan(fields={"daily_kcal_target": 1750, "session_slots": [{"slot": "squat"}]})
+    fields: Any = plan.fields  # 故意尝试修改只读内容
+    with pytest.raises(AttributeError):
+        fields["session_slots"].clear()
+    with pytest.raises(TypeError):
+        fields["session_slots"][0]["slot"] = "x"
+    assert PlanVersion.model_validate_json(plan.model_dump_json()) == plan
+
+
+def test_diff_bool_and_number_differ() -> None:
+    with pytest.raises(ValidationError):
+        _plan(
+            fields={"daily_kcal_target": True},
+            diff=[{"field": "daily_kcal_target", "from_value": 1900, "to_value": 1}],
+        )

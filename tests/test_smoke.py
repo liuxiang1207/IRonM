@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 def _registered_layers() -> set[str]:
     """依赖分层配置里登记的子包，是子包清单的唯一来源。"""
     with (ROOT / "pyproject.toml").open("rb") as f:
-        [contract] = tomllib.load(f)["tool"]["importlinter"]["contracts"]
+        contracts = tomllib.load(f)["tool"]["importlinter"]["contracts"]
+    [contract] = [c for c in contracts if c["type"] == "layers"]
     return {name.strip() for layer in contract["layers"] for name in layer.split("|")}
 
 

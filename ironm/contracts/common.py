@@ -4,13 +4,14 @@ from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
-from typing import Annotated
+from typing import Annotated, cast
 
 from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
+    JsonValue,
     SerializerFunctionWrapHandler,
     WrapSerializer,
 )
@@ -28,17 +29,51 @@ class ContractModel(BaseModel):
 type UtcDatetime = Annotated[datetime, AfterValidator(ensure_utc)]
 
 
-def _freeze[K, V](mapping: Mapping[K, V]) -> Mapping[K, V]:
-    return MappingProxyType(dict(mapping))
+def deep_freeze(value: object) -> object:
+    """递归转为只读：映射 → 只读映射，列表 → 元组。"""
+    if isinstance(value, Mapping):
+        return MappingProxyType({k: deep_freeze(v) for k, v in value.items()})
+    if isinstance(value, list | tuple):
+        return tuple(deep_freeze(v) for v in value)
+    return value
 
 
-# 只读映射：模型本身 frozen 只防重新赋值，映射内容也要防改
-def _thaw(mapping: Mapping[object, object], handler: SerializerFunctionWrapHandler) -> object:
-    return handler(dict(mapping))
+def deep_thaw(value: object) -> object:
+    """deep_freeze 的逆过程，用于序列化。"""
+    if isinstance(value, Mapping):
+        return {k: deep_thaw(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [deep_thaw(v) for v in value]
+    return value
 
 
+def json_equal(a: object, b: object) -> bool:
+    """JSON 值比较；与 Python 的 == 不同，数值与布尔不视为相等（1 != True）。"""
+    if isinstance(a, bool) or isinstance(b, bool):
+        return type(a) is type(b) and a == b
+    if isinstance(a, Mapping) and isinstance(b, Mapping):
+        return a.keys() == b.keys() and all(json_equal(a[k], b[k]) for k in a)
+    if isinstance(a, list | tuple) and isinstance(b, list | tuple):
+        return len(a) == len(b) and all(json_equal(x, y) for x, y in zip(a, b, strict=True))
+    return a == b
+
+
+def _freeze_map[K, V](mapping: Mapping[K, V]) -> Mapping[K, V]:
+    return cast(Mapping[K, V], deep_freeze(mapping))
+
+
+def _thaw(value: object, handler: SerializerFunctionWrapHandler) -> object:
+    return handler(deep_thaw(value))
+
+
+# 只读映射：模型本身 frozen 只防重新赋值，映射及其嵌套内容也要防改
 type FrozenMap[K, V] = Annotated[
-    Mapping[K, V], AfterValidator(_freeze), WrapSerializer(_thaw, when_used="always")
+    Mapping[K, V], AfterValidator(_freeze_map), WrapSerializer(_thaw, when_used="always")
+]
+
+# 只读的任意 JSON 值（嵌套的列表与对象同样不可改）
+type FrozenJson = Annotated[
+    JsonValue, AfterValidator(deep_freeze), WrapSerializer(_thaw, when_used="always")
 ]
 
 # 带版本的名称，如 diet_review@1.0.0

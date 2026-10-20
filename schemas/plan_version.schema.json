@@ -7,10 +7,10 @@
           "$ref": "#/$defs/PlanField"
         },
         "from_value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         },
         "to_value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         }
       },
       "required": [
@@ -20,6 +20,9 @@
       ],
       "title": "FieldChange",
       "type": "object"
+    },
+    "FrozenJson": {
+      "$ref": "#/$defs/JsonValue"
     },
     "FrozenMap_PlanField_JsonValue_": {
       "additionalProperties": {

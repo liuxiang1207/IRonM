@@ -99,6 +99,25 @@ class Persona(_Model):
     hidden: Hidden
     traps: tuple[Trap, ...] = ()
 
+    @model_validator(mode="after")
+    def _check_traps(self) -> "Persona":
+        last = self.weeks * 7
+        single_days: dict[int, str] = {}
+        for t in self.traps:
+            for name in ("day", "from_day", "to_day"):
+                value = getattr(t, name)
+                if value is not None and not 1 <= value <= last:
+                    raise ValueError(f"陷阱 {t.kind} 的 {name}={value} 超出模拟范围 1–{last}")
+            if t.day is not None:
+                if t.day in single_days:
+                    raise ValueError(
+                        f"第 {t.day} 天同时有 {single_days[t.day]} 与 {t.kind} 两个陷阱，会互相覆盖"
+                    )
+                single_days[t.day] = t.kind
+            if t.from_day is not None and t.to_day is not None and t.from_day > t.to_day:
+                raise ValueError(f"陷阱 {t.kind} 的起止天颠倒：{t.from_day} > {t.to_day}")
+        return self
+
     def tz(self) -> timezone:
         return timezone(timedelta(hours=self.tz_offset_hours))
 

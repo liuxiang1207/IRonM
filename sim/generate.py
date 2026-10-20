@@ -200,7 +200,7 @@ def generate(p: Persona) -> Simulation:
                     {
                         "fatigue": fatigue,
                         "sleep_quality": _clamp(6 - fatigue + r.randint(-1, 0)),
-                        "diet_adherence_days": min(7, round(7 * p_done + r.uniform(-1, 1))),
+                        "diet_adherence_days": max(0, min(7, round(7 * p_done + r.uniform(-1, 1)))),
                         "clothes_fit": fit,
                     },
                 )

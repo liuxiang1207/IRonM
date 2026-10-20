@@ -34,11 +34,14 @@ class Migration:
 
 
 def load_migrations(migrations_dir: Path) -> list[Migration]:
+    if not migrations_dir.is_dir():
+        raise MigrationError(f"迁移目录不存在：{migrations_dir}")
     found: dict[int, Migration] = {}
-    for path in sorted(migrations_dir.glob("*.sql")):
+    files = [p for p in sorted(migrations_dir.iterdir()) if not p.name.startswith(".")]
+    for path in files:
         match = _NAME_RE.fullmatch(path.name)
         if match is None:
-            raise MigrationError(f"迁移文件名不合规（应为 NNNN_说明.sql）：{path.name}")
+            raise MigrationError(f"迁移目录中有不合规的文件（应为 NNNN_说明.sql）：{path.name}")
         version = int(match.group(1))
         if version in found:
             raise MigrationError(f"迁移编号 {version:04d} 重复：{found[version].name}、{path.name}")

@@ -1,6 +1,7 @@
 """加载规则目录下的全部 *.yaml。任何格式问题都直接报错，应用因此启动失败。"""
 
 import json
+import re
 from collections.abc import Hashable, Sequence
 from pathlib import Path
 
@@ -23,7 +24,27 @@ class UnknownRuleError(KeyError):
 
 
 class _StrictLoader(yaml.SafeLoader):
-    """同一层级出现重复的键时报错（PyYAML 默认静默覆盖）。"""
+    """同一层级出现重复的键时报错（PyYAML 默认静默覆盖）；数字与真假值只认现行标准写法。"""
+
+
+# PyYAML 沿用 YAML 1.1：1:30 读成 90、010 读成 8、yes / on 读成真，都会悄悄改值。
+# 换成 YAML 1.2 核心写法，旧式写法一律当文字，再由类型校验报错。
+_BOOL, _INT, _FLOAT = (f"tag:yaml.org,2002:{t}" for t in ("bool", "int", "float"))
+_StrictLoader.yaml_implicit_resolvers = {
+    first: [(tag, rx) for tag, rx in resolvers if tag not in {_BOOL, _INT, _FLOAT}]
+    for first, resolvers in yaml.SafeLoader.yaml_implicit_resolvers.items()
+}
+_StrictLoader.add_implicit_resolver(_BOOL, re.compile(r"^(?:true|false)$"), list("tf"))
+_StrictLoader.add_implicit_resolver(
+    _INT, re.compile(r"^[-+]?(?:0|[1-9][0-9]*)$"), list("-+0123456789")
+)
+_StrictLoader.add_implicit_resolver(
+    _FLOAT,
+    re.compile(
+        r"^[-+]?(?:(?:0|[1-9][0-9]*)\.[0-9]+(?:[eE][-+]?[0-9]+)?|(?:0|[1-9][0-9]*)[eE][-+]?[0-9]+)$"
+    ),
+    list("-+0123456789"),
+)
 
 
 def _construct_mapping(loader: _StrictLoader, node: yaml.MappingNode) -> dict[Hashable, object]:
@@ -81,9 +102,15 @@ def _load_file(path: Path) -> RuleSet:
 def load_rules(rules_dir: Path) -> RuleBook:
     if not rules_dir.is_dir():
         raise RuleLoadError(f"规则目录不存在：{rules_dir}")
-    for path in sorted(rules_dir.rglob("*.yml")):
-        raise RuleLoadError(f"{path}：规则文件扩展名必须是 .yaml")
-    files = sorted(rules_dir.rglob("*.yaml"))
+    files: list[Path] = []
+    for path in sorted(p for p in rules_dir.rglob("*") if p.is_file()):
+        if any(part.startswith(".") for part in path.relative_to(rules_dir).parts):
+            continue  # 隐藏文件（如 .DS_Store）
+        if path.suffix == ".md":
+            continue  # 说明文档
+        if path.suffix != ".yaml":
+            raise RuleLoadError(f"{path}：规则目录中只能有 .yaml 规则文件或 .md 说明")
+        files.append(path)
     if not files:
         raise RuleLoadError(f"规则目录里没有任何规则表：{rules_dir}")
 

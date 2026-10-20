@@ -2,6 +2,7 @@
 
 import io
 import json
+import logging
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 
@@ -112,3 +113,48 @@ def _run_flow(seed: int) -> str:
 def test_flow_reproducible() -> None:
     assert _run_flow(42) == _run_flow(42)
     assert _run_flow(42) != _run_flow(43)
+
+
+# ---- 独立审查后补充：取值受限、标准日志接口不泄露 ----
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("user_id", "今天胸口疼得厉害"),
+        ("event_id", "has space"),
+        ("status", "体重 92kg"),
+        ("path", "/x?note=头晕"),
+        ("error_type", "ValueError: 体重 80"),
+        ("method", "DELETE everything"),
+    ],
+)
+def test_free_text_values_rejected(stream: io.StringIO, field: str, value: str) -> None:
+    with pytest.raises(LogFieldError, match=field):
+        get_logger("ironm.test").info("event.recorded", **{field: value})
+    assert stream.getvalue() == ""
+
+
+def test_identifier_values_accepted(stream: io.StringIO) -> None:
+    get_logger("ironm.test").info(
+        "http.request",
+        user_id="u_1",
+        event_id="6f1c2a3e-1b2c-4d5e-8f90-123456789abc",
+        status="ok",
+        path="/events/batch",
+        method="POST",
+        error_type="sqlite3.IntegrityError",
+        status_code=200,
+        duration_ms=12.5,
+    )
+    assert len(_lines(stream)) == 1
+
+
+def test_stdlib_logging_does_not_leak(stream: io.StringIO) -> None:
+    logging.getLogger("ironm.y").warning("用户说胸口很痛 %s", "体重 80")
+    out = stream.getvalue()
+    assert "胸口" not in out
+    assert "体重" not in out
+    [rec] = _lines(stream)
+    assert rec["event"] == "log.rejected_unstructured"
+    assert rec["logger"] == "ironm.y"

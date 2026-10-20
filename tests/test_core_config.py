@@ -38,6 +38,8 @@ def test_ignores_unprefixed_vars() -> None:
         ({"IRONM_ENV": "staging"}, "IRONM_ENV"),
         ({"IRONM_LOG_LEVEL": "loud"}, "IRONM_LOG_LEVEL"),
         ({"IRONM_FOO": "1"}, "IRONM_FOO"),
+        ({"IRONM_ENV": "prod", "IRONM_env": "test"}, "IRONM_env"),
+        ({"IRONM_log_level": "debug"}, "IRONM_log_level"),
     ],
 )
 def test_invalid_or_unknown_fails_naming_var(environ: dict[str, str], var: str) -> None:

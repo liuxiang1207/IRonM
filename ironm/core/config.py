@@ -23,7 +23,11 @@ class Settings(BaseModel):
 
 
 def load_settings(environ: Mapping[str, str]) -> Settings:
-    values = {k.removeprefix(PREFIX).lower(): v for k, v in environ.items() if k.startswith(PREFIX)}
+    keys = [k for k in environ if k.startswith(PREFIX)]
+    lower = sorted(k for k in keys if k != k.upper())
+    if lower:
+        raise ConfigError(f"配置错误；配置项名必须全大写：{', '.join(lower)}")
+    values = {k.removeprefix(PREFIX).lower(): environ[k] for k in keys}
     try:
         return Settings.model_validate(values)
     except ValidationError as e:

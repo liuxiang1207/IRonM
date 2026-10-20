@@ -49,7 +49,7 @@
           "$ref": "#/$defs/Text"
         },
         "value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         }
       },
       "required": [
@@ -79,10 +79,10 @@
           "$ref": "#/$defs/PlanField"
         },
         "from_value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         },
         "to_value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         }
       },
       "required": [
@@ -92,6 +92,9 @@
       ],
       "title": "FieldChange",
       "type": "object"
+    },
+    "FrozenJson": {
+      "$ref": "#/$defs/JsonValue"
     },
     "FrozenMap_Domain_Precision_": {
       "additionalProperties": {

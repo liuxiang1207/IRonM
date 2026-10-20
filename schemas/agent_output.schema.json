@@ -39,7 +39,7 @@
           "$ref": "#/$defs/Text"
         },
         "value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         }
       },
       "required": [
@@ -83,6 +83,9 @@
       ],
       "title": "ConstraintOutput",
       "type": "object"
+    },
+    "FrozenJson": {
+      "$ref": "#/$defs/JsonValue"
     },
     "JsonValue": {},
     "NoOpinionOutput": {
@@ -162,7 +165,7 @@
           "$ref": "#/$defs/PlanField"
         },
         "from_value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         },
         "proposal_id": {
           "$ref": "#/$defs/Text"
@@ -187,7 +190,7 @@
           "$ref": "#/$defs/Text"
         },
         "to_value": {
-          "$ref": "#/$defs/JsonValue"
+          "$ref": "#/$defs/FrozenJson"
         }
       },
       "required": [

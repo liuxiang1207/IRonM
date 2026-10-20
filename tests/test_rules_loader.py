@@ -1,6 +1,7 @@
 """规则表格式与加载（spec [2026-10-20] §6）。"""
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -136,3 +137,42 @@ def test_app_startup_fails_on_bad_rules(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert "demo.yaml" in result.stderr
+
+
+# ---- 独立审查后补充 ----
+
+
+@pytest.mark.parametrize("name", ["extra.YAML", "x.yaml.bak", "notes.txt"])
+def test_unexpected_files_fail(tmp_path: Path, name: str) -> None:
+    d = tmp_path / "rules"
+    _write(d, "demo.yaml", GOOD)
+    _write(d, name, GOOD)
+    with pytest.raises(RuleLoadError, match=re.escape(name)):
+        load_rules(d)
+
+
+def test_docs_and_hidden_files_allowed(tmp_path: Path) -> None:
+    d = tmp_path / "rules"
+    _write(d, "demo.yaml", GOOD)
+    _write(d, "README.md", "# 说明")
+    _write(d, ".DS_Store", "x")
+    assert load_rules(d).versions() == {"demo": "2026.10.1"}
+
+
+@pytest.mark.parametrize(
+    ("literal", "kept"), [("1:30", "1:30"), ("010", "010"), ("yes", "yes"), ("on", "on")]
+)
+def test_yaml11_literals_stay_text(tmp_path: Path, literal: str, kept: str) -> None:
+    rule = _load_one(tmp_path, GOOD.replace("days: 7", f"days: {literal}")).get("R-DEMO-ONE")
+    assert rule.params["days"] == kept
+
+
+def test_standard_literals_still_parsed(tmp_path: Path) -> None:
+    text = GOOD.replace("days: 7", "days: 7\n      flag: true\n      ratio: -0.5\n      big: 1e3")
+    params = _load_one(tmp_path, text).get("R-DEMO-ONE").params
+    assert (params["days"], params["flag"], params["ratio"], params["big"]) == (
+        7,
+        True,
+        -0.5,
+        1000.0,
+    )

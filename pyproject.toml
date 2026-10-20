@@ -55,7 +55,9 @@ xfail_strict = true
 filterwarnings = ["error"]
 
 # 模块依赖方向（spec [2026-10-20] §1）：上层可依赖下层，反之不行；同一行用 | 分隔的互不依赖。
-# store 放在 agents 之上，使 agents / skills / 计算层都无法直接读写存储。
+# store 放在 agents 之上，使 agents / skills / 计算层都无法直接读写存储；
+# 另有一条禁止规则：除编排层与对外接口外，任何模块都不能直接引用 store
+# （调度、记忆需要持久化时，用契约中的数据访问接口，由上层注入实现）。
 # safety 只在 contracts、core 之上，保证离线、模型不可用时仍能独立运行。
 # exhaustive：ironm 下每个子包都必须在这里登记，新增子包漏登记即失败。
 [tool.importlinter]
@@ -80,3 +82,22 @@ layers = [
     "contracts",
     "core",
 ]
+
+[[tool.importlinter.contracts]]
+name = "数据存储只供编排层与对外接口直接使用"
+type = "forbidden"
+source_modules = [
+    "ironm.scheduler",
+    "ironm.memory",
+    "ironm.agents",
+    "ironm.skills",
+    "ironm.engine",
+    "ironm.knowledge",
+    "ironm.llm",
+    "ironm.rules",
+    "ironm.safety",
+    "ironm.contracts",
+    "ironm.core",
+]
+forbidden_modules = ["ironm.store"]
+

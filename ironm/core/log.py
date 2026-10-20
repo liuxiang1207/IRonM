@@ -16,10 +16,13 @@ ROOT_LOGGER = "ironm"
 
 _EVENT_RE = re.compile(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*")
 _ID_FIELD_RE = re.compile(r"[a-z][a-z0-9_]*_id")
-# 运行类字段。新增前确认取值不可能携带健康数据原文
-_RUNTIME_FIELDS = frozenset(
-    {"status", "status_code", "method", "path", "duration_ms", "count", "attempt", "error_type"}
-)
+# 取值规则：标识与状态只能是不含空格、中文的短标识；路径不得带查询参数
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_.:\-]{1,128}")
+_PATH_RE = re.compile(r"/[A-Za-z0-9_.\-/]{0,255}")
+_METHODS = frozenset({"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"})
+# 运行类字段及其取值规则。新增前确认取值不可能携带健康数据原文
+_NUMERIC_FIELDS = frozenset({"status_code", "duration_ms", "count", "attempt"})
+_TEXT_FIELDS = {"status": _TOKEN_RE, "error_type": _TOKEN_RE, "path": _PATH_RE}
 _LEVELS = {
     "debug": logging.DEBUG,
     "info": logging.INFO,
@@ -44,9 +47,14 @@ class _JsonFormatter(logging.Formatter):
             "ts": self._clock.now().isoformat(),
             "level": record.levelname.lower(),
             "logger": record.name,
-            "event": record.msg,
         }
-        line.update(getattr(record, "ironm_fields", {}))
+        fields = getattr(record, "ironm_fields", None)
+        if fields is None:
+            # 绕过结构化接口写的日志：内容可能含健康数据，只记下“有一条被拒”，不输出原文
+            line["event"] = "log.rejected_unstructured"
+        else:
+            line["event"] = record.msg
+            line.update(fields)
         return json.dumps(line, ensure_ascii=False)
 
 
@@ -70,10 +78,23 @@ def _check(event: str, fields: dict[str, FieldValue]) -> None:
     if not _EVENT_RE.fullmatch(event):
         raise LogFieldError(f"日志事件名必须是点分小写标识，不能是自由文本：{event!r}")
     for key, value in fields.items():
-        if not (_ID_FIELD_RE.fullmatch(key) or key in _RUNTIME_FIELDS):
+        if value is None:
+            continue
+        if key in _NUMERIC_FIELDS:
+            ok = isinstance(value, int | float) and not isinstance(value, bool)
+        elif key == "method":
+            ok = value in _METHODS
+        elif key in _TEXT_FIELDS:
+            ok = isinstance(value, str) and _TEXT_FIELDS[key].fullmatch(value) is not None
+        elif _ID_FIELD_RE.fullmatch(key):
+            ok = isinstance(value, int) or (
+                isinstance(value, str) and _TOKEN_RE.fullmatch(value) is not None
+            )
+        else:
             raise LogFieldError(f"日志字段不在允许范围内：{key}")
-        if not isinstance(value, str | int | float | bool | None):
-            raise LogFieldError(f"日志字段 {key} 只能是标量，实际为 {type(value).__name__}")
+        if not ok:
+            # 不在错误信息里回显取值：它可能正是健康数据原文
+            raise LogFieldError(f"日志字段 {key} 的取值不合规（{type(value).__name__}）")
 
 
 class StructLogger:

@@ -3,7 +3,7 @@
 import json
 import sqlite3
 from collections.abc import Collection
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from ironm.contracts.events import EVENT_ADAPTER, Event
@@ -11,6 +11,7 @@ from ironm.core.clock import Clock
 from ironm.store.db import from_db_time, to_db_time, transaction
 
 _MIN_QUERY_CHARS = 3  # trigram 分词至少需要 3 个字才能匹配
+_CLOCK_SKEW = timedelta(minutes=5)  # 允许的设备时钟误差
 
 
 class EventConflictError(ValueError):
@@ -19,6 +20,10 @@ class EventConflictError(ValueError):
 
 class InvalidCorrectionError(ValueError):
     pass
+
+
+class FutureEventError(ValueError):
+    """记录时间晚于服务端接收时间（超出允许的时钟误差）。"""
 
 
 class SearchQueryError(ValueError):
@@ -50,6 +55,11 @@ class EventStore:
 
     def append(self, event: Event) -> bool:
         """写入一条记录。返回 False 表示同一记录已存在（内容相同），未重复写入。"""
+        received = self._clock.now()
+        if event.recorded_at > received + _CLOCK_SKEW:
+            raise FutureEventError(
+                f"记录 {event.event_id} 的记录时间晚于接收时间 {received.isoformat()}"
+            )
         with transaction(self._conn):
             existing = self.get(event.event_id)
             if existing is not None:
@@ -68,7 +78,7 @@ class EventStore:
                     event.type,
                     to_db_time(event.occurred_at),
                     to_db_time(event.recorded_at),
-                    to_db_time(self._clock.now()),
+                    to_db_time(received),
                     event.source,
                     int(event.confirmed),
                     event.raw,
@@ -112,6 +122,8 @@ class EventStore:
         """按发生时间排序；时间范围为 [since, until)。"""
         sql = "SELECT * FROM events WHERE user_id = ?"
         params: list[str] = [user_id]
+        if isinstance(types, str):
+            raise TypeError('types 必须是类型的集合，例如 {"weight"}，不能是单个字符串')
         if types is not None:
             sql += f" AND type IN ({', '.join('?' * len(types))})"
             params.extend(types)
