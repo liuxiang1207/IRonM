@@ -1,7 +1,11 @@
 """黄金用例：tests/golden/*.yaml 驱动（spec [2026-10-20] §7）。"""
 
+import inspect
+import json
 import math
+from collections.abc import Callable
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import BaseModel, ConfigDict, validate_call
@@ -26,6 +30,21 @@ def _close(a: object, b: object) -> bool:
     return a == b
 
 
+def _convert(fn: Callable[..., object], given: dict[str, object]) -> dict[str, object]:
+    """契约参数按 JSON 校验（契约是严格模式，日期等只能从 JSON 文字读入）；时区名转成时区。"""
+    hints = inspect.get_annotations(fn, eval_str=True)
+    out: dict[str, object] = {}
+    for name, value in given.items():
+        kind = hints.get(name)
+        if isinstance(kind, type) and issubclass(kind, BaseModel) and isinstance(value, dict):
+            out[name] = kind.model_validate_json(json.dumps(value))
+        elif kind is ZoneInfo and isinstance(value, str):
+            out[name] = ZoneInfo(value)
+        else:
+            out[name] = value
+    return out
+
+
 def test_golden_files_consistent() -> None:
     assert FILES, "没有任何黄金用例文件"
     check_golden(FILES.values(), BOOK)
@@ -38,7 +57,7 @@ def test_golden(file: GoldenFile, case: GoldenCase, request: pytest.FixtureReque
             pytest.mark.xfail(raises=NotImplementedError, strict=True, reason=file.reason or "")
         )
     fn = resolve(file.target, file.status)
-    kwargs = dict(case.given)
+    kwargs = _convert(fn, dict(case.given))
     if "rulebook" in file.inject:
         kwargs["rulebook"] = BOOK
     # 按被测函数的参数类型转换 YAML 中的取值（如时间文字 → 带时区的时间）

@@ -13,6 +13,7 @@ from ironm.contracts.metrics import MetricResult
 from ironm.contracts.model_call import ModelCall
 from ironm.contracts.plan import PlanVersion
 from ironm.contracts.rules import RuleSet
+from ironm.contracts.screening import Screening, TierResult
 from ironm.contracts.snapshot import Snapshot
 from ironm.contracts.unknown import Unknown
 
@@ -25,6 +26,8 @@ SCHEMAS: dict[str, TypeAdapter[Any]] = {
     "plan_version": TypeAdapter(PlanVersion),
     "model_call": TypeAdapter(ModelCall),
     "rule_set": TypeAdapter(RuleSet),
+    "screening": TypeAdapter(Screening),
+    "tier_result": TypeAdapter(TierResult),
 }
 
 

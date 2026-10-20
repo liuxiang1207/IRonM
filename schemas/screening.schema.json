@@ -1,0 +1,202 @@
+{
+  "$defs": {
+    "Condition": {
+      "description": "筛查问卷中可申报的健康状况。各自归入哪一层写在规则表里。",
+      "enum": [
+        "hypertension",
+        "recent_injury",
+        "weight_loss_drug_supervised",
+        "weight_loss_drug_unsupervised",
+        "pregnant",
+        "breastfeeding",
+        "postpartum_within_year",
+        "heart_disease",
+        "kidney_disease",
+        "diabetes_on_medication",
+        "injury_rehab",
+        "eating_disorder_history",
+        "eating_disorder_signal"
+      ],
+      "title": "Condition",
+      "type": "string"
+    },
+    "SafetyFlag": {
+      "additionalProperties": false,
+      "description": "一次红旗或急症判定的记录；不含用户原话。",
+      "properties": {
+        "at": {
+          "$ref": "#/$defs/UtcDatetime"
+        },
+        "categories": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "title": "Categories",
+          "type": "array"
+        },
+        "level": {
+          "enum": [
+            "emergency",
+            "red_flag"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "rule_ids": {
+          "items": {
+            "$ref": "#/$defs/Text"
+          },
+          "minItems": 1,
+          "title": "Rule Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "at",
+        "level",
+        "rule_ids"
+      ],
+      "title": "SafetyFlag",
+      "type": "object"
+    },
+    "Sex": {
+      "enum": [
+        "male",
+        "female"
+      ],
+      "title": "Sex",
+      "type": "string"
+    },
+    "Text": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "description": "JSON 形如 {\"unknown\": \"not_recorded\"}。不能参与运算，也不能当真假值判断。",
+      "properties": {
+        "unknown": {
+          "$ref": "#/$defs/UnknownReason"
+        }
+      },
+      "required": [
+        "unknown"
+      ],
+      "title": "Unknown",
+      "type": "object"
+    },
+    "UnknownReason": {
+      "enum": [
+        "not_recorded",
+        "declined",
+        "unparseable",
+        "insufficient_data"
+      ],
+      "title": "UnknownReason",
+      "type": "string"
+    },
+    "UtcDatetime": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "分层所需的筛查信息；每项都可以是“未知”。",
+  "properties": {
+    "birth_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Birth Date"
+    },
+    "clearances": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/UtcDatetime"
+      },
+      "title": "Clearances",
+      "type": "array"
+    },
+    "conditions": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Condition"
+          },
+          "type": "array"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Conditions"
+    },
+    "flags": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SafetyFlag"
+      },
+      "title": "Flags",
+      "type": "array"
+    },
+    "height_cm": {
+      "anyOf": [
+        {
+          "maximum": 250,
+          "minimum": 100,
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Height Cm"
+    },
+    "sex": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sex"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Sex"
+    },
+    "waist_cm": {
+      "anyOf": [
+        {
+          "maximum": 250,
+          "minimum": 40,
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Waist Cm"
+    },
+    "weight_kg": {
+      "anyOf": [
+        {
+          "maximum": 400,
+          "minimum": 20,
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Weight Kg"
+    }
+  },
+  "title": "Screening",
+  "type": "object"
+}

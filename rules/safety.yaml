@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=../schemas/rule_set.schema.json
+# 安全分层（spec §23）。只能由人修改，改动后必须同时改黄金用例 tests/golden/safety_tiers.yaml。
+# 分层顺序（暂停 > D > C > 不适用 > 协作 > B > A′ > A）写在代码里；这里只放界值与健康状况的归属。
+rule_set: safety
+version: 2026.10.1
+rules:
+  - id: R-SF-TIER
+    title: 人群安全分层（减脂场景）
+    status: pending_review
+    source:
+      kind: guideline
+      ref: WS/T 428-2013《成人体重判定》（BMI 与腰围切点）；国家卫健委《体重管理指导原则（2024年版）》（BMI ≥ 32.5 分阶段减重与转诊情形）；IronM 方案 v3.0 §4.1
+    params:
+      adult_age: 18  # 未满即 D
+      senior_age: 65  # 达到即 B
+      bmi_underweight: 18.5  # 低于即不适用（减脂）
+      bmi_overweight: 24.0  # 达到即 A
+      bmi_staged: 32.5  # 达到即 B（分阶段减重）
+      waist_male_cm: 85.0  # 中心型肥胖前期，达到即 A
+      waist_female_cm: 80.0
+      c_conditions: [pregnant, breastfeeding, postpartum_within_year, heart_disease, kidney_disease, diabetes_on_medication, injury_rehab, eating_disorder_history, eating_disorder_signal, weight_loss_drug_unsupervised]
+      collaborative_conditions: [weight_loss_drug_supervised]
+      b_conditions: [hypertension, recent_injury]
+    note: BMI 按一位小数四舍五入后比较；年龄按用户时区的当地日期（生日当天算满岁）。协作层准入条件待医学顾问审定。每种健康状况必须且只能归入一层。

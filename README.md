@@ -55,7 +55,7 @@ make run       # 本地启动（启动时自动执行迁移）；/healthz 存活
 ironm/
   core/        时间来源、标识生成、配置、结构化日志（最底层）
   contracts/   数据契约：记录、未知值、指标结果、Agent 输出、字段归属、快照、计划版本、模型调用
-  safety/      急症词表（emergency_terms.yaml，只能由人修改）与匹配：不依赖其他业务模块，离线可用
+  safety/      急症词表（emergency_terms.yaml，只能由人修改）与匹配、人群安全分层：不依赖其他业务模块，离线可用
   rules/ engine/ knowledge/ llm/ skills/ agents/ memory/ orchestrator/ scheduler/ api/
   store/       SQLite 连接、迁移执行器、记录仓储（只追加、去重、全文检索）
 migrations/    按编号的数据库迁移脚本

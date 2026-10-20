@@ -24,6 +24,7 @@ from ironm.engine.precision import (
 from ironm.engine.trend import WEIGHT_TREND, TrendParams
 from ironm.engine.window import JUDGEMENT_WINDOW, WindowParams
 from ironm.rules.loader import RuleBook
+from ironm.safety.tiers import TIER_RULE, TierParams
 
 RULE_PARAMS: dict[str, type[BaseModel]] = {
     WEIGHT_JUMP: WeightJumpParams,
@@ -36,6 +37,7 @@ RULE_PARAMS: dict[str, type[BaseModel]] = {
     DIET: DietParams,
     RECOVERY: RecoveryParams,
     JUDGEMENT_WINDOW: WindowParams,
+    TIER_RULE: TierParams,
     DIET_MIN_DATA: DietMinDataParams,
     **{rule_id_for(level): EnergyParams for level in range(1, 6)},
 }

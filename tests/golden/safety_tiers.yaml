@@ -1,0 +1,986 @@
+# 黄金用例：人群安全分层（R-SF-TIER，spec §23）。由人维护；改规则必须同时改这里。
+# 结果中 reasons 列出所有满足的层的依据（不只主层）。
+# 默认筛查信息：1990-06-15 出生、女、身高 200 厘米、体重 100 千克（BMI 25.0）、腰围 70、无健康状况；截至上海 2026-10-20 中午。
+target: ironm.safety.tiers:classify
+status: active
+inject:
+- rulebook
+rules:
+- R-SF-TIER
+cases:
+- id: G-SF-T-001
+  title: 明天满 18 岁 → D
+  given:
+    screening:
+      birth_date: '2008-10-21'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: d
+    status: ok
+- id: G-SF-T-002
+  title: 今天满 18 岁（生日当天）→ A
+  given:
+    screening:
+      birth_date: '2008-10-20'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+  twin_of: G-SF-T-001
+- id: G-SF-T-003
+  title: 上海已是生日当天 → 满 18 岁、A
+  given:
+    screening:
+      birth_date: '2008-10-20'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-19T17:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+- id: G-SF-T-004
+  title: 同一时刻按世界时还是前一天 → 未满 18、D
+  given:
+    screening:
+      birth_date: '2008-10-20'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-19T17:00:00Z'
+    tz: UTC
+  expect:
+    tier: d
+    status: ok
+  twin_of: G-SF-T-003
+- id: G-SF-T-005
+  title: 64 岁（明天满 65）→ A
+  given:
+    screening:
+      birth_date: '1961-10-21'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+- id: G-SF-T-006
+  title: 今天满 65 岁 → B，同时满足 A
+  given:
+    screening:
+      birth_date: '1961-10-20'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: b
+    status: ok
+    matched:
+    - b
+    - a
+  twin_of: G-SF-T-005
+- id: G-SF-T-010
+  title: BMI 18.4 → 不适用（减脂）
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 73.6
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: not_applicable
+    status: ok
+- id: G-SF-T-011
+  title: BMI 18.5 → A′
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 74.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: ok
+    bmi: 18.5
+  twin_of: G-SF-T-010
+- id: G-SF-T-012
+  title: BMI 18.45 四舍五入为 18.5 → A′
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 73.8
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: ok
+    bmi: 18.5
+- id: G-SF-T-013
+  title: BMI 23.9 → A′
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 95.6
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: ok
+    bmi: 23.9
+- id: G-SF-T-014
+  title: BMI 24.0 → A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 96.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+    bmi: 24.0
+  twin_of: G-SF-T-013
+- id: G-SF-T-015
+  title: BMI 32.4 → A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 129.6
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+    bmi: 32.4
+- id: G-SF-T-016
+  title: BMI 32.5 → B（分阶段减重），同时满足 A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 130.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: b
+    status: ok
+    bmi: 32.5
+    matched:
+    - b
+    - a
+  twin_of: G-SF-T-015
+- id: G-SF-T-020
+  title: 男、腰围 84 → A′
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: male
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 84.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: ok
+- id: G-SF-T-021
+  title: 男、腰围 85 → A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: male
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 85.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+  twin_of: G-SF-T-020
+- id: G-SF-T-022
+  title: 女、腰围 79 → A′
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 79.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: ok
+- id: G-SF-T-023
+  title: 女、腰围 80 → A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 80.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+  twin_of: G-SF-T-022
+- id: G-SF-T-024
+  title: 性别未知、腰围 82（介于两个界值之间）→ 按 A′ 假设，还差性别
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: &id001
+        unknown: not_recorded
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 82.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: assumed
+    missing:
+    - sex
+- id: G-SF-T-025
+  title: 性别未知、腰围 86（两个界值都达到）→ A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: *id001
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 86.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+- id: G-SF-T-026
+  title: 性别未知、腰围 78（两个界值都没达到）→ A′
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: *id001
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 78.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: ok
+- id: G-SF-T-027
+  title: 腰围未知、BMI 22 → 按 A′ 假设，还差腰围
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: *id001
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a_prime
+    status: assumed
+    missing:
+    - waist_cm
+- id: G-SF-T-028
+  title: 腰围未知、BMI 25 → A（BMI 已足够判断）
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: *id001
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+    missing: []
+- id: G-SF-T-030
+  title: pregnant → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - pregnant
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-031
+  title: breastfeeding → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - breastfeeding
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-032
+  title: postpartum_within_year → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - postpartum_within_year
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-033
+  title: heart_disease → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - heart_disease
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-034
+  title: kidney_disease → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - kidney_disease
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-035
+  title: diabetes_on_medication → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - diabetes_on_medication
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-036
+  title: injury_rehab → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - injury_rehab
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-037
+  title: eating_disorder_history → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - eating_disorder_history
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-038
+  title: eating_disorder_signal → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - eating_disorder_signal
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-039
+  title: weight_loss_drug_unsupervised → c
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - weight_loss_drug_unsupervised
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-040
+  title: weight_loss_drug_supervised → collaborative
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - weight_loss_drug_supervised
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: collaborative
+    status: ok
+- id: G-SF-T-041
+  title: hypertension → b
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - hypertension
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: b
+    status: ok
+- id: G-SF-T-042
+  title: recent_injury → b
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - recent_injury
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: b
+    status: ok
+- id: G-SF-T-050
+  title: 70 岁、BMI 22、腰围正常 → 主层 B，同时满足 A′
+  given:
+    screening:
+      birth_date: '1956-01-01'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 88.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: b
+    status: ok
+    matched:
+    - b
+    - a_prime
+- id: G-SF-T-051
+  title: 孕期 + 高血压 → C，同时满足 B
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - pregnant
+      - hypertension
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+    matched:
+    - c
+    - b
+    - a
+- id: G-SF-T-052
+  title: BMI 17 + 医生指导下用药 → 不适用，同时满足协作
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 68.0
+      waist_cm: 70.0
+      conditions:
+      - weight_loss_drug_supervised
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: not_applicable
+    status: ok
+    matched:
+    - not_applicable
+    - collaborative
+- id: G-SF-T-053
+  title: BMI 17 + 孕期 → C
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 68.0
+      waist_cm: 70.0
+      conditions:
+      - pregnant
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+    matched:
+    - c
+    - not_applicable
+- id: G-SF-T-054
+  title: 未满 18 岁 + 孕期 → D
+  given:
+    screening:
+      birth_date: '2010-01-01'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - pregnant
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: d
+    status: ok
+    matched:
+    - d
+    - c
+    - a
+- id: G-SF-T-060
+  title: 昨天有红旗、没有就医确认 → 暂停
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+      flags:
+      - &id002
+        at: '2026-10-19T10:00:00Z'
+        level: red_flag
+        rule_ids: &id003
+        - RF-CHEST
+        categories: &id004
+        - cardiovascular
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: paused
+    status: ok
+    reasons:
+    - red_flag_uncleared
+    - bmi_at_least_overweight
+- id: G-SF-T-061
+  title: 红旗之后已就医确认 → 恢复 A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+      flags:
+      - *id002
+      clearances:
+      - '2026-10-19T12:00:00Z'
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+  twin_of: G-SF-T-060
+- id: G-SF-T-062
+  title: 就医确认早于红旗 → 仍暂停
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+      flags:
+      - *id002
+      clearances:
+      - '2026-10-18T12:00:00Z'
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: paused
+    status: ok
+- id: G-SF-T-063
+  title: 就医确认与红旗同一时刻 → 仍暂停
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+      flags:
+      - *id002
+      clearances:
+      - '2026-10-19T10:00:00Z'
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: paused
+    status: ok
+- id: G-SF-T-064
+  title: 红旗在截至时间之后 → 不计入、A
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+      flags:
+      - at: '2026-10-20T05:00:00Z'
+        level: red_flag
+        rule_ids: *id003
+        categories: *id004
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+- id: G-SF-T-065
+  title: 催吐类红旗已就医确认 → C（进食障碍信号）
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+      flags:
+      - &id005
+        at: '2026-10-19T10:00:00Z'
+        level: red_flag
+        rule_ids:
+        - RF-PURGE
+        categories:
+        - eating_disorder
+      clearances:
+      - '2026-10-19T12:00:00Z'
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+    reasons:
+    - condition:eating_disorder_signal
+    - bmi_at_least_overweight
+- id: G-SF-T-066
+  title: 催吐类红旗、问卷未答 → 已就医确认后仍可判为 C
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: *id001
+      flags:
+      - *id005
+      clearances:
+      - '2026-10-19T12:00:00Z'
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: c
+    status: ok
+- id: G-SF-T-070
+  title: 出生日期未知 → 分层未知，还差出生日期
+  given:
+    screening:
+      birth_date: *id001
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: &id006
+      unknown: insufficient_data
+    status: insufficient
+    missing:
+    - birth_date
+- id: G-SF-T-071
+  title: 问卷未答 → 分层未知，还差健康状况
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: *id001
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: *id006
+    status: insufficient
+    missing:
+    - conditions
+- id: G-SF-T-072
+  title: 身高未知 → 分层未知，还差身高
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: *id001
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: *id006
+    status: insufficient
+    missing:
+    - height_cm
+    bmi: *id006
+- id: G-SF-T-073
+  title: 什么都不知道但有未确认的红旗 → 暂停
+  given:
+    screening:
+      flags:
+      - *id002
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: paused
+    status: ok
+- id: G-SF-T-074
+  title: 未满 18 岁、问卷未答 → D（问卷不影响结果）
+  given:
+    screening:
+      birth_date: '2010-01-01'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: *id001
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: d
+    status: ok
+    missing: []
+- id: G-SF-T-075
+  title: 出生日期未知、孕期 → 分层未知（可能是未成年）
+  given:
+    screening:
+      birth_date: *id001
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions:
+      - pregnant
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: *id006
+    status: insufficient
+    missing:
+    - birth_date
+- id: G-SF-T-076
+  title: 高血压、体重未知 → B 之前要先排除 BMI 过低，分层未知
+  given:
+    screening:
+      birth_date: '1990-06-15'
+      sex: female
+      height_cm: 200.0
+      weight_kg: *id001
+      waist_cm: 70.0
+      conditions:
+      - hypertension
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: *id006
+    status: insufficient
+    missing:
+    - weight_kg
+- id: G-SF-T-077
+  title: 出生日期晚于今天（填错）→ 视为未知
+  given:
+    screening:
+      birth_date: '2030-01-01'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: *id006
+    status: insufficient
+    missing:
+    - birth_date
+- id: G-SF-T-078
+  title: 2 月 29 日出生，平年 2 月 28 日还未满岁 → D
+  given:
+    screening:
+      birth_date: '2008-02-29'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-02-28T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: d
+    status: ok
+- id: G-SF-T-079
+  title: 2 月 29 日出生，平年 3 月 1 日满 18 岁 → A
+  given:
+    screening:
+      birth_date: '2008-02-29'
+      sex: female
+      height_cm: 200.0
+      weight_kg: 100.0
+      waist_cm: 70.0
+      conditions: []
+    as_of: '2026-03-01T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tier: a
+    status: ok
+  twin_of: G-SF-T-078

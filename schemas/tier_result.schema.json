@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "Text": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "Tier": {
+      "description": "安全分层，按从严到宽排列；第一期只有减脂场景。",
+      "enum": [
+        "paused",
+        "d",
+        "c",
+        "not_applicable",
+        "collaborative",
+        "b",
+        "a_prime",
+        "a"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "description": "JSON 形如 {\"unknown\": \"not_recorded\"}。不能参与运算，也不能当真假值判断。",
+      "properties": {
+        "unknown": {
+          "$ref": "#/$defs/UnknownReason"
+        }
+      },
+      "required": [
+        "unknown"
+      ],
+      "title": "Unknown",
+      "type": "object"
+    },
+    "UnknownReason": {
+      "enum": [
+        "not_recorded",
+        "declined",
+        "unparseable",
+        "insufficient_data"
+      ],
+      "title": "UnknownReason",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "分层结果。tier 为主层；matched 为满足的所有层（从严到宽）；missing 为还差的信息。",
+  "properties": {
+    "bmi": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Bmi"
+    },
+    "matched": {
+      "items": {
+        "$ref": "#/$defs/Tier"
+      },
+      "title": "Matched",
+      "type": "array"
+    },
+    "missing": {
+      "items": {
+        "$ref": "#/$defs/Text"
+      },
+      "title": "Missing",
+      "type": "array"
+    },
+    "reasons": {
+      "items": {
+        "$ref": "#/$defs/Text"
+      },
+      "title": "Reasons",
+      "type": "array"
+    },
+    "rule_id": {
+      "$ref": "#/$defs/Text"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "assumed",
+        "insufficient"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tier": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Tier"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Tier"
+    }
+  },
+  "required": [
+    "tier",
+    "status",
+    "matched",
+    "reasons",
+    "missing",
+    "bmi",
+    "rule_id"
+  ],
+  "title": "TierResult",
+  "type": "object"
+}

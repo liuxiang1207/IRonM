@@ -3,14 +3,21 @@
 from enum import StrEnum
 from typing import Annotated, Self
 
-from pydantic import BaseModel, Field, ValidationError, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, ValidationError, model_validator
 
 from ironm.contracts.common import ContractModel, FrozenMap
 
 type Text = Annotated[str, Field(min_length=1)]
 type RuleId = Annotated[str, Field(pattern=r"^R(-[A-Z0-9]+)+$")]
 type Scalar = bool | int | float | str
-type ParamValue = Scalar | tuple[Scalar, ...]
+
+
+def _as_tuple(value: object) -> object:
+    # 只读映射校验前会把元组还原成列表，严格模式下列表不能直接当元组；在这里转回去
+    return tuple(value) if isinstance(value, list) else value
+
+
+type ParamValue = Scalar | Annotated[tuple[Scalar, ...], BeforeValidator(_as_tuple)]
 
 
 class SourceKind(StrEnum):

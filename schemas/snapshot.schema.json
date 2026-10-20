@@ -351,15 +351,16 @@
       "type": "string"
     },
     "Tier": {
-      "description": "安全分层。",
+      "description": "安全分层，按从严到宽排列；第一期只有减脂场景。",
       "enum": [
-        "a",
-        "a_prime",
-        "b",
-        "collaborative",
-        "c",
+        "paused",
         "d",
-        "paused"
+        "c",
+        "not_applicable",
+        "collaborative",
+        "b",
+        "a_prime",
+        "a"
       ],
       "title": "Tier",
       "type": "string"
