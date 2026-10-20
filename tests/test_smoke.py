@@ -17,6 +17,7 @@ EXPECTED_PACKAGES = {
     "agents",
     "api",
     "contracts",
+    "core",
     "engine",
     "knowledge",
     "llm",
