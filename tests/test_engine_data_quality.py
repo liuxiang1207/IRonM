@@ -155,3 +155,25 @@ def test_real_shift_against_corroborated_baseline_still_flagged() -> None:
 def test_single_baseline_not_overturned_without_enough_followers() -> None:
     series = [_w(1, 88.0), _w(3, 80.1)]  # 只有 1 条后续读数，不足以推翻基准
     assert pending_weights(series, BOOK) == {series[1].event_id: "R-DQ-WEIGHT-JUMP"}
+
+
+def test_spike_followed_by_return_does_not_overturn_true_baseline() -> None:
+    # 80 → 82.1（尖峰）→ 80.3 → 80.4：后续读数与基准一致、与尖峰不一致，应标尖峰而不是 80
+    series = [_w(1, 80.0), _w(3, 82.1), _w(4, 80.3), _w(5, 80.4)]
+    assert pending_weights(series, BOOK) == {series[1].event_id: "R-DQ-WEIGHT-JUMP"}
+
+
+def test_followers_close_to_baseline_do_not_overturn_it() -> None:
+    # 后续 81.3、81.4 与 82.1 一致（差 ≤ 1），但与基准 80 相差不到 2：不算“基准有误”
+    series = [_w(1, 80.0), _w(3, 82.1), _w(4, 81.3), _w(5, 81.4)]
+    pending = pending_weights(series, BOOK)
+    assert series[0].event_id not in pending
+    assert series[1].event_id in pending
+
+
+def test_followers_must_agree_with_current_within_tolerance() -> None:
+    # 后续 84.6、82.4 都与基准 80 相差超过 2，但 84.6 与 83 相差 1.6（超过容差 1）：不推翻基准
+    series = [_w(1, 80.0), _w(3, 83.0), _w(4, 84.6), _w(5, 82.4)]
+    pending = pending_weights(series, BOOK)
+    assert series[0].event_id not in pending
+    assert series[1].event_id in pending

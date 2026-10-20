@@ -133,3 +133,18 @@ def test_order_and_duplicates_do_not_change_result(batches: list[list[Event]]) -
 def test_same_time_sorted_by_id_not_arrival() -> None:
     _, listed = _submit([[EVENTS[2]], [EVENTS[1]]])  # 第 3 天两条，倒序到达
     assert [e.event_id for e in listed["u1"]] == [EVENTS[1].event_id, EVENTS[2].event_id]
+
+
+def test_two_corrections_of_same_record_in_one_batch_order_independent(tmp_path: Path) -> None:
+    c1 = _ev(20, kg=79.0, corrects=1)
+    c2 = _ev(21, kg=79.5, corrects=1)
+    outcomes = []
+    for i, order in enumerate(([EVENTS[0], c1, c2], [EVENTS[0], c2, c1])):
+        with closing(connect(tmp_path / f"db{i}.sqlite")) as conn:
+            clock = FixedClock(NOW)
+            migrate(conn, MIGRATIONS_DIR, clock)
+            store = EventStore(conn, clock)
+            statuses = {r.event_id: r.status for r in store.append_many(order)}
+            outcomes.append((statuses, _rows(conn)))
+    assert outcomes[0] == outcomes[1]
+    assert outcomes[0][0][c1.event_id] == outcomes[0][0][c2.event_id] == "invalid"

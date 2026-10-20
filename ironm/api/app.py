@@ -48,21 +48,52 @@ def _invalid(errors: list[dict[str, Any]]) -> JSONResponse:
     return JSONResponse(status_code=422, content={"status": "invalid", "errors": errors})
 
 
+# 校验错误的说明一律用自己的话，不用 pydantic 的原文：
+# 原文可能带出提交的取值（类型名、标识里的字符等）。
+# 限值只取自契约本身（ctx 中的 le / ge 等），不是用户输入。
+_MESSAGES: dict[str, str] = {
+    "missing": "缺少该字段",
+    "extra_forbidden": "未定义的字段",
+    "union_tag_invalid": "记录类型不在支持范围内",
+    "union_tag_not_found": "缺少记录类型",
+    "json_invalid": "请求体不是合法 JSON",
+    "uuid_parsing": "不是合法的记录标识（UUID）",
+    "uuid_type": "不是合法的记录标识（UUID）",
+    "datetime_parsing": "不是合法的时间",
+    "datetime_type": "不是合法的时间",
+    "string_type": "应为文字",
+    "int_type": "应为整数",
+    "float_type": "应为数字",
+    "bool_type": "应为真或假",
+    "finite_number": "应为有限的数字",
+    "literal_error": "取值不在允许范围内",
+    "enum": "取值不在允许范围内",
+    "string_too_short": "不能为空",
+    "value_error": "取值不合规",
+}
+_LIMITS = {
+    "less_than_equal": ("le", "应不大于 {}"),
+    "less_than": ("lt", "应小于 {}"),
+    "greater_than_equal": ("ge", "应不小于 {}"),
+    "greater_than": ("gt", "应大于 {}"),
+}
+
+
 def _safe_msg(err: Any) -> str:
-    """原因说明里若带出了提交的取值（如类型名写成一句话、标识里的字符），改用通用说明。"""
-    msg = str(err["msg"])
-    value = err.get("input")
-    echoed = isinstance(value, str) and value != "" and value in msg
-    if echoed or not msg.isascii():
-        return f"取值不合规（{err['type']}）"
-    return msg
+    kind = str(err["type"])
+    if kind in _LIMITS:
+        key, template = _LIMITS[kind]
+        limit = err.get("ctx", {}).get(key)
+        if isinstance(limit, int | float):
+            return template.format(limit)
+    return _MESSAGES.get(kind, f"取值不合规（{kind}）")
 
 
 def _errors(e: ValidationError) -> list[dict[str, Any]]:
     """校验错误：只给字段位置、原因与类型，不带取值。"""
     return [
         {"loc": _safe_loc(err["loc"]), "msg": _safe_msg(err), "type": err["type"]}
-        for err in e.errors(include_context=False, include_url=False)
+        for err in e.errors(include_input=False, include_url=False)
     ]
 
 
@@ -99,6 +130,9 @@ def create_app(
             yield EventStore(conn, clock)
 
     async def raw_body(request: Request) -> bytes:
+        declared = request.headers.get("content-length")
+        if declared is not None and declared.isdigit() and int(declared) > MAX_BODY_BYTES:
+            raise HTTPException(status_code=413, detail="请求过大")  # 先看声明的大小，不先读进内存
         body = await request.body()
         if len(body) > MAX_BODY_BYTES:
             raise HTTPException(status_code=413, detail="请求过大")

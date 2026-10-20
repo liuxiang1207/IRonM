@@ -104,3 +104,23 @@ def test_ci_level_from_rule_table(tmp_path: Path) -> None:
     assert isinstance(wide.ci_low, float) and isinstance(wide.ci_high, float)
     assert isinstance(narrow.ci_low, float) and isinstance(narrow.ci_high, float)
     assert narrow.ci_high - narrow.ci_low < wide.ci_high - wide.ci_low
+
+
+def test_identical_times_never_divide_by_zero() -> None:
+    fit = fit_trend(
+        [(1.0, 80), (1.0, 79), (1.0, 78)], ci_level=0.95, min_readings=3, min_span_days=0
+    )
+    assert fit.status == "insufficient"
+
+
+def test_min_span_days_must_be_positive(tmp_path: Path) -> None:
+    from ironm.contracts.rules import RuleParamError
+    from ironm.engine.rule_params import validate_rule_params
+
+    rules = tmp_path / "rules"
+    rules.mkdir()
+    for f in RULES_DIR.glob("*.yaml"):
+        text = f.read_text(encoding="utf-8").replace("min_span_days: 3", "min_span_days: 0")
+        (rules / f.name).write_text(text, encoding="utf-8")
+    with pytest.raises(RuleParamError, match="R-MT-WEIGHT-TREND"):
+        validate_rule_params(load_rules(rules))

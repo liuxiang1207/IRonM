@@ -26,6 +26,7 @@ class WeightJumpParams(BaseModel):
     window_days: int
     baseline_readings: Annotated[int, Field(ge=1)]
     rebaseline_after: Annotated[int, Field(ge=1)]
+    rebaseline_tolerance_kg: Annotated[float, Field(gt=0)]
 
 
 class KcalRangeParams(BaseModel):
@@ -100,7 +101,8 @@ def pending_weights(events: Iterable[WeightEvent], rulebook: RuleBook) -> dict[U
                 current_at=e.occurred_at,
             )
             if check.pending_confirm:
-                if len(recent) == 1 and _followers_agree(items[idx + 1 :], e, p):
+                baseline_kg = recent[0].payload.weight_kg
+                if len(recent) == 1 and _followers_agree(items[idx + 1 :], e, baseline_kg, p):
                     wrong = recent[0]
                     pending[wrong.event_id] = check.rule_id
                     history.remove(wrong)
@@ -112,8 +114,13 @@ def pending_weights(events: Iterable[WeightEvent], rulebook: RuleBook) -> dict[U
     return pending
 
 
-def _followers_agree(later: list[WeightEvent], e: WeightEvent, p: WeightJumpParams) -> bool:
-    """e 之后同一数据流、规定天数内的若干次读数是否彼此一致、且与 e 一致。"""
+def _followers_agree(
+    later: list[WeightEvent], e: WeightEvent, baseline_kg: float, p: WeightJumpParams
+) -> bool:
+    """e 之后同一数据流、规定天数内的若干次读数是否都与 e 一致（容差另设），且都与基准明显不同。
+
+    只看“与 e 一致”不够：尖峰之后回到正常的读数，与 e 的差可能也在跳变阈值之内。
+    """
     window = timedelta(days=p.window_days)
     same = [
         f for f in later if f.stream_key == e.stream_key and f.occurred_at - e.occurred_at <= window
@@ -121,8 +128,12 @@ def _followers_agree(later: list[WeightEvent], e: WeightEvent, p: WeightJumpPara
     followers = same[: p.rebaseline_after]
     if len(followers) < p.rebaseline_after:
         return False
-    values = [e.payload.weight_kg, *(f.payload.weight_kg for f in followers)]
-    return max(values) - min(values) <= p.max_change_kg
+    kg = e.payload.weight_kg
+    return all(
+        abs(f.payload.weight_kg - kg) <= p.rebaseline_tolerance_kg
+        and abs(f.payload.weight_kg - baseline_kg) > p.max_change_kg
+        for f in followers
+    )
 
 
 def daily_kcal(

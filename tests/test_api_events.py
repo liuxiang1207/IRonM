@@ -320,7 +320,13 @@ def test_deeply_nested_json_is_422(client: TestClient, path: str) -> None:
 
 @pytest.mark.parametrize(
     ("overrides", "secret"),
-    [({"type": "我体重85公斤"}, "85"), ({"event_id": "6f1c2a3e-胸口-4d5e"}, "胸")],
+    [
+        ({"type": "我体重85公斤"}, "85"),
+        ({"event_id": "6f1c2a3e-胸口-4d5e"}, "胸"),
+        ({"type": "weight85kg"}, "weight85kg"),
+        ({"event_id": "6f1c2a3e-wxyz-4d5e"}, "`w`"),
+        ({"payload": {"weight_kg": "eighty five"}}, "eighty"),
+    ],
 )
 def test_error_message_does_not_echo_value(
     client: TestClient, overrides: dict[str, Any], secret: str
@@ -349,3 +355,12 @@ def test_energy_query_user_param_ignored(client: TestClient) -> None:
     _post(client, _event(type="energy_check", occurred_at=at, recorded_at=at, payload={"level": 2}))
     body = client.get("/energy/today?tz=Asia/Shanghai&user_id=u2").json()
     assert body["selected"] is True and body["level"] == 2  # 用的是当前用户 u1
+
+
+def test_declared_size_checked_before_reading(client: TestClient) -> None:
+    r = client.post(
+        "/events",
+        content=b"{}",
+        headers={"Content-Type": "application/json", "Content-Length": str(10 * 1024 * 1024)},
+    )
+    assert r.status_code == 413

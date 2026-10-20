@@ -176,6 +176,12 @@ class EventStore:
         for e in events:
             versions.setdefault(e.event_id, set()).add(e.model_dump_json())
         inconsistent = {eid for eid, v in versions.items() if len(v) > 1}
+        # 同一批中多条不同的更正指向同一记录：哪条生效会取决于顺序，这几条一律不合法
+        fixers: dict[UUID, set[UUID]] = {}
+        for e in events:
+            if e.corrects is not None:
+                fixers.setdefault(e.corrects, set()).add(e.event_id)
+        forked = {i for ids in fixers.values() if len(ids) > 1 for i in ids}
         for i, e in enumerate(events):
             if e.event_id in inconsistent:
                 stored = self.get(e.event_id)
@@ -184,6 +190,12 @@ class EventStore:
                 else:
                     reason = f"同一批中记录 {e.event_id} 的内容不一致"
                     results[i] = AppendResult(e.event_id, "conflict", reason)
+            elif e.event_id in forked:
+                if self.get(e.event_id) == e:
+                    results[i] = AppendResult(e.event_id, "duplicate")
+                else:
+                    reason = f"同一批中有多条更正指向记录 {e.corrects}"
+                    results[i] = AppendResult(e.event_id, "invalid", reason, "corrects")
         for i in _dependency_order(events):
             if i in results:
                 continue
