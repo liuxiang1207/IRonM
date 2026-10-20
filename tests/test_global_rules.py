@@ -27,6 +27,7 @@ from ironm.engine.precision import (
     training_precision,
 )
 from ironm.engine.trend import weight_trend
+from ironm.engine.window import judgement_window
 from ironm.rules.loader import RULES_DIR, load_rules
 
 BOOK = load_rules(RULES_DIR)
@@ -48,6 +49,7 @@ REGISTERED = {
     "training_precision",
     "diet_precision",
     "recovery_precision",
+    "judgement_window",
 }
 
 
@@ -255,3 +257,16 @@ def test_diet_and_recovery_precision_order_independent(seed: int) -> None:
     r1 = recovery_precision(events, as_of=as_of, tz=SH, rulebook=BOOK)
     assert r1 == recovery_precision(shuffled, as_of=as_of, tz=SH, rulebook=BOOK)
     assert r1.precision == "P1"
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_judgement_window_order_and_as_of(seed: int) -> None:
+    ws = _weights(10)
+    later = _ev("weight", "2026-10-25T07:00:00+08:00", {"weight_kg": 70.0})  # 截止之后
+    events = [*ws, later]
+    shuffled = list(events)
+    random.Random(seed).shuffle(shuffled)
+    as_of = datetime(2026, 10, 11, tzinfo=UTC)
+    a = judgement_window(events, as_of=as_of, tz=SH, rulebook=BOOK)
+    assert a == judgement_window(shuffled, as_of=as_of, tz=SH, rulebook=BOOK)
+    assert a == judgement_window(ws, as_of=as_of, tz=SH, rulebook=BOOK)

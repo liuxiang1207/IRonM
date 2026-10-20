@@ -1,0 +1,42 @@
+# 黄金用例：判断窗口（R-MT-JUDGEMENT-WINDOW，置信水平取 R-MT-WEIGHT-TREND）。
+# 模型：窗口 T 天内均匀称重，读数 n = ⌊每周次数 × T / 7⌋ + 1，间隔 d = T / (n−1)，
+#       Sxx = d²·n·(n²−1)/12，半宽 = t(0.975, n−2) × 波动 / √Sxx × 7（千克/周），取最小的 T 使半宽 ≤ 0.25。
+# 手算核对（每天称、波动 0.5）：
+#   T = 21：n = 22，Sxx = 22×483/12 = 885.5，标准误 = 0.5/√885.5 = 0.016803 千克/天 = 0.11762 千克/周，
+#           t(0.975, 20) = 2.086，半宽 = 0.2453 ≤ 0.25 ✓
+#   T = 20：n = 21，Sxx = 21×440/12 = 770，标准误 = 0.5/√770 × 7 = 0.12613，t(0.975, 19) = 2.093，半宽 = 0.2640 > 0.25
+target: ironm.engine.window:required_window_days
+status: active
+inject: [rulebook]
+rules: [R-MT-JUDGEMENT-WINDOW, R-MT-WEIGHT-TREND]
+cases:
+  - id: G-WIN-001
+    title: 每天称、波动 0.5 千克 → 21 天
+    given: {readings_per_week: 7, residual_sd_kg: 0.5}
+    expect: {status: ok, window_days: 21}
+  - id: G-WIN-002
+    title: 每周 2 次、波动 0.5 千克 → 32 天
+    given: {readings_per_week: 2, residual_sd_kg: 0.5}
+    expect: {status: ok, window_days: 32}
+  - id: G-WIN-003
+    title: 每周 1 次、波动 0.5 千克 → 42 天
+    given: {readings_per_week: 1, residual_sd_kg: 0.5}
+    expect: {status: ok, window_days: 42}
+  - id: G-WIN-004
+    title: 每周 1 次、波动 0.6 千克 → 49 天
+    twin_of: G-WIN-003
+    given: {readings_per_week: 1, residual_sd_kg: 0.6}
+    expect: {status: ok, window_days: 49}
+  - id: G-WIN-005
+    title: 每周 1 次、波动 1.0 千克 → 超过 56 天，数据不足；每周至少称 2 次（51 天）
+    given: {readings_per_week: 1, residual_sd_kg: 1.0}
+    expect:
+      status: insufficient
+      window_days: {unknown: insufficient_data}
+      needed: [{item: weigh_ins_per_week, count: 2}]
+  - id: G-WIN-006
+    title: 每周 0 次 → 数据不足，需要称重
+    given: {readings_per_week: 0, residual_sd_kg: 0.5}
+    expect:
+      status: insufficient
+      needed: [{item: weigh_ins_per_week, count: 1}]

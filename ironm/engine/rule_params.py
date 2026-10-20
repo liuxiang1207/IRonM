@@ -21,6 +21,7 @@ from ironm.engine.precision import (
     TrainingParams,
 )
 from ironm.engine.trend import WEIGHT_TREND, TrendParams
+from ironm.engine.window import JUDGEMENT_WINDOW, WindowParams
 from ironm.rules.loader import RuleBook
 
 RULE_PARAMS: dict[str, type[BaseModel]] = {
@@ -33,6 +34,7 @@ RULE_PARAMS: dict[str, type[BaseModel]] = {
     TRAINING: TrainingParams,
     DIET: DietParams,
     RECOVERY: RecoveryParams,
+    JUDGEMENT_WINDOW: WindowParams,
     **{rule_id_for(level): EnergyParams for level in range(1, 6)},
 }
 

@@ -25,3 +25,17 @@ rules:
       score_skipped: 0.0
     note: 计划日没有打卡记录的记为“未知”，不当作没练，不计入完成度。
 
+
+  - id: R-MT-JUDGEMENT-WINDOW
+    title: 体重判断窗口：先定需要多确定，再算需要多久
+    status: pending_review
+    source: {kind: design}
+    params:
+      target_half_width_kg_per_week: 0.25  # 趋势可信范围半宽不超过此值才能据以调整饮食
+      default_residual_sd_kg: 0.5  # 读数不足以估计时的体重日常波动
+      min_residual_sd_kg: 0.3  # 估计出的波动下限：真实的日常波动不可能为 0
+      min_readings_for_sd: 6
+      frequency_window_days: 28  # 称重频率按近几天的实际称重天数平均
+      min_window_days: 7
+      max_window_days: 56  # 超过仍不够确定就不下结论
+    note: 置信水平取 R-MT-WEIGHT-TREND。方案中“每天称约 2 周”为估计，按本计算约 3 周。
