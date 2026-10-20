@@ -12,23 +12,12 @@ from ironm.api.app import app
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# 架构约定的子包。新增子包时同时加在这里，确保是有意为之而不是误建
-EXPECTED_PACKAGES = {
-    "agents",
-    "api",
-    "contracts",
-    "core",
-    "engine",
-    "knowledge",
-    "llm",
-    "memory",
-    "orchestrator",
-    "rules",
-    "safety",
-    "scheduler",
-    "skills",
-    "store",
-}
+
+def _registered_layers() -> set[str]:
+    """依赖分层配置里登记的子包，是子包清单的唯一来源。"""
+    with (ROOT / "pyproject.toml").open("rb") as f:
+        [contract] = tomllib.load(f)["tool"]["importlinter"]["contracts"]
+    return {name.strip() for layer in contract["layers"] for name in layer.split("|")}
 
 
 def _subpackages() -> set[str]:
@@ -36,7 +25,7 @@ def _subpackages() -> set[str]:
 
 
 def test_subpackages_match_architecture() -> None:
-    assert _subpackages() == EXPECTED_PACKAGES
+    assert _subpackages() == _registered_layers()
 
 
 def test_every_module_imports() -> None:
