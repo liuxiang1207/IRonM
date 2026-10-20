@@ -109,3 +109,12 @@ def test_daily_weigher_with_huge_noise_gets_consistency_hint() -> None:
     plan = required_window_days(rulebook=BOOK, readings_per_week=7, residual_sd_kg=2.5)
     assert plan.status == "insufficient"
     assert [(n.item, n.count) for n in plan.needed] == [("consistent_weighing_time", 1)]
+
+
+def test_new_user_frequency_uses_actual_span() -> None:
+    week = [_w(d, 80.0) for d in range(7)]  # 第 0–6 天每天称
+    assert judgement_window(week, as_of=AS_OF, tz=SH, rulebook=BOOK).readings_per_week == 7.0
+    once = [_w(0, 80.0)]
+    assert judgement_window(once, as_of=AS_OF, tz=SH, rulebook=BOOK).readings_per_week == 1.0
+    veteran = [_w(d, 80.0) for d in (0, 7, 14, 21, 35)]  # 用满 4 周以上：35 天前那次不在 4 周内
+    assert judgement_window(veteran, as_of=AS_OF, tz=SH, rulebook=BOOK).readings_per_week == 1.0

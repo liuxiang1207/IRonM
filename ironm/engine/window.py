@@ -129,7 +129,14 @@ def judgement_window(
         return (today - e.occurred_at.astimezone(tz).date()).days
 
     recent_days = {local_age(e) for e in trusted if local_age(e) < p.frequency_window_days}
-    per_week = len(recent_days) / (p.frequency_window_days / 7)
+    oldest = max((local_age(e) for e in trusted), default=0)
+    if oldest >= p.frequency_window_days - 1 or not recent_days:
+        per_week = len(recent_days) / (p.frequency_window_days / 7)
+    elif len(recent_days) == 1:
+        per_week = 1.0  # 只称过 1 天：按每周 1 次
+    else:
+        # 新用户历史不满一个频率窗口：按称重间隔估算，避免被当作每周只称一两次
+        per_week = (len(recent_days) - 1) / oldest * 7
 
     sd_source: Literal["estimated", "default"]
     fit = weight_trend(trusted, as_of=as_of, window_days=p.frequency_window_days, rulebook=rulebook)
