@@ -30,4 +30,5 @@ def test_expected_contracts_exported() -> None:
         "snapshot",
         "plan_version",
         "model_call",
+        "rule_set",
     } <= set(SCHEMAS)

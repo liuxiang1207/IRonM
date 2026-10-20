@@ -9,10 +9,12 @@ from ironm import __version__
 from ironm.core.clock import SystemClock
 from ironm.core.config import load_settings
 from ironm.core.log import configure_logging
+from ironm.rules.loader import load_rules
 
-# 配置有误时在导入阶段直接失败，服务不会带着错误配置启动
+# 配置或规则表有误时在导入阶段直接失败，服务不会带着错误启动
 settings = load_settings(os.environ)
 configure_logging(settings, SystemClock(), sys.stderr)
+rulebook = load_rules(settings.rules_dir)
 
 app = FastAPI(title="IronM", version=__version__)
 

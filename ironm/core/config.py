@@ -19,6 +19,7 @@ class Settings(BaseModel):
     env: Literal["dev", "test", "prod"] = "dev"
     log_level: Literal["debug", "info", "warning", "error"] = "info"
     db_path: Path = Path("data/ironm.sqlite")
+    rules_dir: Path = Path("rules")
 
 
 def load_settings(environ: Mapping[str, str]) -> Settings:

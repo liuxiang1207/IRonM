@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "FrozenMap_str_ParamValue_": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ParamValue"
+      },
+      "type": "object"
+    },
+    "ParamValue": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Scalar"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/Scalar"
+          },
+          "type": "array"
+        }
+      ]
+    },
+    "ReviewStatus": {
+      "enum": [
+        "draft",
+        "pending_review",
+        "approved"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "Rule": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/RuleId"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "params": {
+          "$ref": "#/$defs/FrozenMap_str_ParamValue_"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "status": {
+          "$ref": "#/$defs/ReviewStatus"
+        },
+        "title": {
+          "$ref": "#/$defs/Text"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "status",
+        "source",
+        "params"
+      ],
+      "title": "Rule",
+      "type": "object"
+    },
+    "RuleId": {
+      "pattern": "^R(-[A-Z0-9]+)+$",
+      "type": "string"
+    },
+    "RuleSource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/SourceKind"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "RuleSource",
+      "type": "object"
+    },
+    "Scalar": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
+    "SourceKind": {
+      "enum": [
+        "guideline",
+        "design",
+        "borrowed",
+        "estimate"
+      ],
+      "title": "SourceKind",
+      "type": "string"
+    },
+    "Text": {
+      "minLength": 1,
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "rule_set": {
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "title": "Rule Set",
+      "type": "string"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/Rule"
+      },
+      "minItems": 1,
+      "title": "Rules",
+      "type": "array"
+    },
+    "version": {
+      "pattern": "^\\d{4}\\.\\d{1,2}\\.\\d+$",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "rule_set",
+    "version",
+    "rules"
+  ],
+  "title": "RuleSet",
+  "type": "object"
+}

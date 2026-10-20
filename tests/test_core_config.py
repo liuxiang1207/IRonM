@@ -15,6 +15,7 @@ def test_defaults() -> None:
     assert s.env == "dev"
     assert s.log_level == "info"
     assert s.db_path == Path("data/ironm.sqlite")
+    assert s.rules_dir == Path("rules")
 
 
 def test_db_path_configurable() -> None:

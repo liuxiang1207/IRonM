@@ -12,6 +12,7 @@ from ironm.contracts.events import EVENT_ADAPTER
 from ironm.contracts.metrics import MetricResult
 from ironm.contracts.model_call import ModelCall
 from ironm.contracts.plan import PlanVersion
+from ironm.contracts.rules import RuleSet
 from ironm.contracts.snapshot import Snapshot
 from ironm.contracts.unknown import Unknown
 
@@ -23,6 +24,7 @@ SCHEMAS: dict[str, TypeAdapter[Any]] = {
     "snapshot": TypeAdapter(Snapshot),
     "plan_version": TypeAdapter(PlanVersion),
     "model_call": TypeAdapter(ModelCall),
+    "rule_set": TypeAdapter(RuleSet),
 }
 
 
