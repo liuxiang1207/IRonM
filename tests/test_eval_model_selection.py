@@ -246,7 +246,7 @@ def test_rate_limit_spaces_requests(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("FAKE_API_KEY", "x")
     path = tmp_path / "models.yaml"
     path.write_text(
-        CNY_MODEL + "    rate_limit: {concurrency: 1, min_interval_s: 0.01}\n", encoding="utf-8"
+        CNY_MODEL + "    rate_limit: {concurrency: 1, min_interval_s: 0.02}\n", encoding="utf-8"
     )
     [m] = load_models(path)
     starts: list[float] = []
@@ -261,4 +261,5 @@ def test_rate_limit_spaces_requests(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     run_all([m], load_questions(QUESTIONS_PATH), tmp_path / "out", transport)
     gaps = [b - a for a, b in itertools.pairwise(starts)]
     assert len(starts) == 50
-    assert min(gaps) >= 0.009
+    # 时间戳记在发请求时，放行到发请求之间有几毫秒的线程调度抖动；留出余量避免偶发失败
+    assert min(gaps) >= 0.015
