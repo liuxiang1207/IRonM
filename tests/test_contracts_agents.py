@@ -145,3 +145,37 @@ def test_constraint_accepted() -> None:
     }
     out = _parse(_output("safety_officer", "constraint", [item]))
     assert out.kind == "constraint"
+
+
+def test_field_ownership_table() -> None:
+    # 归属表的完整快照：增删字段或改归属必须同时改这里，确保是有意为之
+    expected = {
+        AgentId.TRAINING_PLANNER: {
+            "training_days_per_week",
+            "training_schedule",
+            "session_slots",
+            "intensity_target",
+            "progression_rule",
+            "deload_schedule",
+            "weekly_cardio_minutes",
+            "daily_steps_target",
+        },
+        AgentId.EXERCISE_COACH: {"exercise_selection", "minimum_task", "alternative_version"},
+        AgentId.NUTRITIONIST: {
+            "diet_mode",
+            "daily_kcal_target",
+            "daily_protein_g_target",
+            "portion_guide",
+            "eating_out_strategy",
+        },
+        AgentId.BEHAVIOR_COACH: {
+            "weekly_habit_step",
+            "reminder_schedule",
+            "weigh_in_days",
+            "checkin_day",
+        },
+    }
+    actual: dict[AgentId, set[str]] = {}
+    for field, owner in FIELD_OWNERS.items():
+        actual.setdefault(owner, set()).add(field.value)
+    assert actual == expected
