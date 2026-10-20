@@ -1,6 +1,10 @@
-"""统计工具：t 分布分位数（不引入 scipy；用正则化不完全贝塔函数求 t 分布函数，再二分求逆）。"""
+"""统计工具：t 分布分位数（不引入 scipy；用正则化不完全贝塔函数求 t 分布函数，再二分求逆）、
+只对已知值求平均。"""
 
 import math
+from collections.abc import Iterable
+
+from ironm.contracts.unknown import Unknown, UnknownReason
 
 
 def _beta_cf(a: float, b: float, x: float) -> float:
@@ -65,3 +69,11 @@ def t_quantile(p: float, df: int) -> float:
         else:
             hi = mid
     return (lo + hi) / 2.0
+
+
+def mean_known(values: Iterable[float | Unknown]) -> float | Unknown:
+    """只对已知值求平均；“未知”不计入。全部未知时结果为“未知（数据不足）”，不算作 0。"""
+    known = [v for v in values if not isinstance(v, Unknown)]
+    if not known:
+        return Unknown(unknown=UnknownReason.INSUFFICIENT_DATA)
+    return sum(known) / len(known)

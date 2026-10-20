@@ -12,3 +12,15 @@ rules:
       ci_level: 0.95
       min_readings: 3
     note: 可信范围按 t 分布计算，读数少时自然变宽；少于 3 次无法估计残差，不给趋势。
+
+  - id: R-MT-TRAINING-COMPLETION
+    title: 训练完成度的计分
+    status: pending_review
+    source:
+      kind: design
+    params:
+      score_done: 1.0
+      score_half: 0.5
+      score_skipped: 0.0
+    note: 计划日没有打卡记录的记为“未知”，不当作没练，不计入完成度。
+

@@ -4,14 +4,15 @@
 被更正的记录不再是有效读数，更正记录视为用户已确认。
 """
 
-from collections.abc import Iterable
-from datetime import datetime, timedelta
+from collections.abc import Iterable, Mapping
+from datetime import date, datetime, timedelta, tzinfo
 from statistics import median
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from ironm.contracts.events import WeightEvent
+from ironm.contracts.events import MealEvent, WeightEvent
+from ironm.contracts.unknown import Unknown, UnknownReason, not_recorded
 from ironm.rules.loader import RuleBook
 
 WEIGHT_JUMP = "R-DQ-WEIGHT-JUMP"
@@ -100,4 +101,40 @@ def pending_weights(events: Iterable[WeightEvent], rulebook: RuleBook) -> dict[U
                 pending[e.event_id] = check.rule_id
                 continue
         history.append(e)
+    return pending
+
+
+def daily_kcal(
+    meals: Iterable[MealEvent], *, days: Iterable[date], tz: tzinfo
+) -> dict[date, float | Unknown]:
+    """按用户所在时区的当地日期汇总热量。
+
+    当天任一餐热量未知、或当天没有饮食记录时，当天总量为“未知”：部分记录会让总量偏低，空白优于部分记录。
+    """
+    by_day: dict[date, list[MealEvent]] = {}
+    for m in meals:
+        by_day.setdefault(m.occurred_at.astimezone(tz).date(), []).append(m)
+    totals: dict[date, float | Unknown] = {}
+    for day in days:
+        kcals = [m.payload.kcal for m in by_day.get(day, [])]
+        if not kcals:
+            totals[day] = not_recorded()
+        elif any(isinstance(k, Unknown) for k in kcals):
+            totals[day] = Unknown(unknown=UnknownReason.NOT_RECORDED)
+        else:
+            totals[day] = sum(k for k in kcals if not isinstance(k, Unknown))
+    return totals
+
+
+def pending_kcal_days(
+    totals: Mapping[date, float | Unknown], rulebook: RuleBook
+) -> dict[date, str]:
+    """已知的单日总量超出范围 → 待确认；未知的日子不判定。"""
+    pending: dict[date, str] = {}
+    for day, total in totals.items():
+        if isinstance(total, Unknown):
+            continue
+        check = kcal_out_of_range(rulebook=rulebook, day_kcal=total)
+        if check.pending_confirm:
+            pending[day] = check.rule_id
     return pending
