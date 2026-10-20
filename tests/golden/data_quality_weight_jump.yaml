@@ -1,0 +1,32 @@
+# 黄金用例：体重短期跳变标“待确认”（R-DQ-WEIGHT-JUMP：7 天内变化超过 2 千克）
+target: ironm.engine.data_quality:weight_jump_pending
+status: pending
+reason: 异常值判定随 T1.2 实现
+rules: [R-DQ-WEIGHT-JUMP]
+cases:
+  - id: G-DQ-WJ-001
+    title: 3 天内增加恰好 2 千克，不触发
+    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 82.0, current_at: "2026-10-04T00:00:00Z"}
+    expect: {pending_confirm: false}
+  - id: G-DQ-WJ-002
+    title: 3 天内增加 2.1 千克，触发
+    twin_of: G-DQ-WJ-001
+    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 82.1, current_at: "2026-10-04T00:00:00Z"}
+    expect: {pending_confirm: true}
+  - id: G-DQ-WJ-003
+    title: 2 天内下降 2.5 千克，触发
+    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-03T00:00:00Z"}
+    expect: {pending_confirm: true}
+  - id: G-DQ-WJ-004
+    title: 同样下降 2.5 千克但相隔 8 天，不触发
+    twin_of: G-DQ-WJ-003
+    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-09T00:00:00Z"}
+    expect: {pending_confirm: false}
+  - id: G-DQ-WJ-005
+    title: 恰好相隔 7 天下降 2.5 千克，仍在窗口内，触发
+    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-08T00:00:00Z"}
+    expect: {pending_confirm: true}
+  - id: G-DQ-WJ-006
+    title: 首次称重，没有可比的上一次，不触发
+    given: {previous_kg: null, previous_at: null, current_kg: 95.0, current_at: "2026-10-01T00:00:00Z"}
+    expect: {pending_confirm: false}

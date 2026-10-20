@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from ironm.contracts.rules import Rule, RuleParamError, RuleSet
 
-__all__ = ["RULES_DIR", "RuleBook", "RuleLoadError", "RuleParamError", "load_rules"]
+__all__ = ["RULES_DIR", "RuleBook", "RuleLoadError", "RuleParamError", "load_rules", "load_yaml"]
 
 RULES_DIR = Path(__file__).resolve().parents[2] / "rules"
 
@@ -57,10 +57,15 @@ class RuleBook:
         return dict(self._versions)
 
 
+def load_yaml(path: Path) -> object:
+    """读取 YAML；同一层级出现重复的键时报错。"""
+    # _StrictLoader 继承 SafeLoader，不会构造任意 Python 对象
+    return yaml.load(path.read_text(encoding="utf-8"), Loader=_StrictLoader)
+
+
 def _load_file(path: Path) -> RuleSet:
     try:
-        # _StrictLoader 继承 SafeLoader，不会构造任意 Python 对象
-        data = yaml.load(path.read_text(encoding="utf-8"), Loader=_StrictLoader)
+        data = load_yaml(path)
     except yaml.YAMLError as e:
         raise RuleLoadError(f"{path}：YAML 格式错误：{e}") from e
     try:

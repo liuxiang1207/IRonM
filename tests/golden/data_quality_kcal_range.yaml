@@ -1,0 +1,28 @@
+# 黄金用例：单日热量异常标“待确认”（R-DQ-KCAL-RANGE：低于 500 或高于 6000 千卡）
+target: ironm.engine.data_quality:kcal_out_of_range
+status: pending
+reason: 异常值判定随 T1.2 实现
+rules: [R-DQ-KCAL-RANGE]
+cases:
+  - id: G-DQ-KC-001
+    title: 单日 499 千卡，触发
+    given: {day_kcal: 499}
+    expect: {pending_confirm: true}
+  - id: G-DQ-KC-002
+    title: 单日恰好 500 千卡，不触发
+    twin_of: G-DQ-KC-001
+    given: {day_kcal: 500}
+    expect: {pending_confirm: false}
+  - id: G-DQ-KC-003
+    title: 单日恰好 6000 千卡，不触发
+    given: {day_kcal: 6000}
+    expect: {pending_confirm: false}
+  - id: G-DQ-KC-004
+    title: 单日 6001 千卡，触发
+    twin_of: G-DQ-KC-003
+    given: {day_kcal: 6001}
+    expect: {pending_confirm: true}
+  - id: G-DQ-KC-005
+    title: 常见的单日 1800 千卡，不触发
+    given: {day_kcal: 1800}
+    expect: {pending_confirm: false}

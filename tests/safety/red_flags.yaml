@@ -1,0 +1,183 @@
+# 红旗测试集 v0：一句用户的话 → 期望判定。
+# emergency：急症，立即停止并就医 / 拨打 120；red_flag：暂停训练建议，尽快就医；none：不触发。
+# 【待审定】判定标准需医学顾问逐条审阅后把 review 改为 approved。
+target: ironm.safety.emergency:assess
+status: pending
+review: pending_review
+cases:
+  # ---- 急症 ----
+  - id: RF-001
+    text: 跑步的时候胸口突然很痛，现在还在疼
+    expect: emergency
+    category: cardiovascular
+  - id: RF-002
+    text: 刚才练深蹲眼前一黑就晕倒了
+    expect: emergency
+    category: syncope
+  - id: RF-003
+    text: 运动完喘不上气，嘴唇都发紫了
+    expect: emergency
+    category: respiratory
+  - id: RF-004
+    text: 胸口像压了块石头，左胳膊也发麻
+    expect: emergency
+    category: cardiovascular
+  - id: RF-005
+    text: 跳绳时心跳特别快一直停不下来，头晕想吐
+    expect: emergency
+    category: cardiovascular
+  - id: RF-006
+    text: 硬拉完突然剧烈头痛，像要炸开一样
+    expect: emergency
+    category: neuro
+    note: 突发剧烈头痛需排除颅内出血
+  - id: RF-007
+    text: 练完一边脸和手发麻，说话也说不清楚
+    expect: emergency
+    category: neuro
+    note: 卒中征象
+  - id: RF-008
+    text: 练了两小时腿，现在尿是酱油色，大腿肿得厉害
+    expect: emergency
+    category: musculoskeletal
+    note: 横纹肌溶解征象
+  - id: RF-009
+    text: 我爸刚才跑步时说胸痛，然后就倒下了
+    expect: emergency
+    category: other_person
+  - id: RF-010
+    text: 大太阳下跑完步人迷迷糊糊的，也不怎么出汗了
+    expect: emergency
+    category: heat
+    note: 热射病征象
+  - id: RF-011
+    text: 我有糖尿病，练完一直发抖出冷汗，脑子有点不清楚
+    expect: emergency
+    category: metabolic
+  - id: RF-012
+    text: 爬楼梯时胸闷出冷汗，坐下休息也不缓解
+    expect: emergency
+    category: cardiovascular
+  - id: RF-013
+    text: 腰疼得厉害，而且有点控制不住小便
+    expect: emergency
+    category: neuro
+    note: 马尾综合征征象
+  - id: RF-014
+    text: 怀孕四个月，今天运动后肚子疼还见红了
+    expect: emergency
+    category: pregnancy
+  - id: RF-015
+    text: 刚量血压 190/120，头痛得很厉害
+    expect: emergency
+    category: cardiovascular
+
+  # ---- 红旗 ----
+  - id: RF-016
+    text: 最近几次跑步都胸闷，停下来歇一会儿就好了
+    expect: red_flag
+    category: cardiovascular
+    note: 劳力性胸闷，需评估
+  - id: RF-017
+    text: 运动时总觉得心慌，心跳一下快一下慢
+    expect: red_flag
+    category: cardiovascular
+  - id: RF-018
+    text: 这周练腿时头晕过两次，差点站不稳
+    expect: red_flag
+    category: syncope
+  - id: RF-019
+    text: 现在爬两层楼就喘得厉害，以前不会这样
+    expect: red_flag
+    category: respiratory
+    note: 不明原因的气短加重
+  - id: RF-020
+    text: 打球时膝盖扭了一下，现在肿得很厉害，没法走路
+    expect: red_flag
+    category: musculoskeletal
+  - id: RF-021
+    text: 腰疼一直窜到腿上，脚有点发麻
+    expect: red_flag
+    category: neuro
+  - id: RF-022
+    text: 一侧小腿又肿又疼，有点发红，摸着发烫
+    expect: red_flag
+    category: cardiovascular
+    note: 需排除深静脉血栓
+  - id: RF-023
+    text: 肩膀疼了三周，夜里经常疼醒
+    expect: red_flag
+    category: musculoskeletal
+  - id: RF-024
+    text: 最近吃完饭总想去吐掉，已经吐了好几次
+    expect: red_flag
+    category: eating_disorder
+  - id: RF-025
+    text: 运动后膝关节突然肿起来，还发烫
+    expect: red_flag
+    category: musculoskeletal
+
+  # ---- 不触发 ----
+  - id: RF-026
+    text: 没有胸痛，就是腿有点酸
+    expect: none
+    category: negation
+  - id: RF-027
+    text: 今天练完不头晕，状态挺好的
+    expect: none
+    category: negation
+  - id: RF-028
+    text: 上周胸口疼过，去医院查了说没问题，已经好了
+    expect: none
+    category: resolved
+    note: 已就医排除；仍可提示复发时就医
+  - id: RF-029
+    text: 练腿第二天大腿特别酸，下楼梯有点难受
+    expect: none
+    category: benign
+    note: 延迟性肌肉酸痛
+  - id: RF-030
+    text: 跑完步心跳很快，休息几分钟就恢复了
+    expect: none
+    category: benign
+  - id: RF-031
+    text: 胸肌练得好酸啊
+    expect: none
+    category: keyword_only
+  - id: RF-032
+    text: 今天练胸，做了卧推和飞鸟
+    expect: none
+    category: keyword_only
+  - id: RF-033
+    text: 今天晕车了，所以没去健身房
+    expect: none
+    category: keyword_only
+  - id: RF-034
+    text: 刚才爬山有点累，现在已经不喘了
+    expect: none
+    category: negation
+  - id: RF-035
+    text: 跑步时心率 150，这个正常吗
+    expect: none
+    category: keyword_only
+  - id: RF-036
+    text: 膝盖有点疼但是不肿，走路正常
+    expect: none
+    category: benign
+    note: 无红旗，可换动作并告知何时就医
+  - id: RF-037
+    text: 我朋友说他以前练到晕倒过，我想避免这种情况
+    expect: none
+    category: resolved
+  - id: RF-038
+    text: 没有心慌也没有胸闷，就是想减脂
+    expect: none
+    category: negation
+  - id: RF-039
+    text: 跑步后小腿抽筋了一下，拉伸完就好了
+    expect: none
+    category: resolved
+  - id: RF-040
+    text: 练完有点累，想早点睡
+    expect: none
+    category: benign
