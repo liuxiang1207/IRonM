@@ -1,6 +1,7 @@
 """运行配置：只从 IRONM_ 前缀的环境变量读取。未知变量或非法取值直接报错，不回退默认值。"""
 
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -17,6 +18,7 @@ class Settings(BaseModel):
 
     env: Literal["dev", "test", "prod"] = "dev"
     log_level: Literal["debug", "info", "warning", "error"] = "info"
+    db_path: Path = Path("data/ironm.sqlite")
 
 
 def load_settings(environ: Mapping[str, str]) -> Settings:

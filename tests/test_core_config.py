@@ -3,6 +3,7 @@
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,11 @@ def test_defaults() -> None:
     s = load_settings({})
     assert s.env == "dev"
     assert s.log_level == "info"
+    assert s.db_path == Path("data/ironm.sqlite")
+
+
+def test_db_path_configurable() -> None:
+    assert load_settings({"IRONM_DB_PATH": "/tmp/x.sqlite"}).db_path == Path("/tmp/x.sqlite")
 
 
 def test_reads_prefixed_vars() -> None:

@@ -8,6 +8,7 @@
 make setup     # 安装依赖与 pre-commit
 make check     # 提交前与 CI 都跑：锁文件 → ruff → 依赖方向 → mypy → pytest
 make schemas   # 契约改动后重新导出 JSON Schema（make check 会比对）
+make migrate   # 执行尚未执行的数据库迁移（migrations/NNNN_说明.sql）
 make run       # 本地启动，/healthz 存活检查
 ```
 
@@ -26,6 +27,7 @@ make run       # 本地启动，/healthz 存活检查
 |---|---|---|
 | `IRONM_ENV` | `dev` / `test` / `prod` | `dev` |
 | `IRONM_LOG_LEVEL` | `debug` / `info` / `warning` / `error` | `info` |
+| `IRONM_DB_PATH` | 数据库文件路径 | `data/ironm.sqlite` |
 
 出现未知的 `IRONM_` 变量或非法取值时，启动失败。
 
@@ -35,7 +37,9 @@ make run       # 本地启动，/healthz 存活检查
 ironm/
   core/        时间来源、标识生成、配置、结构化日志（最底层）
   contracts/   数据契约：记录、未知值、指标结果、Agent 输出、字段归属、快照、计划版本、模型调用
-  safety/ rules/ engine/ knowledge/ llm/ skills/ agents/ store/ memory/ orchestrator/ scheduler/ api/
+  safety/ rules/ engine/ knowledge/ llm/ skills/ agents/ memory/ orchestrator/ scheduler/ api/
+  store/       SQLite 连接、迁移执行器、记录仓储（只追加、去重、全文检索）
+migrations/    按编号的数据库迁移脚本
 schemas/       契约导出的 JSON Schema
 spec/          需求与验证清单
 tests/
