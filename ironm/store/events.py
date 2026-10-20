@@ -3,9 +3,10 @@
 import json
 import sqlite3
 import threading
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Sequence
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Concatenate
+from typing import Any, Concatenate, Literal
 from uuid import UUID
 
 from ironm.contracts.events import EVENT_ADAPTER, Event
@@ -52,6 +53,41 @@ def _to_event(row: sqlite3.Row) -> Event:
         "payload": json.loads(row["payload"]),
     }
     return EVENT_ADAPTER.validate_json(json.dumps(data))
+
+
+@dataclass(frozen=True)
+class AppendResult:
+    """批量入库中一条记录的结果。reason 只在冲突或不合法时给出，不含记录内容。"""
+
+    event_id: UUID
+    status: Literal["created", "duplicate", "conflict", "invalid"]
+    reason: str | None = None
+    field: str | None = None  # 不合法时出问题的字段
+
+
+def _dependency_order(events: Sequence[Event]) -> list[int]:
+    """返回处理顺序：同批中更正记录排在它所指向的原记录之后，其余保持原顺序。"""
+    first_index: dict[UUID, int] = {}
+    for i, e in enumerate(events):
+        first_index.setdefault(e.event_id, i)
+    order: list[int] = []
+    done: set[int] = set()
+    visiting: set[int] = set()
+
+    def visit(i: int) -> None:
+        if i in done or i in visiting:  # visiting：更正链成环时按原顺序处理，由仓储报错
+            return
+        visiting.add(i)
+        target = events[i].corrects
+        if target is not None and target in first_index:
+            visit(first_index[target])
+        visiting.discard(i)
+        done.add(i)
+        order.append(i)
+
+    for i in range(len(events)):
+        visit(i)
+    return order
 
 
 def _exclusive[**P, R](
@@ -124,6 +160,24 @@ class EventStore:
             raise InvalidCorrectionError(f"更正记录类型 {event.type} 与原记录 {target.type} 不同")
 
     @_exclusive
+    def append_many(self, events: Sequence[Event]) -> list[AppendResult]:
+        """逐条入库，单条出错不影响其他；结果与输入顺序一一对应。失败可安全重传。"""
+        results: dict[int, AppendResult] = {}
+        for i in _dependency_order(events):
+            e = events[i]
+            try:
+                created = self.append(e)
+            except EventConflictError as err:
+                results[i] = AppendResult(e.event_id, "conflict", str(err))
+            except FutureEventError as err:
+                results[i] = AppendResult(e.event_id, "invalid", str(err), "recorded_at")
+            except InvalidCorrectionError as err:
+                results[i] = AppendResult(e.event_id, "invalid", str(err), "corrects")
+            else:
+                results[i] = AppendResult(e.event_id, "created" if created else "duplicate")
+        return [results[i] for i in range(len(events))]
+
+    @_exclusive
     def get(self, event_id: UUID) -> Event | None:
         row = self._conn.execute(
             "SELECT * FROM events WHERE event_id = ?", (str(event_id),)
@@ -160,7 +214,8 @@ class EventStore:
         if until is not None:
             sql += " AND occurred_at < ?"
             params.append(to_db_time(until))
-        sql += " ORDER BY occurred_at, seq"
+        # 同一发生时间按记录标识排序：结果与到达先后无关
+        sql += " ORDER BY occurred_at, event_id"
         return [_to_event(r) for r in self._conn.execute(sql, params)]
 
     @_exclusive
@@ -172,7 +227,7 @@ class EventStore:
         phrase = '"' + text.replace('"', '""') + '"'
         rows = self._conn.execute(
             "SELECT e.* FROM events_fts f JOIN events e ON e.seq = f.rowid"
-            " WHERE events_fts MATCH ? AND e.user_id = ? ORDER BY e.occurred_at, e.seq",
+            " WHERE events_fts MATCH ? AND e.user_id = ? ORDER BY e.occurred_at, e.event_id",
             (phrase, user_id),
         )
         return [_to_event(r) for r in rows]

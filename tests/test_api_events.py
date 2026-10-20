@@ -186,3 +186,82 @@ def test_invalid_value_itself_not_echoed(client: TestClient, overrides: dict[str
     r = _post(client, _event(**overrides))
     assert r.status_code == 422
     assert "胸口疼" not in r.text
+
+
+# ---- 批量与离线补交（spec §11）----
+
+E2 = "7a2b3c4d-5e6f-4a1b-9c2d-3e4f5a6b7c8d"
+E3 = "8b3c4d5e-6f7a-4b2c-8d3e-4f5a6b7c8d9e"
+
+
+def _batch(client: TestClient, events: list[Any] | Any) -> Any:
+    body = json.dumps({"events": events} if isinstance(events, list) else events)
+    return client.post("/events/batch", content=body, headers={"Content-Type": "application/json"})
+
+
+def test_batch_all_created(client: TestClient, tmp_path: Path) -> None:
+    r = _batch(client, [_event(), _event(event_id=E2), _event(event_id=E3)])
+    assert r.status_code == 200
+    assert [(x["index"], x["event_id"], x["status"]) for x in r.json()["results"]] == [
+        (0, EID, "created"),
+        (1, E2, "created"),
+        (2, E3, "created"),
+    ]
+    assert _count(tmp_path) == 3
+
+
+def test_batch_duplicates(client: TestClient, tmp_path: Path) -> None:
+    _post(client, _event(event_id=E3))
+    r = _batch(client, [_event(), _event(), _event(event_id=E3)])
+    assert [x["status"] for x in r.json()["results"]] == ["created", "duplicate", "duplicate"]
+    assert _count(tmp_path) == 2
+
+
+def test_batch_one_invalid_others_stored(client: TestClient, tmp_path: Path) -> None:
+    bad = _event(event_id=E2, raw=["胸口疼"])
+    r = _batch(client, [_event(), bad, _event(event_id=E3)])
+    results = r.json()["results"]
+    assert [x["status"] for x in results] == ["created", "invalid", "created"]
+    assert results[1]["errors"][0]["loc"]
+    assert "胸口疼" not in r.text
+    assert _count(tmp_path) == 2
+
+
+def test_batch_correction_before_original(client: TestClient, tmp_path: Path) -> None:
+    fix = _event(event_id=E2, corrects=EID, payload={"weight_kg": 81.0})
+    r = _batch(client, [fix, _event()])
+    assert [x["status"] for x in r.json()["results"]] == ["created", "created"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [[], [_event()] * 501, ["not", "objects"], {"items": [_event()]}, {"events": "x"}],
+)
+def test_batch_rejected_as_a_whole(client: TestClient, tmp_path: Path, body: Any) -> None:
+    if isinstance(body, list) and body and isinstance(body[0], str):
+        r = client.post("/events/batch", content=json.dumps(body))
+    else:
+        r = _batch(client, body)
+    assert r.status_code == 422
+    assert _count(tmp_path) == 0
+
+
+def test_offline_backfill(client: TestClient, tmp_path: Path) -> None:
+    old = (NOW - timedelta(days=3)).isoformat()
+    recent = _event(event_id=E2, occurred_at="2026-10-20T07:30:00+08:00")
+    r = _batch(client, [recent, _event(occurred_at=old, recorded_at=old)])
+    assert [x["status"] for x in r.json()["results"]] == ["created", "created"]
+    with closing(sqlite3.connect(tmp_path / "db.sqlite")) as c:
+        rows = c.execute("SELECT event_id, received_at FROM events ORDER BY occurred_at").fetchall()
+    assert [row[0] for row in rows] == [EID, E2]
+    assert {row[1] for row in rows} == {"2026-10-20T12:00:00.000000Z"}
+
+
+def test_batch_logging(client: TestClient, logs: io.StringIO) -> None:
+    _batch(client, [_event(raw="早上空腹"), _event(event_id=E2, raw=["胸口疼"])])
+    lines = [json.loads(line) for line in logs.getvalue().splitlines()]
+    per_item = [x for x in lines if x["event"] == "events.submitted"]
+    batch = [x for x in lines if x["event"] == "events.batch_submitted"]
+    assert [x["status"] for x in per_item] == ["created", "invalid"]
+    assert len(batch) == 1 and batch[0]["count"] == 2 and "duration_ms" in batch[0]
+    assert "空腹" not in logs.getvalue() and "胸口疼" not in logs.getvalue()
