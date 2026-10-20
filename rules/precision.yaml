@@ -25,3 +25,24 @@ rules:
       min_training_days: 4
       share_required: 0.75
     note: 训练日记录程度：3 按组且每组有 RIR/RPE；2 按组缺 RIR/RPE 或打卡带用力；1 只有打卡。
+
+  - id: R-PR-DIET
+    title: 饮食领域精度
+    status: pending_review
+    source: {kind: design}
+    params:
+      window_days: 28
+      min_logged_days: 16  # 平均每周 4 天，与饮食调整的最低数据量一致
+      share_required: 0.75
+      weeks_required: 3  # P1：至少几周的签到回答了“按计划吃了几天”
+    note: 记录程度：3 每餐都有自己填的热量与蛋白质；2 每餐都有热量（可为确认的估算）；1 其他。
+
+  - id: R-PR-RECOVERY
+    title: 恢复领域精度（设备接入前最高 P1）
+    status: pending_review
+    source: {kind: design}
+    params:
+      window_days: 28
+      weeks_required: 3  # 至少几周的签到填了疲劳或睡眠
+      min_energy_days: 16  # 或至少几天选择了每日精力
+    note: P3、P2 需要设备的睡眠、心率变异性、静息心率等数据。

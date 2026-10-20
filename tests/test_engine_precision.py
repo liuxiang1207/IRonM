@@ -7,7 +7,12 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from ironm.contracts.events import EVENT_ADAPTER
-from ironm.engine.precision import body_precision, training_precision
+from ironm.engine.precision import (
+    body_precision,
+    diet_precision,
+    recovery_precision,
+    training_precision,
+)
 from ironm.rules.loader import RULES_DIR, load_rules
 
 BOOK = load_rules(RULES_DIR)
@@ -121,3 +126,81 @@ def test_training_uses_local_date() -> None:
     early = _ev("workout_check", "2026-10-01T00:30:00", {"status": "done"})
     r = training_precision([early], as_of=AS_OF, tz=SH, rulebook=BOOK)
     assert r.basis["training_days"] == 1
+
+
+# ---- 饮食、恢复（spec §18）----
+
+
+def _meal(day: int, kcal: float | None, protein: float | None, **extra: Any) -> Any:
+    payload: dict[str, Any] = {"slot": "lunch"}
+    if kcal is not None:
+        payload["kcal"] = kcal
+    if protein is not None:
+        payload["protein_g"] = protein
+    return _ev("meal", f"2026-10-{day:02d}T12:30:00", payload, **extra)
+
+
+def _checkin(day: int, **payload: Any) -> Any:
+    return _ev("checkin", f"2026-10-{day:02d}T21:00:00", payload)
+
+
+def test_diet_day_levels() -> None:
+    events = [
+        _meal(1, 600, 30),  # 自己填热量与蛋白质 → 3
+        _meal(2, 600, None),  # 缺蛋白质 → 2
+        _meal(3, 600, 30, source="estimate"),  # 确认的估算 → 2
+        _meal(4, 600, 30, source="estimate", confirmed=False),  # 未确认的估算 → 1
+        _meal(5, None, None),  # 缺热量 → 1
+        _meal(6, 600, 30),
+        _meal(6, 500, None),  # 一餐缺蛋白质 → 当天 2
+    ]
+    r = diet_precision(events, as_of=AS_OF, tz=SH, rulebook=BOOK)
+    assert r.basis["day_levels"] == [3, 2, 2, 1, 1, 2]
+
+
+def test_diet_checkin_weeks_and_corrections() -> None:
+    meals = [_meal(d, 600, 30) for d in range(1, 16)]  # 15 天
+    wrong = _meal(16, None, None)
+    fix = _ev(
+        "meal",
+        "2026-10-16T12:30:00",
+        {"slot": "lunch", "kcal": 600, "protein_g": 30},
+        corrects=str(wrong.event_id),
+    )
+    checkins = [_checkin(d, diet_adherence_days=5) for d in (4, 11, 18)]
+    r = diet_precision([*meals, wrong, fix, *checkins], as_of=AS_OF, tz=SH, rulebook=BOOK)
+    assert r.basis["logged_days"] == 16
+    assert r.basis["day_levels"] == [3] * 16
+    assert r.precision == "P3"
+    assert r.basis["adherence_weeks"] == 3
+
+
+def test_diet_min_days_from_rule_table(tmp_path: Path) -> None:
+    d = tmp_path / "rules"
+    d.mkdir()
+    for f in RULES_DIR.glob("*.yaml"):
+        text = f.read_text(encoding="utf-8")
+        if f.name == "precision.yaml":
+            text = text.replace("min_logged_days: 16", "min_logged_days: 10")
+        (d / f.name).write_text(text, encoding="utf-8")
+    meals = [_meal(day, 600, 30) for day in range(1, 11)]
+    assert diet_precision(meals, as_of=AS_OF, tz=SH, rulebook=BOOK).precision == "P0"
+    assert diet_precision(meals, as_of=AS_OF, tz=SH, rulebook=load_rules(d)).precision == "P3"
+
+
+def test_recovery_counts() -> None:
+    checkins = [_checkin(d, fatigue=3) for d in (4, 11, 18)]
+    checkins.append(_checkin(25))  # 只有空签到，不算
+    energy = [_ev("energy_check", f"2026-10-{d:02d}T08:00:00", {"level": 3}) for d in range(1, 11)]
+    r = recovery_precision([*checkins, *energy], as_of=AS_OF, tz=SH, rulebook=BOOK)
+    assert r.basis == {"checkin_weeks": 3, "energy_days": 10}
+    assert r.precision == "P1"
+
+
+def test_recovery_energy_local_date() -> None:
+    # 上海 10 月 1 日 0:30 的精力选择属于窗口第一天；同一天两次只算一天
+    events = [
+        _ev("energy_check", "2026-10-01T00:30:00", {"level": 3}),
+        _ev("energy_check", "2026-10-01T09:00:00", {"level": 4}),
+    ]
+    assert recovery_precision(events, as_of=AS_OF, tz=SH, rulebook=BOOK).basis["energy_days"] == 1

@@ -10,7 +10,16 @@ from ironm.engine.completeness import (
 )
 from ironm.engine.data_quality import KCAL_RANGE, WEIGHT_JUMP, KcalRangeParams, WeightJumpParams
 from ironm.engine.energy import EnergyParams, rule_id_for
-from ironm.engine.precision import BODY, TRAINING, BodyParams, TrainingParams
+from ironm.engine.precision import (
+    BODY,
+    DIET,
+    RECOVERY,
+    TRAINING,
+    BodyParams,
+    DietParams,
+    RecoveryParams,
+    TrainingParams,
+)
 from ironm.engine.trend import WEIGHT_TREND, TrendParams
 from ironm.rules.loader import RuleBook
 
@@ -22,6 +31,8 @@ RULE_PARAMS: dict[str, type[BaseModel]] = {
     WEIGHT_TREND: TrendParams,
     BODY: BodyParams,
     TRAINING: TrainingParams,
+    DIET: DietParams,
+    RECOVERY: RecoveryParams,
     **{rule_id_for(level): EnergyParams for level in range(1, 6)},
 }
 

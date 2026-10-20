@@ -20,7 +20,12 @@ from ironm.engine.completeness import training_completion, weight_freshness
 from ironm.engine.data_quality import daily_kcal, pending_weights
 from ironm.engine.effective import CorrectionForkError, resolve
 from ironm.engine.energy import energy_today
-from ironm.engine.precision import body_precision, training_precision
+from ironm.engine.precision import (
+    body_precision,
+    diet_precision,
+    recovery_precision,
+    training_precision,
+)
 from ironm.engine.trend import weight_trend
 from ironm.rules.loader import RULES_DIR, load_rules
 
@@ -41,6 +46,8 @@ REGISTERED = {
     "energy_today",
     "body_precision",
     "training_precision",
+    "diet_precision",
+    "recovery_precision",
 }
 
 
@@ -226,3 +233,25 @@ def test_precision_order_independent_and_uses_corrections(seed: int) -> None:
     assert a.basis["weigh_days"] == 9  # 1 日不再算
     t = training_precision([], as_of=as_of, tz=SH, rulebook=BOOK)
     assert t.precision == "P0"
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_diet_and_recovery_precision_order_independent(seed: int) -> None:
+    meals = [
+        _ev("meal", f"2026-10-{d:02d}T12:00:00+08:00", {"slot": "lunch", "kcal": 600})
+        for d in range(1, 20)
+    ]
+    late = _ev("meal", "2026-10-29T12:00:00+08:00", {"slot": "lunch", "kcal": 600})  # 截止之后
+    energy = [
+        _ev("energy_check", f"2026-10-{d:02d}T08:00:00+08:00", {"level": 3}) for d in range(1, 18)
+    ]
+    events = [*meals, late, *energy]
+    shuffled = list(events)
+    random.Random(seed).shuffle(shuffled)
+    as_of = datetime(2026, 10, 28, 15, tzinfo=UTC)
+    d1 = diet_precision(events, as_of=as_of, tz=SH, rulebook=BOOK)
+    assert d1 == diet_precision(shuffled, as_of=as_of, tz=SH, rulebook=BOOK)
+    assert d1.basis["logged_days"] == 19 and d1.precision == "P2"
+    r1 = recovery_precision(events, as_of=as_of, tz=SH, rulebook=BOOK)
+    assert r1 == recovery_precision(shuffled, as_of=as_of, tz=SH, rulebook=BOOK)
+    assert r1.precision == "P1"

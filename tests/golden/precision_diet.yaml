@@ -1,0 +1,38 @@
+# 黄金用例：饮食精度（R-PR-DIET）。day_levels：每个有饮食记录的日子的记录程度（1–3）；
+# adherence_weeks：4 周中有几周的签到回答了“按计划吃了几天”。
+# 规则：记录天数 ≥ 16 时取最高的 L（3 或 2）使程度 ≥ L 的占比 ≥ 75%；否则签到 ≥ 3 周为 P1；其余 P0。
+target: ironm.engine.precision:diet_precision_from_days
+status: active
+inject: [rulebook]
+rules: [R-PR-DIET]
+cases:
+  - id: G-PR-D-001
+    title: 16 天、程度 3 恰好占 75%（12/16）→ P3
+    given: {day_levels: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1, 1], adherence_weeks: 0}
+    expect: {precision: P3}
+  - id: G-PR-D-002
+    title: 只有 15 天记录、签到 0 周 → P0
+    given: {day_levels: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1], adherence_weeks: 0}
+    expect: {precision: P0}
+  - id: G-PR-D-003
+    title: 只有 15 天记录、签到 3 周 → P1
+    twin_of: G-PR-D-002
+    given: {day_levels: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 1, 1, 1], adherence_weeks: 3}
+    expect: {precision: P1}
+  - id: G-PR-D-004
+    title: 16 天、程度 ≥ 2 恰好占 75%、程度 3 不足 → P2
+    given: {day_levels: [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1], adherence_weeks: 0}
+    expect: {precision: P2}
+  - id: G-PR-D-005
+    title: 16 天但程度 ≥ 2 只占 50%、签到 3 周 → P1
+    given: {day_levels: [2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1], adherence_weeks: 3}
+    expect: {precision: P1}
+  - id: G-PR-D-006
+    title: 同上但签到只有 2 周 → P0
+    twin_of: G-PR-D-005
+    given: {day_levels: [2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1], adherence_weeks: 2}
+    expect: {precision: P0}
+  - id: G-PR-D-007
+    title: 什么都没有 → P0
+    given: {day_levels: [], adherence_weeks: 0}
+    expect: {precision: P0}
