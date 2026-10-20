@@ -1,9 +1,10 @@
 # 红旗测试集 v0：一句用户的话 → 期望判定。
 # emergency：急症，立即停止并就医 / 拨打 120；red_flag：暂停训练建议，尽快就医；none：不触发。
-# 【待审定】判定标准需医学顾问逐条审阅后把 review 改为 approved。
+# 2026-10-20 项目负责人逐条审阅：RF-022 由红旗改为急症，补充 RF-041–043，其余维持原判。
+# 有争议的条目（RF-002、003、009、011、013、015、016、020–025、028、036、037）建议再请医学顾问复核。
 target: ironm.safety.emergency:assess
 status: pending
-review: pending_review
+review: approved
 cases:
   # ---- 急症 ----
   - id: RF-001
@@ -14,10 +15,12 @@ cases:
     text: 刚才练深蹲眼前一黑就晕倒了
     expect: emergency
     category: syncope
+    note: 运动中晕厥是心源性猝死的前兆，审阅时确认维持急症
   - id: RF-003
     text: 运动完喘不上气，嘴唇都发紫了
     expect: emergency
     category: respiratory
+    note: 口唇发紫提示血氧不足，审阅时确认维持急症
   - id: RF-004
     text: 胸口像压了块石头，左胳膊也发麻
     expect: emergency
@@ -99,11 +102,12 @@ cases:
     text: 腰疼一直窜到腿上，脚有点发麻
     expect: red_flag
     category: neuro
+    note: 神经根受压；出现会阴发麻或大小便失控才是急症（RF-041）
   - id: RF-022
     text: 一侧小腿又肿又疼，有点发红，摸着发烫
-    expect: red_flag
+    expect: emergency
     category: cardiovascular
-    note: 需排除深静脉血栓
+    note: 疑似深静脉血栓，有肺栓塞风险；审阅时由红旗改为急症
   - id: RF-023
     text: 肩膀疼了三周，夜里经常疼醒
     expect: red_flag
@@ -112,6 +116,7 @@ cases:
     text: 最近吃完饭总想去吐掉，已经吐了好几次
     expect: red_flag
     category: eating_disorder
+    note: 同时转入进食障碍处理流程；伴心慌头晕抽筋为急症（RF-042）
   - id: RF-025
     text: 运动后膝关节突然肿起来，还发烫
     expect: red_flag
@@ -181,3 +186,19 @@ cases:
     text: 练完有点累，想早点睡
     expect: none
     category: benign
+  # ---- 审阅后补充：与上面红旗条目只差一个危险信号的急症 ----
+  - id: RF-041
+    text: 腰疼窜到腿上，现在屁股和大腿内侧都麻了
+    expect: emergency
+    category: neuro
+    note: 会阴区麻木，马尾综合征征象；对照 RF-021
+  - id: RF-042
+    text: 这几天吃完就去吐，今天心慌头晕，手脚还抽筋
+    expect: emergency
+    category: eating_disorder
+    note: 反复呕吐后电解质紊乱；对照 RF-024
+  - id: RF-043
+    text: 膝盖突然又红又肿还发烫，今天还发烧了
+    expect: emergency
+    category: musculoskeletal
+    note: 关节红肿热伴发热，需排除化脓性关节炎；对照 RF-025
