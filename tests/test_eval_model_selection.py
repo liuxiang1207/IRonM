@@ -1,6 +1,8 @@
 """模型选型评测：判分、成本、汇总、失败记录与密钥不落盘（spec [2026-10-20] §8）。"""
 
+import itertools
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -140,7 +142,8 @@ models:
     api_key_env: FAKE_API_KEY
     thinking: false
     extra_body: {}
-    price_usd_per_mtok:
+    price_per_mtok:
+      currency: USD
       offpeak: {input_hit: 0.1, input_miss: 1.0, output: 2.0}
       peak: {input_hit: 0.2, input_miss: 2.0, output: 4.0}
 """,
@@ -190,3 +193,72 @@ def test_rescore_uses_saved_answers(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     [after] = rescore(out, [model], relaxed)
     assert after.qa_acc == before.qa_acc + 1 / len(qs.qa)
     assert (out / "report.md").read_text(encoding="utf-8").count(model.name) == 1
+
+
+CNY_MODEL = """\
+cny_per_usd: 6.68
+models:
+  - name: kimi
+    provider: moonshot
+    base_url: https://example.invalid
+    model: kimi-x
+    api_key_env: FAKE_API_KEY
+    thinking: false
+    extra_body: {}
+    price_per_mtok:
+      currency: CNY
+      offpeak: {input_hit: 1.1, input_miss: 6.5, output: 27.0}
+"""
+
+
+def test_cny_prices_converted_and_peak_defaults_to_offpeak(tmp_path: Path) -> None:
+    path = tmp_path / "models.yaml"
+    path.write_text(CNY_MODEL, encoding="utf-8")
+    [m] = load_models(path)
+    assert m.price_usd.offpeak.output == pytest.approx(27.0 / 6.68)
+    assert m.price_usd.peak == m.price_usd.offpeak
+
+
+def test_cny_without_rate_fails(tmp_path: Path) -> None:
+    path = tmp_path / "models.yaml"
+    path.write_text(CNY_MODEL.replace("cny_per_usd: 6.68\n", ""), encoding="utf-8")
+    with pytest.raises(ValueError, match="cny_per_usd"):
+        load_models(path)
+
+
+def test_truncated_output_is_a_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "x")
+    model = load_models(MODELS_PATH)[0]
+
+    def transport(url: str, headers: dict[str, str], body: dict[str, object]) -> dict[str, object]:
+        return {
+            "choices": [{"message": {"content": ""}, "finish_reason": "length"}],
+            "usage": {"prompt_tokens": 10, "completion_tokens": 8000},
+        }
+
+    [row] = run_all([model], load_questions(QUESTIONS_PATH), tmp_path / "out", transport)
+    assert row.errors == 50
+    first = json.loads((tmp_path / "out" / f"{model.name}.jsonl").read_text().splitlines()[0])
+    assert "截断" in first["error"]
+
+
+def test_rate_limit_spaces_requests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("FAKE_API_KEY", "x")
+    path = tmp_path / "models.yaml"
+    path.write_text(
+        CNY_MODEL + "    rate_limit: {concurrency: 1, min_interval_s: 0.01}\n", encoding="utf-8"
+    )
+    [m] = load_models(path)
+    starts: list[float] = []
+
+    def transport(url: str, headers: dict[str, str], body: dict[str, object]) -> dict[str, object]:
+        starts.append(time.monotonic())
+        return {
+            "choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 1, "completion_tokens": 1},
+        }
+
+    run_all([m], load_questions(QUESTIONS_PATH), tmp_path / "out", transport)
+    gaps = [b - a for a, b in itertools.pairwise(starts)]
+    assert len(starts) == 50
+    assert min(gaps) >= 0.009

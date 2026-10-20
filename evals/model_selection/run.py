@@ -9,6 +9,7 @@ import json
 import math
 import os
 import sys
+import threading
 import time
 import urllib.request
 from collections.abc import Callable, Sequence
@@ -35,7 +36,7 @@ HERE = Path(__file__).parent
 QUESTIONS_PATH = HERE / "questions.yaml"
 MODELS_PATH = HERE / "models.yaml"
 OUT_ROOT = Path("data/evals/model_selection")
-MAX_TOKENS = 3000
+MAX_TOKENS = 8000  # 思考模式的推理也计入输出，留足余量；被截断时记为失败
 TIMEOUT_S = 180
 
 type Transport = Callable[[str, dict[str, str], dict[str, object]], dict[str, object]]
@@ -52,7 +53,22 @@ class Prices(_Model):
     peak: Price
 
 
-class ModelConfig(_Model):
+class PriceTable(_Model):
+    """配置文件里的价格：按厂商原币种填写；没有高峰价时省略 peak。"""
+
+    currency: Literal["USD", "CNY"]
+    offpeak: Price
+    peak: Price | None = None
+
+
+class RateLimit(_Model):
+    """主动限速（不是失败重试）：并发数与相邻两次请求的最小间隔。"""
+
+    concurrency: int = Field(default=4, ge=1)
+    min_interval_s: float = Field(default=0.0, ge=0)
+
+
+class _ModelEntry(_Model):
     name: str
     provider: str
     base_url: str
@@ -60,7 +76,22 @@ class ModelConfig(_Model):
     api_key_env: Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]*$")]
     thinking: bool
     extra_body: dict[str, object]
-    price_usd_per_mtok: Prices
+    price_per_mtok: PriceTable
+    rate_limit: RateLimit = RateLimit()
+
+
+class ModelConfig(_Model):
+    """加载后的配置：价格统一换算为美元 / 百万 token。"""
+
+    name: str
+    provider: str
+    base_url: str
+    model: str
+    api_key_env: str
+    thinking: bool
+    extra_body: dict[str, object]
+    price_usd: Prices
+    rate_limit: RateLimit
 
 
 class ExtractionQ(_Model):
@@ -84,15 +115,43 @@ class QuestionSet(_Model):
 
 
 class _ModelList(_Model):
-    models: tuple[ModelConfig, ...]
+    cny_per_usd: float | None = Field(default=None, gt=0)
+    models: tuple[_ModelEntry, ...]
 
 
 def load_questions(path: Path) -> QuestionSet:
     return QuestionSet.model_validate(load_yaml(path))
 
 
+def _to_usd(price: Price, rate: float) -> Price:
+    return Price(
+        input_hit=price.input_hit / rate,
+        input_miss=price.input_miss / rate,
+        output=price.output / rate,
+    )
+
+
 def load_models(path: Path) -> tuple[ModelConfig, ...]:
-    return _ModelList.model_validate(load_yaml(path)).models
+    listing = _ModelList.model_validate(load_yaml(path))
+    configs = []
+    for m in listing.models:
+        table = m.price_per_mtok
+        if table.currency == "USD":
+            rate = 1.0
+        elif listing.cny_per_usd is None:
+            raise ValueError(f"{m.name} 以人民币计价，配置文件必须给出汇率 cny_per_usd")
+        else:
+            rate = listing.cny_per_usd
+        offpeak = _to_usd(table.offpeak, rate)
+        peak = offpeak if table.peak is None else _to_usd(table.peak, rate)
+        configs.append(
+            ModelConfig(
+                **m.model_dump(exclude={"price_per_mtok", "rate_limit"}),
+                rate_limit=m.rate_limit,
+                price_usd=Prices(offpeak=offpeak, peak=peak),
+            )
+        )
+    return tuple(configs)
 
 
 SYSTEM_EXTRACT = """\
@@ -143,6 +202,23 @@ def _usage(resp: dict[str, object]) -> Usage:
     return Usage(input_hit=hit, input_miss=miss, output=int(u["completion_tokens"]))
 
 
+class _Pacer:
+    """保证相邻两次请求的开始时间至少间隔 min_interval_s。"""
+
+    def __init__(self, min_interval_s: float) -> None:
+        self._interval = min_interval_s
+        self._lock = threading.Lock()
+        self._next = 0.0
+
+    def wait(self) -> None:
+        # 在锁内等待并按实际放行时刻计算下一次，避免 sleep 误差让间隔变短
+        with self._lock:
+            delay = self._next - time.monotonic()
+            if delay > 0:
+                time.sleep(delay)
+            self._next = time.monotonic() + self._interval
+
+
 def call(cfg: ModelConfig, system: str, user: str, transport: Transport) -> CallResult:
     headers = {
         "Authorization": f"Bearer {os.environ[cfg.api_key_env]}",
@@ -159,6 +235,8 @@ def call(cfg: ModelConfig, system: str, user: str, transport: Transport) -> Call
         resp = transport(f"{cfg.base_url}/chat/completions", headers, body)
         choices = resp["choices"]
         assert isinstance(choices, list)
+        if choices[0].get("finish_reason") == "length":
+            raise ValueError("输出被截断（finish_reason=length），未得到完整回答")
         text = str(choices[0]["message"]["content"])
         usage = _usage(resp)
     except Exception as e:
@@ -207,11 +285,14 @@ class Row:
     avg_cost_peak_usd: float
 
 
-def _run_one(cfg: ModelConfig, kind: Kind, q: ExtractionQ | TextQ, transport: Transport) -> Record:
+def _run_one(
+    cfg: ModelConfig, kind: Kind, q: ExtractionQ | TextQ, transport: Transport, pacer: _Pacer
+) -> Record:
     system, user = (SYSTEM_EXTRACT, q.text) if isinstance(q, ExtractionQ) else (SYSTEM_QA, q.prompt)
+    pacer.wait()
     r = call(cfg, system, user, transport)
     v = Verdict(False, ("调用失败",)) if r.text is None else _judge(q, r.text)
-    prices = cfg.price_usd_per_mtok
+    prices = cfg.price_usd
     return Record(
         model=cfg.name,
         kind=kind,
@@ -326,7 +407,6 @@ def run_all(
     questions: QuestionSet,
     out_dir: Path,
     transport: Transport,
-    workers: int = 4,
 ) -> list[Row]:
     for cfg in models:
         if cfg.api_key_env not in os.environ:
@@ -334,9 +414,11 @@ def run_all(
     out_dir.mkdir(parents=True, exist_ok=True)
     results: dict[str, list[Record]] = {}
     for cfg in models:
-        with ThreadPoolExecutor(max_workers=workers) as pool:
+        pacer = _Pacer(cfg.rate_limit.min_interval_s)
+        with ThreadPoolExecutor(max_workers=cfg.rate_limit.concurrency) as pool:
             futures = [
-                pool.submit(_run_one, cfg, kind, q, transport) for kind, q in _items(questions)
+                pool.submit(_run_one, cfg, kind, q, transport, pacer)
+                for kind, q in _items(questions)
             ]
             results[cfg.name] = [fut.result() for fut in futures]
     rows = [_summary(cfg, results[cfg.name]) for cfg in models]
