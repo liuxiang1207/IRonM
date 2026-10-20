@@ -12,8 +12,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH, assess, load_terms
 from ironm.safety.offline import OFFLINE_PATH, render
+from ironm.safety.replies import four_section
 from tests.safety.test_emergency import (
     BLOOD_PRESSURE,
     NEGATIONS,
@@ -28,8 +30,8 @@ RUNNER = Path(__file__).with_name("run_offline.mjs")
 
 def test_offline_data_up_to_date() -> None:
     assert OFFLINE_PATH.exists(), "缺少 App 离线词表，请运行 make offline"
-    assert OFFLINE_PATH.read_text(encoding="utf-8") == render(load_terms(TERMS_PATH)), (
-        "App 离线词表与 ironm/safety/emergency_terms.yaml 不一致，请运行 make offline"
+    assert OFFLINE_PATH.read_text(encoding="utf-8") == render(load_kit()), (
+        "App 离线数据与急症词表或回答模板不一致，请运行 make offline"
     )
 
 
@@ -99,8 +101,40 @@ def _offline(texts: list[str]) -> list[dict[str, object]]:
 def test_offline_matches_server() -> None:
     texts = _cases()
     offline = _offline(texts)
-    server = [assess(t).model_dump(mode="json") for t in texts]
+    replies = load_kit().replies
+    server: list[dict[str, object]] = []
+    for t in texts:
+        a = assess(t)
+        sections = [s.model_dump(mode="json") for s in four_section(replies, a)]
+        server.append({"assessment": a.model_dump(mode="json"), "sections": sections})
     mismatches = [(t, s, o) for t, s, o in zip(texts, server, offline, strict=True) if s != o]
     assert not mismatches, f"共 {len(mismatches)} 处不一致，例如：{mismatches[:3]}"
     # 随机句子确实覆盖到三种级别，比对才有意义
-    assert {r["level"] for r in server} == {"emergency", "red_flag", "none"}
+    levels = {assess(t).level for t in texts}
+    assert levels == {"emergency", "red_flag", "none"}
+
+
+def test_offline_merges_like_server_when_categories_share_text(tmp_path: Path) -> None:
+    """两个类别的停止文字、科室、可带信息相同时，两边都去重（真实模板里暂未出现，单独构造）。"""
+    data = json.loads(OFFLINE_PATH.read_text(encoding="utf-8"))
+    cats = data["replies"]["categories"]
+    cats["syncope"] = dict(cats["cardiovascular"])
+    book = tmp_path / "book.json"
+    book.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    replies = load_kit().replies
+    shared = replies.categories["cardiovascular"]
+    replies = replies.model_copy(update={"categories": {**replies.categories, "syncope": shared}})
+
+    text = "我爸刚才跑步时说胸痛，然后就倒下了"
+    a = assess(text)
+    assert set(a.categories) == {"cardiovascular", "syncope"}
+    expected = [s.model_dump(mode="json") for s in four_section(replies, a)]
+    node = shutil.which("node")
+    assert node is not None
+    payload = json.dumps({"book": str(book), "texts": [text]}, ensure_ascii=False)
+    done = subprocess.run(
+        [node, str(RUNNER)], input=payload, capture_output=True, text=True, check=True
+    )
+    [offline] = json.loads(done.stdout)
+    assert offline["sections"] == expected
+    assert expected[1]["text"].count(shared.stop) == 1

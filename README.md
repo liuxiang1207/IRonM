@@ -8,7 +8,7 @@
 make setup     # 安装依赖与 pre-commit
 make check     # 提交前与 CI 都跑：锁文件 → ruff → 依赖方向 → mypy → pytest
 make schemas   # 契约改动后重新导出 JSON Schema（make check 会比对）
-make offline   # 急症词表改动后重新生成 App 离线版数据（make check 会比对）
+make offline   # 急症词表或回答模板改动后重新生成 App 离线版数据（make check 会比对）
 make migrate   # 执行尚未执行的数据库迁移（migrations/NNNN_说明.sql）
 make sim       # 快进模拟：5 类模拟用户各 8 周，输出汇总与第 8 周末的指标（精度、趋势与可信范围、真实趋势、状态、还差什么）
 make eval-models  # 模型选型评测（调用真实接口、产生费用；密钥放 .env）
@@ -35,7 +35,7 @@ make run       # 本地启动（启动时自动执行迁移）；/healthz 存活
 | `IRONM_DB_PATH` | 数据库文件路径 | `data/ironm.sqlite` |
 | `IRONM_RULES_DIR` | 规则表目录 | `rules` |
 
-出现未知的 `IRONM_` 变量、非法取值，或规则表、急症词表格式错误时，启动失败。
+出现未知的 `IRONM_` 变量、非法取值，或规则表、急症词表、拒答词表、回答模板有误时，启动失败。
 
 ## 接口
 
@@ -55,7 +55,7 @@ make run       # 本地启动（启动时自动执行迁移）；/healthz 存活
 ironm/
   core/        时间来源、标识生成、配置、结构化日志（最底层）
   contracts/   数据契约：记录、未知值、指标结果、Agent 输出、字段归属、快照、计划版本、模型调用
-  safety/      急症词表（emergency_terms.yaml，只能由人修改）与匹配、人群安全分层：不依赖其他业务模块，离线可用
+  safety/      急症词表、拒答词表、回答模板（*.yaml，只能由人修改）；急症判定、人群安全分层、三档输出与四段式：不依赖其他业务模块，离线可用
   rules/ engine/ knowledge/ llm/ skills/ agents/ memory/ orchestrator/ scheduler/ api/
   store/       SQLite 连接、迁移执行器、记录仓储（只追加、去重、全文检索）
 migrations/    按编号的数据库迁移脚本

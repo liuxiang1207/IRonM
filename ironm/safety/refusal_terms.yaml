@@ -1,0 +1,47 @@
+# 四项拒答词表（spec §24）：不诊断、不开处方、不制定治疗方案、不提供紧急医疗服务。只能由人修改。
+# 结构与急症词表相同：symptoms 为信号（同义说法、分句内多组同时出现），rules 为拒答条目。
+# 提到药名本身不算，要同时在问用法、用量、搭配或购买。
+version: "0.1"
+review: pending_review
+
+negation:
+  # “不用开药”“不需要诊断”：紧挨着这些词的一处不算
+  before: [不用, 不需要, 不要, 无需, 没让你, 不是让你, 不是要]
+
+symptoms:
+  - id: diagnosis_ask
+    name: 要求判断是什么病
+    terms: [帮我诊断, 帮我确诊, 确诊一下, 诊断一下, 是什么病, 什么病, 得了什么, 是不是病了]
+    combos:
+      - [[是不是, 是否, 会不会是, 难道是, 是不是得了], [病, 炎, 撕裂, 骨折, 癌, 综合征, 糖尿病, 高血压, 劳损, 突出, 损伤, 结石, 甲亢, 抑郁]]
+  - id: report_ask
+    name: 要求解读检查报告
+    combos:
+      - [[报告, 化验单, 检查结果, 心电图, 片子, b超, ct, 核磁, 体检单, 指标], [什么意思, 怎么看, 帮我看, 解读, 正常吗, 什么病, 严重吗, 有问题吗]]
+  - id: drug_name
+    name: 药名或药物类别
+    terms: [克伦特罗, 类固醇, 睾酮, 合成代谢, sarms, 司美格鲁肽, 替尔泊肽, 利拉鲁肽, 奥利司他, 二甲双胍, 布洛芬, 对乙酰氨基酚, 阿司匹林, 泻药, 减肥药, 止痛药, 消炎药, 激素, 安眠药, 降压药, 胰岛素, 生长激素, 抗生素, 西布曲明]
+  - id: dose_ask
+    name: 问用法、用量、搭配或购买
+    terms: [吃多少, 吃几, 几片, 几粒, 多少毫克, 多少mg, 用多少, 打多少, 剂量, 怎么吃, 怎么用, 怎么打, 怎么加, 加量, 周期, 一天几次, 用法, 效果最好, 各用多少, 一起用, 一起吃, 能不能一起, 怎么搭配, 推荐哪, 买哪, 哪一款, 哪里买, 哪个牌子, 停药, 减量]
+  - id: drug_ask
+    name: 要药或要处方
+    terms: [吃什么药, 用什么药, 打什么针, 推荐什么药, 有什么药, 开点药, 开个药, 开药, 开处方, 处方药, 给我开]
+    combos:
+      - [[开], [药, 处方, 方子]]
+  - id: treatment_ask
+    name: 要治疗方案
+    terms: [治疗方案, 怎么治, 怎么治疗, 怎么根治, 治好, 康复方案, 理疗方案, 治疗一下, 开个方子, 偏方]
+  - id: call_emergency
+    name: 要求代叫急救
+    terms: [帮我叫救护车, 叫个救护车, 帮我打120, 替我打120, 帮忙打120, 帮我叫急救]
+    combos:
+      - [[帮我, 替我, 你帮, 帮忙, 给我], ["120", 救护车, 急救]]
+
+rules:
+  - {id: RJ-DIAGNOSIS, kind: diagnosis, title: 要求判断是什么病, all: [diagnosis_ask]}
+  - {id: RJ-REPORT, kind: diagnosis, title: 要求解读检查报告, all: [report_ask]}
+  - {id: RJ-DOSE, kind: prescription, title: 问药物用法用量、搭配或购买, all: [drug_name, dose_ask]}
+  - {id: RJ-DRUG, kind: prescription, title: 要药或要处方, all: [drug_ask]}
+  - {id: RJ-TREATMENT, kind: treatment, title: 要治疗方案, all: [treatment_ask]}
+  - {id: RJ-CALL, kind: emergency_service, title: 要求代叫急救, all: [call_emergency]}

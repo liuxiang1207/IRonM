@@ -29,9 +29,36 @@ export interface EmergencyRule {
 export interface Negation {
   before: string[];
   exceptions: string[];
-  past_after: string;
+  past_after: string | null;
   past_not_followed_by: string[];
   recurrence: string[];
+}
+
+export interface LevelText {
+  conclusion: string;
+  stop: string;
+  cannot_judge: string;
+  help: string;
+}
+
+export interface CategoryText {
+  stop: string;
+  department: string;
+  bring: string[];
+}
+
+export interface Replies {
+  version: string;
+  review: "pending_review" | "approved";
+  titles: LevelText;
+  levels: Record<"emergency" | "red_flag", LevelText>;
+  categories: Record<string, CategoryText>;
+}
+
+export interface ReplySection {
+  kind: "conclusion" | "stop" | "cannot_judge" | "help";
+  title: string;
+  text: string;
 }
 
 export interface TermBook {
@@ -43,6 +70,7 @@ export interface TermBook {
   negation: Negation;
   symptoms: Symptom[];
   rules: EmergencyRule[];
+  replies: Replies;
 }
 
 export interface Assessment {
@@ -96,7 +124,7 @@ function counts(neg: Negation, clause: string, start: number, end: number, pastC
   const negated = neg.before.some((w) => head.endsWith(w));
   if (negated && !neg.exceptions.some((w) => head.endsWith(w))) return false;
   const tail = clause.slice(end);
-  if (pastCounts || !tail.startsWith(neg.past_after)) return true;
+  if (pastCounts || neg.past_after === null || !tail.startsWith(neg.past_after)) return true;
   const rest = tail.slice(neg.past_after.length);
   return neg.past_not_followed_by.some((w) => rest.startsWith(w));
 }
@@ -133,4 +161,26 @@ export function assess(book: TermBook, text: string): Assessment {
     rule_ids: fired.map((r) => r.id),
     categories: [...new Set(fired.map((r) => r.category))],
   };
+}
+
+function unique(items: string[]): string[] {
+  return [...new Set(items)];
+}
+
+// 红旗四段式：安全结论 → 现在需要停止的 → 我不能判断的 → 建议的专业帮助（与 ironm/safety/replies.py 对应）
+export function fourSection(book: TermBook, assessment: Assessment): ReplySection[] {
+  if (assessment.level === "none") return [];
+  const r = book.replies;
+  const level = r.levels[assessment.level];
+  const cats = assessment.categories.map((c) => r.categories[c]);
+  const stop = unique([level.stop, ...cats.map((c) => c.stop)]).join("");
+  const departments = unique(cats.map((c) => c.department)).join("或");
+  const bring = unique(cats.flatMap((c) => c.bring)).join("、");
+  const help = level.help.replace("{departments}", departments).replace("{bring}", bring);
+  return [
+    { kind: "conclusion", title: r.titles.conclusion, text: level.conclusion },
+    { kind: "stop", title: r.titles.stop, text: stop },
+    { kind: "cannot_judge", title: r.titles.cannot_judge, text: level.cannot_judge },
+    { kind: "help", title: r.titles.help, text: help },
+  ];
 }

@@ -25,7 +25,10 @@ from ironm.engine.energy import EnergyAdjustment, energy_today
 from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.rules.loader import load_rules
-from ironm.safety.emergency import TERMS_PATH, load_terms
+from ironm.safety.decision import load_kit
+from ironm.safety.emergency import TERMS_PATH
+from ironm.safety.refusals import REFUSALS_PATH
+from ironm.safety.replies import REPLIES_PATH
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
@@ -132,12 +135,15 @@ def create_app(
     log_stream: IO[str] = sys.stderr,
     migrations_dir: Path = MIGRATIONS_DIR,
     terms_path: Path = TERMS_PATH,
+    refusals_path: Path = REFUSALS_PATH,
+    replies_path: Path = REPLIES_PATH,
 ) -> FastAPI:
-    """配置、规则表或急症词表有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
+    """配置、规则表或安全文件有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
     configure_logging(settings, clock, log_stream)
     rulebook = load_rules(settings.rules_dir)
     validate_rule_params(rulebook)
-    load_terms(terms_path)  # 急症词表：启动时校验，供问答与离线版使用（D22、D24）
+    # 急症词表、拒答词表与回答模板：启动时校验并互相核对（spec §21–24）
+    load_kit(terms_path, refusals_path, replies_path)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
