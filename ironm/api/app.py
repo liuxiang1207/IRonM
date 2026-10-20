@@ -7,6 +7,7 @@ import sys
 import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager, closing
+from datetime import timedelta
 from pathlib import Path
 from typing import IO, Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,6 +22,7 @@ from ironm.core.clock import Clock, SystemClock, local_day_bounds
 from ironm.core.config import Settings, load_settings
 from ironm.core.log import configure_logging, get_logger
 from ironm.engine.energy import EnergyAdjustment, energy_today
+from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.rules.loader import load_rules
 from ironm.store.db import connect
@@ -263,6 +265,24 @@ def create_app(
             "adjustment": result.adjustment.model_dump(),
         }
         return JSONResponse(content=content)
+
+    @app.get("/metrics")
+    def metrics_view(
+        tz: str,
+        user_id: Annotated[str, Depends(current_user)],
+        store: Annotated[EventStore, Depends(event_store)],
+    ) -> JSONResponse:
+        """当前用户的指标：四个领域的精度与指标结果列表。只读取计算所需的最近一段记录。"""
+        try:
+            zone = ZoneInfo(tz)
+        except (ZoneInfoNotFoundError, ValueError):
+            msg = "时区无效，应为标准名称（如 Asia/Shanghai）"
+            return _invalid([{"loc": ["query", "tz"], "msg": msg, "type": "timezone"}])
+        as_of = clock.now()
+        since = as_of - timedelta(days=lookback_days(rulebook))
+        events = store.list_for_user(user_id, since=since)
+        report = build_metrics(events, as_of=as_of, tz=zone, rulebook=rulebook)
+        return JSONResponse(content=report.model_dump(mode="json"))
 
     return app
 

@@ -137,14 +137,18 @@ def _followers_agree(
 
 
 def daily_kcal(
-    meals: Iterable[MealEvent], *, days: Iterable[date], tz: tzinfo
+    meals: Iterable[MealEvent],
+    *,
+    days: Iterable[date],
+    tz: tzinfo,
+    as_of: datetime | None = None,
 ) -> dict[date, float | Unknown]:
     """按用户所在时区的当地日期汇总热量。
 
     当天任一餐热量未知、或当天没有饮食记录时，当天总量为“未知”：部分记录会让总量偏低，空白优于部分记录。
     """
     by_day: dict[date, list[MealEvent]] = {}
-    for m in resolve(meals):
+    for m in resolve(meals, as_of=as_of):
         by_day.setdefault(m.occurred_at.astimezone(tz).date(), []).append(m)
     totals: dict[date, float | Unknown] = {}
     for day in days:

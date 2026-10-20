@@ -20,6 +20,7 @@ from ironm.engine.completeness import training_completion, weight_freshness
 from ironm.engine.data_quality import daily_kcal, pending_weights
 from ironm.engine.effective import CorrectionForkError, resolve
 from ironm.engine.energy import energy_today
+from ironm.engine.metrics_view import build_metrics
 from ironm.engine.precision import (
     body_precision,
     diet_precision,
@@ -50,6 +51,7 @@ REGISTERED = {
     "diet_precision",
     "recovery_precision",
     "judgement_window",
+    "build_metrics",
 }
 
 
@@ -270,3 +272,21 @@ def test_judgement_window_order_and_as_of(seed: int) -> None:
     a = judgement_window(events, as_of=as_of, tz=SH, rulebook=BOOK)
     assert a == judgement_window(shuffled, as_of=as_of, tz=SH, rulebook=BOOK)
     assert a == judgement_window(ws, as_of=as_of, tz=SH, rulebook=BOOK)
+
+
+def test_daily_kcal_respects_as_of() -> None:
+    meal = _ev("meal", "2026-10-20T12:30:00+08:00", {"slot": "lunch", "kcal": 800})
+    late = _ev("meal", "2026-10-20T19:00:00+08:00", {"slot": "dinner", "kcal": 700})
+    as_of = datetime(2026, 10, 20, 8, tzinfo=UTC)  # 上海 16:00，晚饭还没吃
+    assert daily_kcal([meal, late], days=[DAY], tz=SH, as_of=as_of)[DAY] == 800
+
+
+@pytest.mark.parametrize("seed", range(3))
+def test_build_metrics_order_independent(seed: int) -> None:
+    ws = _weights(20)
+    shuffled = list(ws)
+    random.Random(seed).shuffle(shuffled)
+    as_of = datetime(2026, 10, 21, tzinfo=UTC)
+    assert build_metrics(ws, as_of=as_of, tz=SH, rulebook=BOOK) == build_metrics(
+        shuffled, as_of=as_of, tz=SH, rulebook=BOOK
+    )

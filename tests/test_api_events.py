@@ -364,3 +364,29 @@ def test_declared_size_checked_before_reading(client: TestClient) -> None:
         headers={"Content-Type": "application/json", "Content-Length": str(10 * 1024 * 1024)},
     )
     assert r.status_code == 413
+
+
+# ---- 指标接口（spec §20）----
+
+
+def test_metrics_endpoint(client: TestClient) -> None:
+    for d in range(3):
+        at = (NOW - timedelta(days=d)).isoformat()
+        eid = f"00000000-0000-4000-8000-{d:012d}"
+        _post(client, _event(event_id=eid, occurred_at=at, recorded_at=at))
+    other = _event(event_id="00000000-0000-4000-8000-000000000099", user_id="u2")
+    assert _post(client, other).status_code == 403
+    r = client.get("/metrics?tz=Asia/Shanghai")
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body["precision"]) == {"training", "body", "diet", "recovery"}
+    names = {m["name"]: m for m in body["metrics"]}
+    assert names["weight_trend"]["n_records"] == 3
+    assert names["weight_trend"]["status"] == "insufficient"
+
+
+def test_metrics_requires_user_and_valid_tz(tmp_path: Path, client: TestClient) -> None:
+    assert client.get("/metrics?tz=Mars/Base").status_code == 422
+    app = create_app(_settings(tmp_path), FixedClock(NOW), log_stream=io.StringIO())
+    with TestClient(app) as anonymous:
+        assert anonymous.get("/metrics?tz=Asia/Shanghai").status_code == 401
