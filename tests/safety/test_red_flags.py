@@ -35,6 +35,10 @@ def test_red_flag(case: RedFlagCase, request: pytest.FixtureRequest) -> None:
         request.applymarker(
             pytest.mark.xfail(raises=NotImplementedError, strict=True, reason="急症拦截未实现")
         )
+    elif case.pending is not None:
+        request.applymarker(
+            pytest.mark.xfail(raises=AssertionError, strict=True, reason=case.pending)
+        )
     assess = resolve(FILE.target, FILE.status)
     result = assess(case.text)
     assert getattr(result, "level", result) == case.expect

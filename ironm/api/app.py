@@ -25,6 +25,7 @@ from ironm.engine.energy import EnergyAdjustment, energy_today
 from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.rules.loader import load_rules
+from ironm.safety.emergency import TERMS_PATH, load_terms
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
@@ -130,11 +131,13 @@ def create_app(
     clock: Clock,
     log_stream: IO[str] = sys.stderr,
     migrations_dir: Path = MIGRATIONS_DIR,
+    terms_path: Path = TERMS_PATH,
 ) -> FastAPI:
-    """配置或规则表有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
+    """配置、规则表或急症词表有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
     configure_logging(settings, clock, log_stream)
     rulebook = load_rules(settings.rules_dir)
     validate_rule_params(rulebook)
+    load_terms(terms_path)  # 急症词表：启动时校验，供问答与离线版使用（D22、D24）
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:

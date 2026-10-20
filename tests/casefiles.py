@@ -51,6 +51,7 @@ class RedFlagCase(_Model):
     expect: Literal["emergency", "red_flag", "none"]
     category: Text
     note: Text | None = None
+    pending: Text | None = None  # 被测功能已启用、但这条依赖的部分尚未实现：写明原因，标为预期失败
 
 
 class RedFlagFile(_Model):

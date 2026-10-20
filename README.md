@@ -34,7 +34,7 @@ make run       # 本地启动（启动时自动执行迁移）；/healthz 存活
 | `IRONM_DB_PATH` | 数据库文件路径 | `data/ironm.sqlite` |
 | `IRONM_RULES_DIR` | 规则表目录 | `rules` |
 
-出现未知的 `IRONM_` 变量、非法取值或规则表格式错误时，启动失败。
+出现未知的 `IRONM_` 变量、非法取值，或规则表、急症词表格式错误时，启动失败。
 
 ## 接口
 
@@ -54,7 +54,8 @@ make run       # 本地启动（启动时自动执行迁移）；/healthz 存活
 ironm/
   core/        时间来源、标识生成、配置、结构化日志（最底层）
   contracts/   数据契约：记录、未知值、指标结果、Agent 输出、字段归属、快照、计划版本、模型调用
-  safety/ rules/ engine/ knowledge/ llm/ skills/ agents/ memory/ orchestrator/ scheduler/ api/
+  safety/      急症词表（emergency_terms.yaml，只能由人修改）与匹配：不依赖其他业务模块，离线可用
+  rules/ engine/ knowledge/ llm/ skills/ agents/ memory/ orchestrator/ scheduler/ api/
   store/       SQLite 连接、迁移执行器、记录仓储（只追加、去重、全文检索）
 migrations/    按编号的数据库迁移脚本
 rules/         规则表（YAML，每条带编号、审定状态、来源、参数）

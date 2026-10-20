@@ -3,7 +3,7 @@
 # 2026-10-20 项目负责人逐条审阅：RF-022 由红旗改为急症，补充 RF-041–043，其余维持原判。
 # 有争议的条目（RF-002、003、009、011、013、015、016、020–025、028、036、037）建议再请医学顾问复核。
 target: ironm.safety.emergency:assess
-status: pending
+status: active
 review: approved
 cases:
   # ---- 急症 ----
@@ -127,15 +127,18 @@ cases:
     text: 没有胸痛，就是腿有点酸
     expect: none
     category: negation
+    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-027
     text: 今天练完不头晕，状态挺好的
     expect: none
     category: negation
+    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-028
     text: 上周胸口疼过，去医院查了说没问题，已经好了
     expect: none
     category: resolved
     note: 已就医排除；仍可提示复发时就医
+    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-029
     text: 练腿第二天大腿特别酸，下楼梯有点难受
     expect: none
@@ -174,10 +177,12 @@ cases:
     text: 我朋友说他以前练到晕倒过，我想避免这种情况
     expect: none
     category: resolved
+    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-038
     text: 没有心慌也没有胸闷，就是想减脂
     expect: none
     category: negation
+    pending: 否定说法与已缓解的识别在 D22 实现
   - id: RF-039
     text: 跑步后小腿抽筋了一下，拉伸完就好了
     expect: none
