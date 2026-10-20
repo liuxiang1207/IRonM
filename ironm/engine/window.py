@@ -99,9 +99,14 @@ def required_window_days(
             for f in range(math.floor(readings_per_week) + 1, 8)
             if _shortest(f, residual_sd_kg, p, ci_level)
         ),
-        7,
+        None,
     )
-    need = (Need(item="weigh_ins_per_week", count=enough),)
+    # 每周称 7 次也不够：再多称没有用，提示固定时间称重以减少波动
+    need = (
+        (Need(item="weigh_ins_per_week", count=enough),)
+        if enough is not None
+        else (Need(item="consistent_weighing_time", count=1),)
+    )
     return WindowPlan(
         status="insufficient", window_days=_INSUFFICIENT, needed=need, rule_id=JUDGEMENT_WINDOW
     )

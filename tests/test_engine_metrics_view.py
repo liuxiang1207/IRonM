@@ -101,17 +101,17 @@ def _meal(days_ago: int, kcal: float | None) -> Any:
 
 
 def test_diet_average_known_days_only() -> None:
-    meals = [_meal(d, 1800 + 10 * d) for d in range(4)]
-    meals += [_meal(4, 1500), _meal(4, None)]  # 第 5 天有一餐没记热量 → 该天不计
+    meals = [_meal(d, 1800 + 10 * d) for d in range(1, 5)]  # 不含今天（spec §20 澄清）
+    meals += [_meal(5, 1500), _meal(5, None)]  # 有一餐没记热量 → 该天不计
     m = _metric(build_metrics(meals, as_of=AS_OF, tz=SH, rulebook=BOOK), "diet_kcal_mean_7d")
     assert m.status is MetricStatus.OK
-    assert m.value == (1800 + 1810 + 1820 + 1830) / 4
+    assert m.value == (1810 + 1820 + 1830 + 1840) / 4
     assert m.n_records == 4 and m.window_days == 7
 
 
 def test_diet_insufficient() -> None:
     m = _metric(
-        build_metrics([_meal(d, 1800) for d in range(3)], as_of=AS_OF, tz=SH, rulebook=BOOK),
+        build_metrics([_meal(d, 1800) for d in range(1, 4)], as_of=AS_OF, tz=SH, rulebook=BOOK),
         "diet_kcal_mean_7d",
     )
     assert m.status is MetricStatus.INSUFFICIENT
@@ -139,7 +139,68 @@ def test_lookback_derived_and_old_history_irrelevant() -> None:
 
 
 def test_diet_pending_day_excluded_from_average() -> None:
-    meals = [_meal(d, 1800) for d in range(4)] + [_meal(4, 450)]  # 450 千卡 → 待确认
+    meals = [_meal(d, 1800) for d in range(1, 5)] + [_meal(5, 450)]  # 450 千卡 → 待确认
     m = _metric(build_metrics(meals, as_of=AS_OF, tz=SH, rulebook=BOOK), "diet_kcal_mean_7d")
     assert m.status is MetricStatus.PENDING_CONFIRM
     assert m.value == 1800
+
+
+# ---- 冲刺 1 末审查后补充 ----
+
+
+def test_status_does_not_flip_once_ok() -> None:
+    rng = random.Random(7)
+    start = datetime(2026, 9, 1, 7, 30, tzinfo=SH)
+    weights = []
+    for d in range(60):
+        at = (start + timedelta(days=d)).isoformat()
+        weights.append(
+            EVENT_ADAPTER.validate_json(
+                json.dumps(
+                    {
+                        "event_id": f"00000000-0000-4000-9000-{d:012d}",
+                        "user_id": "u1",
+                        "type": "weight",
+                        "occurred_at": at,
+                        "recorded_at": at,
+                        "source": "user",
+                        "confirmed": True,
+                        "payload": {"weight_kg": round(85 - 0.07 * d + rng.gauss(0, 0.45), 1)},
+                    }
+                )
+            )
+        )
+    statuses = []
+    for d in range(25, 60):
+        as_of = (datetime(2026, 9, 1, 23, 0, tzinfo=SH) + timedelta(days=d)).astimezone(UTC)
+        report = build_metrics(
+            [e for e in weights if e.occurred_at <= as_of], as_of=as_of, tz=SH, rulebook=BOOK
+        )
+        statuses.append(_metric(report, "weight_trend").status)
+    first_ok = statuses.index(MetricStatus.OK)
+    assert all(s is MetricStatus.OK for s in statuses[first_ok:]), statuses
+
+
+def test_today_excluded_from_diet_average() -> None:
+    meals = [_meal(d, 2000) for d in range(1, 7)]
+    meals.append(_ev("meal", 0, {"slot": "breakfast", "kcal": 300}, hour=8))
+    noon = datetime(2026, 10, 30, 12, 0, tzinfo=SH).astimezone(UTC)
+    m = _metric(build_metrics(meals, as_of=noon, tz=SH, rulebook=BOOK), "diet_kcal_mean_7d")
+    assert m.status is MetricStatus.OK and m.value == 2000
+
+
+def test_unconfirmed_estimate_not_counted_as_kcal() -> None:
+    meals = [
+        _ev("meal", d, {"slot": "lunch", "kcal": 2500}, hour=12, source="estimate", confirmed=False)
+        for d in range(1, 8)
+    ]
+    m = _metric(build_metrics(meals, as_of=AS_OF, tz=SH, rulebook=BOOK), "diet_kcal_mean_7d")
+    assert m.status is MetricStatus.INSUFFICIENT
+
+
+def test_stale_with_only_older_history() -> None:
+    old = [_ev("weight", 70 + d, {"weight_kg": 80.0}) for d in range(3)]
+    report = build_metrics([], as_of=AS_OF, tz=SH, rulebook=BOOK, earlier_weights=old)
+    m = _metric(report, "weight_trend")
+    assert m.status is MetricStatus.STALE
+    assert m.last_record_at == old[0].occurred_at

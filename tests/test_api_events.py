@@ -390,3 +390,41 @@ def test_metrics_requires_user_and_valid_tz(tmp_path: Path, client: TestClient) 
     app = create_app(_settings(tmp_path), FixedClock(NOW), log_stream=io.StringIO())
     with TestClient(app) as anonymous:
         assert anonymous.get("/metrics?tz=Asia/Shanghai").status_code == 401
+
+
+def test_metrics_correction_moved_outside_lookback(client: TestClient) -> None:
+    # 一条近期称重被更正到很久以前：接口应以更正为准（与用全部数据计算一致）
+    recent_at = (NOW - timedelta(days=1)).isoformat()
+    original = _event(event_id=E2, occurred_at=recent_at, recorded_at=recent_at)
+    _post(client, original)
+    old_at = (NOW - timedelta(days=200)).isoformat()
+    fix = _event(event_id=E3, occurred_at=old_at, recorded_at=NOW.isoformat(), corrects=E2)
+    assert _post(client, fix).status_code == 201
+    body = client.get("/metrics?tz=Asia/Shanghai").json()
+    trend = next(m for m in body["metrics"] if m["name"] == "weight_trend")
+    assert trend["n_records"] == 0  # 唯一的近期读数已被更正到范围之外
+
+
+@pytest.mark.parametrize("path", ["/metrics", "/energy/today"])
+def test_overlong_timezone_is_422(client: TestClient, path: str) -> None:
+    assert client.get(f"{path}?tz={'a/' * 400}b").status_code == 422
+
+
+def test_metrics_correction_inside_lookback_not_double_counted(client: TestClient) -> None:
+    for d in range(3):
+        at = (NOW - timedelta(days=d)).isoformat()
+        _post(
+            client,
+            _event(event_id=f"00000000-0000-4000-8000-{d:012d}", occurred_at=at, recorded_at=at),
+        )
+    at = NOW.isoformat()
+    fix = _event(
+        event_id=E3, occurred_at=at, recorded_at=at, corrects="00000000-0000-4000-8000-000000000000"
+    )
+    assert _post(client, fix).status_code == 201
+    trend = next(
+        m
+        for m in client.get("/metrics?tz=Asia/Shanghai").json()["metrics"]
+        if m["name"] == "weight_trend"
+    )
+    assert trend["n_records"] == 3

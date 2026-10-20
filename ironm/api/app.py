@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from ironm import __version__
-from ironm.contracts.events import EVENT_ADAPTER, EnergyCheckEvent, Event
+from ironm.contracts.events import EVENT_ADAPTER, EnergyCheckEvent, Event, WeightEvent
 from ironm.core.clock import Clock, SystemClock, local_day_bounds
 from ironm.core.config import Settings, load_settings
 from ironm.core.log import configure_logging, get_logger
@@ -40,6 +40,7 @@ def _safe_loc(loc: tuple[int | str, ...]) -> list[int | str]:
 
 
 MAX_BATCH = 500
+_EARLIER_WEIGHTS = 10  # 回看范围之外再取几次称重：足以找到一次可信读数
 MAX_BODY_BYTES = 2 * 1024 * 1024
 _USER_RE = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
 _NOT_OWNER = {"loc": ["user_id"], "msg": "记录不属于当前用户", "type": "forbidden_user"}
@@ -97,6 +98,23 @@ def _errors(e: ValidationError) -> list[dict[str, Any]]:
         {"loc": _safe_loc(err["loc"]), "msg": _safe_msg(err), "type": err["type"]}
         for err in e.errors(include_input=False, include_url=False)
     ]
+
+
+_TZ_INVALID = {
+    "loc": ["query", "tz"],
+    "msg": "时区无效，应为标准名称（如 Asia/Shanghai）",
+    "type": "timezone",
+}
+
+
+def _zone(name: str) -> ZoneInfo | None:
+    """解析时区名；不合规（含过长、路径式输入）返回 None，由调用方回 422。"""
+    if len(name) > 64:
+        return None
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError, RecursionError):
+        return None
 
 
 def _reason_errors(result: AppendResult) -> list[dict[str, Any]]:
@@ -244,11 +262,9 @@ def create_app(
         store: Annotated[EventStore, Depends(event_store)],
     ) -> JSONResponse:
         """用户所在时区今天的精力选择与训练量调整；未选择时 selected 为 false，不给调整。"""
-        try:
-            zone = ZoneInfo(tz)
-        except (ZoneInfoNotFoundError, ValueError):
-            msg = "时区无效，应为标准名称（如 Asia/Shanghai）"
-            return _invalid([{"loc": ["query", "tz"], "msg": msg, "type": "timezone"}])
+        zone = _zone(tz)
+        if zone is None:
+            return _invalid([_TZ_INVALID])
         today = clock.now().astimezone(zone).date()
         start, end = local_day_bounds(today, zone)
         checks = [
@@ -273,15 +289,24 @@ def create_app(
         store: Annotated[EventStore, Depends(event_store)],
     ) -> JSONResponse:
         """当前用户的指标：四个领域的精度与指标结果列表。只读取计算所需的最近一段记录。"""
-        try:
-            zone = ZoneInfo(tz)
-        except (ZoneInfoNotFoundError, ValueError):
-            msg = "时区无效，应为标准名称（如 Asia/Shanghai）"
-            return _invalid([{"loc": ["query", "tz"], "msg": msg, "type": "timezone"}])
+        zone = _zone(tz)
+        if zone is None:
+            return _invalid([_TZ_INVALID])
         as_of = clock.now()
         since = as_of - timedelta(days=lookback_days(rulebook))
         events = store.list_for_user(user_id, since=since)
-        report = build_metrics(events, as_of=as_of, tz=zone, rulebook=rulebook)
+        # 更正可能把发生时间改到范围之外，仍要一并取得，否则原记录会被当作有效
+        have = {e.event_id for e in events}
+        events += [e for e in store.corrections_of(user_id, have) if e.event_id not in have]
+        # 范围内没有称重时，用范围之外最近的几次区分“已过期”与“没有数据”
+        earlier = [
+            e
+            for e in store.latest_before(user_id, "weight", since, _EARLIER_WEIGHTS)
+            if isinstance(e, WeightEvent)
+        ]
+        report = build_metrics(
+            events, as_of=as_of, tz=zone, rulebook=rulebook, earlier_weights=earlier
+        )
         return JSONResponse(content=report.model_dump(mode="json"))
 
     return app

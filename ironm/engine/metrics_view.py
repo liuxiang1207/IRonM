@@ -3,6 +3,7 @@
 只需要最近一段记录：回看天数由规则表中的各窗口推算（lookback_days），调用方据此取数。
 """
 
+import math
 from collections.abc import Iterable
 from datetime import datetime, timedelta, tzinfo
 from typing import Annotated
@@ -86,8 +87,14 @@ def lookback_days(rulebook: RuleBook) -> int:
 
 
 def build_metrics(
-    events: Iterable[Event], *, as_of: datetime, tz: tzinfo, rulebook: RuleBook
+    events: Iterable[Event],
+    *,
+    as_of: datetime,
+    tz: tzinfo,
+    rulebook: RuleBook,
+    earlier_weights: Iterable[WeightEvent] = (),
 ) -> MetricsReport:
+    """earlier_weights：回看范围之外最近的几次称重，只用于新鲜度（区分“已过期”与“没有数据”）。"""
     items = list(events)
     weights = [e for e in items if isinstance(e, WeightEvent)]
     meals = [e for e in items if isinstance(e, MealEvent)]
@@ -107,7 +114,9 @@ def build_metrics(
         ).precision,
     }
     metrics = (
-        _weight_trend_metric(weights, as_of, tz, rulebook, precision[Domain.BODY]),
+        _weight_trend_metric(
+            weights, list(earlier_weights), as_of, tz, rulebook, precision[Domain.BODY]
+        ),
         _diet_kcal_metric(meals, as_of, tz, rulebook, precision[Domain.DIET]),
     )
     return MetricsReport(computed_at=as_of, precision=precision, metrics=metrics)
@@ -115,6 +124,7 @@ def build_metrics(
 
 def _weight_trend_metric(
     weights: list[WeightEvent],
+    earlier: list[WeightEvent],
     as_of: datetime,
     tz: tzinfo,
     rulebook: RuleBook,
@@ -122,9 +132,11 @@ def _weight_trend_metric(
 ) -> MetricResult:
     window = judgement_window(weights, as_of=as_of, tz=tz, rulebook=rulebook)
     max_days = rulebook.get(JUDGEMENT_WINDOW).params_as(WindowParams).max_window_days
-    days = window.required_days if isinstance(window.required_days, int) else max_days
+    required = window.required_days if isinstance(window.required_days, int) else max_days
+    # 已有数据超过所需天数时窗口随覆盖增长（不超过上限）：“还差 N 天”才能兑现，状态不会来回跳
+    days = min(max_days, max(required, window.covered_days))
     fit = weight_trend(weights, as_of=as_of, window_days=days, rulebook=rulebook)
-    fresh = weight_freshness(weights, as_of=as_of, rulebook=rulebook)
+    fresh = weight_freshness([*earlier, *weights], as_of=as_of, rulebook=rulebook)
     start = as_of - timedelta(days=days)
     effective = effective_weights(weights, as_of=as_of)
     pending = pending_weights(effective, rulebook)
@@ -138,7 +150,13 @@ def _weight_trend_metric(
         half = (fit.ci_high - fit.ci_low) / 2
         if half > target and window.status == "ok":
             too_wide = True
-            needed = (Need(item="days", count=extra_days_for_target(days, half, target)),)
+            if days < max_days:
+                needed = (Need(item="days", count=extra_days_for_target(days, half, target)),)
+            elif window.readings_per_week < 7:
+                count = min(7, math.floor(window.readings_per_week) + 1)
+                needed = (Need(item="weigh_ins_per_week", count=count),)
+            else:  # 窗口已到上限且每天都称：再多称也没用
+                needed = (Need(item="consistent_weighing_time", count=1),)
     if fresh.status == "stale":
         status = MetricStatus.STALE
     elif pending_in_window:
@@ -174,7 +192,8 @@ def _diet_kcal_metric(
 ) -> MetricResult:
     p = rulebook.get(DIET_MIN_DATA).params_as(DietMinDataParams)
     today = as_of.astimezone(tz).date()
-    days = [today - timedelta(days=i) for i in range(p.window_days)]
+    # 不含今天：今天尚未结束，部分记录会拉低均值并误报异常
+    days = [today - timedelta(days=i) for i in range(1, p.window_days + 1)]
     totals = daily_kcal(meals, days=days, tz=tz, as_of=as_of)
     pending = pending_kcal_days(totals, rulebook)
     trusted = {d: t for d, t in totals.items() if d not in pending}

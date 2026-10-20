@@ -103,3 +103,9 @@ def test_extra_days_for_target() -> None:
     assert extra_days_for_target(32, 0.31, 0.25) == 5
     assert extra_days_for_target(32, 0.25, 0.25) == 0
     assert extra_days_for_target(30, 0.2501, 0.25) == 1  # 稍超也至少 1 天
+
+
+def test_daily_weigher_with_huge_noise_gets_consistency_hint() -> None:
+    plan = required_window_days(rulebook=BOOK, readings_per_week=7, residual_sd_kg=2.5)
+    assert plan.status == "insufficient"
+    assert [(n.item, n.count) for n in plan.needed] == [("consistent_weighing_time", 1)]

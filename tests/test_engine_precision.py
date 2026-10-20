@@ -204,3 +204,29 @@ def test_recovery_energy_local_date() -> None:
         _ev("energy_check", "2026-10-01T09:00:00", {"level": 4}),
     ]
     assert recovery_precision(events, as_of=AS_OF, tz=SH, rulebook=BOOK).basis["energy_days"] == 1
+
+
+def test_skipped_check_is_not_a_training_day() -> None:
+    skipped = [
+        _ev("workout_check", f"2026-10-{d:02d}T20:00:00", {"status": "skipped", "effort": 3})
+        for d in (1, 3, 5, 7)
+    ]
+    r = training_precision(skipped, as_of=AS_OF, tz=SH, rulebook=BOOK)
+    assert r.basis["training_days"] == 0 and r.precision == "P0"
+
+
+def test_diet_weeks_required_within_window(tmp_path: Path) -> None:
+    import pytest
+
+    from ironm.contracts.rules import RuleParamError
+    from ironm.engine.rule_params import validate_rule_params
+
+    d = tmp_path / "rules"
+    d.mkdir()
+    for f in RULES_DIR.glob("*.yaml"):
+        text = f.read_text(encoding="utf-8")
+        if f.name == "precision.yaml":
+            text = text.replace("      weeks_required: 3  # P1", "      weeks_required: 9  # P1")
+        (d / f.name).write_text(text, encoding="utf-8")
+    with pytest.raises(RuleParamError, match="R-PR-DIET"):
+        validate_rule_params(load_rules(d))

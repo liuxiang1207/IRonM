@@ -12,7 +12,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ironm.contracts.events import MealEvent, WeightEvent
+from ironm.contracts.events import MealEvent, Source, WeightEvent
 from ironm.contracts.unknown import Unknown, UnknownReason, not_recorded
 from ironm.engine.effective import resolve
 from ironm.rules.loader import RuleBook
@@ -152,7 +152,10 @@ def daily_kcal(
         by_day.setdefault(m.occurred_at.astimezone(tz).date(), []).append(m)
     totals: dict[date, float | Unknown] = {}
     for day in days:
-        kcals = [m.payload.kcal for m in by_day.get(day, [])]
+        kcals = [
+            m.payload.kcal if m.source is not Source.ESTIMATE or m.confirmed else not_recorded()
+            for m in by_day.get(day, [])
+        ]  # 未经确认的估算视为没有热量
         if not kcals:
             totals[day] = not_recorded()
         elif any(isinstance(k, Unknown) for k in kcals):

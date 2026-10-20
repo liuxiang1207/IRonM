@@ -54,16 +54,25 @@ class TrainingParams(BaseModel):
     share_required: Annotated[float, Field(gt=0, le=1)]
 
 
-class DietParams(BaseModel):
+class _WeeklyWindow(BaseModel):
     window_days: Annotated[int, Field(gt=0)]
+    weeks_required: Annotated[int, Field(ge=1)]
+
+    @model_validator(mode="after")
+    def _check_weeks(self) -> Self:
+        if self.window_days % 7:
+            raise ValueError("window_days 必须是 7 的倍数")
+        if self.weeks_required > self.window_days // 7:
+            raise ValueError("weeks_required 不能超过窗口内的周数")
+        return self
+
+
+class DietParams(_WeeklyWindow):
     min_logged_days: Annotated[int, Field(ge=1)]
     share_required: Annotated[float, Field(gt=0, le=1)]
-    weeks_required: Annotated[int, Field(ge=1)]
 
 
-class RecoveryParams(BaseModel):
-    window_days: Annotated[int, Field(gt=0)]
-    weeks_required: Annotated[int, Field(ge=1)]
+class RecoveryParams(_WeeklyWindow):
     min_energy_days: Annotated[int, Field(ge=1)]
 
 
@@ -190,6 +199,8 @@ def training_precision(
     start = _window_start(as_of, tz, p.window_days)
     by_day: dict[date, list[WorkoutCheckEvent | SetLogEvent]] = {}
     for e in resolve(events, as_of=as_of):
+        if isinstance(e, WorkoutCheckEvent) and e.payload.status == "skipped":
+            continue  # 只有“没练”的打卡不构成训练日
         day = e.occurred_at.astimezone(tz).date()
         if 0 <= (day - start).days < p.window_days:
             by_day.setdefault(day, []).append(e)

@@ -254,6 +254,33 @@ class EventStore:
         return [_to_event(r) for r in self._conn.execute(sql, params)]
 
     @_exclusive
+    def corrections_of(self, user_id: str, event_ids: Collection[UUID]) -> list[Event]:
+        """指向给定记录的更正（沿更正链递归），不论它们的发生时间。"""
+        found: dict[UUID, Event] = {}
+        frontier = {str(i) for i in event_ids}
+        while frontier:
+            marks = ", ".join("?" * len(frontier))
+            rows = self._conn.execute(
+                f"SELECT * FROM events WHERE user_id = ? AND corrects IN ({marks})",
+                [user_id, *frontier],
+            ).fetchall()
+            new = [_to_event(r) for r in rows if UUID(r["event_id"]) not in found]
+            for e in new:
+                found[e.event_id] = e
+            frontier = {str(e.event_id) for e in new}
+        return sorted(found.values(), key=lambda e: (e.occurred_at, str(e.event_id)))
+
+    @_exclusive
+    def latest_before(self, user_id: str, type_: str, before: datetime, limit: int) -> list[Event]:
+        """某类记录在给定时间之前最近的若干条（按发生时间）。"""
+        rows = self._conn.execute(
+            "SELECT * FROM events WHERE user_id = ? AND type = ? AND occurred_at < ?"
+            " ORDER BY occurred_at DESC, event_id DESC LIMIT ?",
+            (user_id, type_, to_db_time(before), limit),
+        )
+        return [_to_event(r) for r in rows]
+
+    @_exclusive
     def search(self, user_id: str, text: str) -> list[Event]:
         """在原文与身体不适描述中按子串检索；检索词整体作为一个短语，符号按普通文字处理。"""
         text = text.strip()
