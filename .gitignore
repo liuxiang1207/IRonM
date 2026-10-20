@@ -15,6 +15,7 @@ data/
 *.sqlite
 *.sqlite3
 .env
+.env.*
 
 # 与本项目无关、含团队内部信息，不进公开仓库
 theta-onboarding/
