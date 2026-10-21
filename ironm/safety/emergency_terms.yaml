@@ -9,24 +9,28 @@
 #       中暑、低血糖、横纹肌溶解、马尾综合征、深静脉血栓、孕期危险信号（ACOG 804）的通行就医标准；
 #       严重过敏、哮喘（GINA）、脑震荡（CRT6）、自伤与轻生的危机处理。
 # 每个症状可写 not_followed_by：说法后紧跟这些字时这一处不算（如“吃完就吐”后接“槽”）。
-version: "1.2"
+version: "1.3"
 review: approved
 
 # 否定与“以前发生过”：只取消紧挨着的一处说法；拿不准时按出现处理。血压数值不受影响。
 negation:
   # 说法前紧挨着这些词时，这一处不算（“没有胸痛”“不头晕”“未见红”）
-  before: [没有, 没, 不, 无, 未, 不再, 不太, 不怎么, 没怎么, 没感觉, 不觉得, 没觉得]
+  # “天生”：“我天生嘴角歪一点”不是新发生的
+  before: [没有, 没, 不, 无, 未, 不再, 不太, 不怎么, 没怎么, 没感觉, 不觉得, 没觉得, 天生]
   # 但前面以这些词结尾时仍算：“差点没晕倒”是差一点晕倒
   exceptions: [差点没, 差一点没, 险些没, 差点儿没]
   # 说法后紧跟“过”表示以前发生过（“上周胸口疼过”“以前晕倒过”），这一处不算……
   past_after: 过
   # ……“晕倒过去”“过敏”“过多”“过后”“过来”等不是以前发生过（冲刺 2 末审查 H2）
   past_not_followed_by: [去, 敏, 多, 后, 度, 来, 量, 速, 快, 头, 劳, 分, 于, 程]
-  # 句中有再次发生的字样时，以前发生过的也照常算（“以前胸口疼过，今天又疼了”）
-  recurrence: [又, 再次, 再一次, 又开始]
-  # 近期字样只在同一分句里才算（“今天晕倒过一次”）：“去年晕倒过一次，最近想开始减肥”
-  # “以前胸口疼过，今天想问问能不能练胸”是既往史，不是当前（冲刺 2 复核 N3）
-  recent: [刚才, 刚刚, 这次, 还是, 还在, 今天, 昨天, 这几天, 最近, 这周]
+  # “X 过”以前发生过，以下情况照常算（冲刺 2 复核 N3 与二次复核）：
+  # 1. 句中有复发的说法（“以前胸口疼过，今天又疼了”“今天跑步时也疼”）；只写具体说法，
+  #    不单用“又、再次”：“去年晕倒过一次，现在又胖回来了”“想再次挑战马拉松”不是复发
+  recurrence: [又疼, 又痛, 又闷, 又晕, 又犯, 又发作, 又开始疼, 又开始痛, 又开始闷, 又开始晕, 又出现, 又抽, 又喘, 又心慌, 再次发作, 再次出现, 也疼, 也痛, 也闷]
+  # 2. 句中有近期或反复的字样（“今天跑步的时候，晕倒过一次”“跑步时胸口疼过好几次”），
+  #    且这处说法所在的分句里没有久远的时间（“去年晕倒过一次，最近想开始减肥”“我今天想问以前胸口疼过能不能练”）
+  recent: [刚才, 刚刚, 这次, 今天, 昨天, 前天, 这几天, 最近, 这周, 这两天, 好几次, 几次了, 每次, 经常, 老是, 总是]
+  remote: [以前, 之前, 去年, 前年, 上个月, 上周, 小时候, 曾经, 年轻时, 几年前, 那时候, 早年, 上次, 前几年]
 
 symptoms:
   - id: chest_pain
@@ -44,20 +48,32 @@ symptoms:
   - id: ongoing
     name: 正在持续、休息不缓解或加重
     # 不单用“还在”：“我还在坚持跑步”“现在还在喘”不是症状持续
-    terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 还是疼, 还是痛, 一直疼, 一直痛, 一直闷, 持续, 到现在, 不缓解, 没有缓解, 不见缓解, 休息了也, 也不行, 没缓解, 不见好, 没好转, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
+    terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 还闷, 还是疼, 还是痛, 一直疼, 一直痛, 一直闷, 持续, 到现在, 不缓解, 没有缓解, 不见缓解, 休息了也, 也不行, 没缓解, 不见好, 没好转, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
   - id: sudden
     name: 突然发生
     terms: [突然, 一下子, 猛地, 突发]
   - id: collapse
     name: 晕倒或意识丧失
-    terms: [晕倒, 昏倒, 晕过去, 昏过去, 倒下, 倒地, 倒在地上, 栽倒, 晕厥, 昏厥, 失去意识, 没了意识, 不省人事, 叫不醒, 叫不应, 喊不醒, 喊不应]
+    # 不用“倒在地上”“栽倒”：“练完腿直接倒在地上”“滑了一跤栽倒了”多是累了或摔了（冲刺 2 二次复核）
+    terms: [晕倒, 昏倒, 晕过去, 昏过去, 晕了过去, 昏了过去, 倒下, 倒地, 一头栽倒, 栽倒在, 突然倒了, 一下子倒了, 晕厥, 昏厥, 失去意识, 没了意识, 没意识了, 没有意识了, 不省人事]
     combos:
-      # 须是叫人没反应（“手机没有反应了”“他没回应我的消息”“他不应该这么练”都不算，冲刺 2 复核 N1）
-      - [[叫, 喊], [没反应, 没有反应, 没回应, 不醒]]
-      # “倒了”须是突然倒了（“我给她倒了杯水”不算）
-      - [[突然, 一下子], [倒了]]
-    # “没反应过来”“突然倒了一杯水”不算
-    not_followed_by: [过来, 杯, 一杯, 水]
+      - [[眼前一黑, 眼前发黑, 头一晕], [倒]]
+      - [[地上], [一动不动, 不动了, 没反应, 没有反应]]
+      - [[他, 她, 人], [失去知觉]]  # “手指失去知觉”是麻木
+      - [[跑着跑着, 练着练着, 骑着骑着, 走着走着], [倒, 栽]]
+    # “突然倒了胃口”“一下子倒了半瓶油”“突然倒了杯水”不算
+    not_followed_by: [杯, 一杯, 两杯, 水, 胃口, 半, 油, 汤, 点, 些, 进, 出]
+  - id: unresponsive
+    name: 叫人没反应
+    # 单独出现不算（“我叫了外卖半天没反应”“我妈每天早上都喊不醒我”）；须与倒下、晕、突然等同时出现
+    terms: [叫不醒, 叫不应, 喊不醒, 喊不应]
+    combos:
+      - [[叫, 喊, 拍], [没反应, 没有反应, 没回应, 不答应, 不应, 不醒]]
+    # “不应该”“没反应过来”不算（冲刺 2 复核 N1）
+    not_followed_by: [该, 过来]
+  - id: collapse_context
+    name: 倒下、晕或突然
+    terms: [倒, 晕, 昏, 地上, 摔, 栽, 抽搐, 突然, 一下子]
   - id: seizure
     name: 抽搐
     terms: [抽搐, 抽风, 口吐白沫]
@@ -71,16 +87,23 @@ symptoms:
       - [[嘴唇, 嘴巴, 脸色, 脸], [发紫, 紫了, 发青, 青紫, 紫色]]
   - id: dyspnea
     name: 呼吸困难
-    terms: [喘不上气, 喘不过气, 喘不过来, 上不来气, 呼吸困难, 呼吸不上来, 透不过气, 吸不上气, 喘得厉害, 气短, 憋得慌]
+    terms: [喘不上气, 喘不过气, 喘不过来, 喘不上来, 上不来气, 呼吸困难, 呼吸不上来, 透不过气, 吸不上气, 喘得厉害, 气短, 憋得慌]
   - id: dyspnea_severe
     name: 快憋死、窒息感
     # 单独出现不算（“健身房太闷了快憋死了”“这个动作有窒息感”）；须与呼吸困难一起（冲刺 2 复核 N2）
-    terms: [憋死, 窒息]
+    # 不用“要死”：“累得要死，喘不上气”是夸张说法
+    terms: [憋死, 窒息, 憋得要死]
+  - id: dyspnea_rest
+    name: 休息或轻微活动时气短、夜里憋醒
+    # 运动中喘不上气很常见；休息字样须与气短在同一分句（“不动也胖，一动就喘不上气”不算，冲刺 2 二次复核）
+    # 不用“爬一层楼”：“以前爬一层楼都喘不上气，现在能跑5公里了”是减重后的进步
+    terms: [憋醒, 喘醒]
+    combos:
+      - [[坐着, 躺着, 躺下, 不动, 休息的时候, 休息时也, 走几步, 走两步就, 一走路就], [喘不上气, 喘不过气, 喘不过来, 喘不上来, 上不来气, 呼吸困难, 透不过气, 吸不上气, 气短, 喘]]
+    not_followed_by: [口气, 口]  # “坐着喘口气”
   - id: at_rest
-    name: 休息或轻微活动时
-    # 运动中喘不上气很常见；没运动时也喘才提醒就医（冲刺 2 复核 M1）
-    # 不用“没运动”“夜里”：“好久没运动了，跑一圈就喘不上气”“夜里跑步喘不上气”是运动中
-    terms: [坐着也, 坐着都, 躺着也, 躺着都, 没在运动, 不动也, 不动都, 什么都没做, 什么都没干, 睡觉时, 睡着时, 走几步, 走两步, 爬一层楼]
+    name: 什么都没做
+    terms: [什么都没做, 什么都没干, 啥也没干, 啥都没干]
   - id: change_worse
     name: 比以前明显变差
     terms: [以前不会, 以前不这样, 以前没有, 比以前, 越来越, 最近总, 最近老, 最近经常]
@@ -103,16 +126,20 @@ symptoms:
     terms: [剧烈, 炸开, 要炸, 从来没有这么, 从来没这么, 从没这么, 受不了, 很厉害, 特别厉害, 非常厉害, 得厉害, 剧痛]
   - id: speech
     name: 说话不清
-    # 只用紧挨着的说法（“教练说话我听不清楚”不算），“含糊其辞”不算（冲刺 2 复核 N2）
-    terms: [说话不清, 说话不太清, 说话说不清, 说话也说不清, 讲话不清, 讲话不太清, 说不出话, 口齿不清, 吐字不清, 说话含糊, 讲话含糊, 吐字含糊, 舌头发硬, 舌头不听使唤]
-    not_followed_by: [其辞]
+    # 只用紧挨着的说法（“教练说话我听不清楚”不算），“含糊其辞”“不清不楚”不算（冲刺 2 复核 N2）
+    terms: [说话不清, 说话不太清, 说话说不清, 说话也说不清, 说话也不清, 说话突然不清, 讲话不清, 讲话不太清, 讲话突然不清, 话都说不清, 说不出话, 口齿不清, 吐字不清, 说话含糊, 讲话含糊, 吐字含糊, 说话有点含糊, 讲话有点含糊, 说话变得含糊, 舌头发硬, 舌头不听使唤, 舌头不灵, 舌头僵]
+    not_followed_by: [其辞, 不楚]
   - id: one_side_weak
     name: 一侧脸或肢体麻木无力
-    # 不用“脸歪”：“脸歪了吗这个自拍”；“嘴歪笑”不算（冲刺 2 复核 N2）
-    terms: [嘴歪, 嘴角歪, 口角歪, 口眼歪斜, 半身不遂, 偏瘫]
+    # 不单用“脸歪”（“脸歪了吗这个自拍”）；侧别组合里不含“歪”（“深蹲时身体往右边歪”是动作问题，冲刺 2 二次复核）
+    # 后接“笑、着笑、一点、歪歪、歪的”不算（“嘴歪笑”“嘴角歪着笑”“嘴歪歪的”）
+    terms: [嘴歪, 嘴巴歪, 嘴角歪, 嘴有点歪, 口角歪, 口眼歪斜, 半身不遂, 偏瘫]
     combos:
-      - [[一边, 半边, 一侧, 单侧, 左边, 右边, 左半边, 右半边, 左手, 右手], [脸, 手, 胳膊, 腿, 身子, 身体], [麻, 没力, 无力, 没劲, 不听使唤, 动不了, 抬不起, 拿不住, 歪]]
-    not_followed_by: [笑]
+      - [[一边, 半边, 一侧, 单侧, 左边, 右边, 左半边, 右半边, 左手, 右手], [脸, 手, 胳膊, 腿, 身子, 身体], [麻, 没力, 无力, 没劲, 不听使唤, 动不了, 抬不起, 拿不住]]
+      - [[左边脸, 右边脸, 半边脸, 一边脸, 一侧脸, 左脸, 右脸], [歪, 下垂, 耷拉]]
+      - [[突然, 一下子], [脸歪]]
+      - [[嘴, 嘴角, 嘴巴], [往一边歪, 往左歪, 往右歪, 歪向一边, 歪到一边]]
+    not_followed_by: [笑, 着笑, 一点, 歪歪, 歪的]
   - id: vision_loss
     name: 视力突然丧失或重影
     terms: [看不见, 看不清, 视物模糊, 重影, 一只眼睛黑, 眼前一片黑]
@@ -228,10 +255,17 @@ symptoms:
     terms: [想死, 想去死, 不如死了, 不想活, 活着没意思, 活不下去, 自杀, 轻生, 结束生命, 想消失, 伤害自己, 自残]
   - id: hives
     name: 全身风团或嘴唇肿
-    # 不含脸肿、眼皮肿：“吃咸了脸肿”“哭了眼皮肿”很常见（冲刺 2 复核 N2）；舌头肿见喉咙发紧
-    terms: [风团, 荨麻疹, 全身起疹子, 全身起疙瘩, 全身痒, 嘴唇肿]
+    # 脸肿、眼皮肿单独不算（“吃咸了脸肿”“哭了眼皮肿”，冲刺 2 复核 N2），见 face_swelling；舌头肿见喉咙发紧
+    terms: [风团, 荨麻疹, 全身起疹子, 全身起疙瘩, 全身起红, 全身痒, 身上痒, 浑身痒, 嘴唇肿, 嘴肿]
     combos:
       - [[嘴唇], [肿]]
+  - id: face_swelling
+    name: 脸或眼睛肿
+    combos:
+      - [[脸, 眼睛, 眼皮], [肿]]
+  - id: allergen
+    name: 常见过敏原或过敏
+    terms: [花生, 坚果, 虾, 蟹, 海鲜, 芒果, 蜂, 蛰, 蜇, 过敏, 吃了药, 打了针]
   - id: throat_swelling
     name: 喉咙发紧或肿
     terms: [喉咙发紧, 嗓子发紧, 喉咙肿, 嗓子肿, 舌头肿, 咽不下去]
@@ -269,6 +303,8 @@ rules:
   - {id: EM-ANAPHYLAXIS-AIRWAY, level: emergency, category: allergy, title: 喉咙发紧或肿（严重过敏）, all: [throat_swelling]}
   - {id: EM-ANAPHYLAXIS-BREATH, level: emergency, category: allergy, title: 全身风团伴呼吸困难, all: [hives, dyspnea]}
   - {id: EM-ANAPHYLAXIS-FAINT, level: emergency, category: allergy, title: 全身风团伴头晕, all: [hives, dizziness]}
+  - {id: EM-ANAPHYLAXIS-FACE, level: emergency, category: allergy, title: 脸或眼睛肿伴呼吸困难, all: [face_swelling, dyspnea]}
+  - {id: RF-ALLERGY-FACE, level: red_flag, category: allergy, title: 接触过敏原后脸或眼睛肿, all: [face_swelling, allergen]}
   - {id: RF-HIVES, level: red_flag, category: allergy, title: 全身风团或嘴唇肿, all: [hives]}
   # ---- 心血管 ----
   - {id: EM-CHEST-ONGOING, level: emergency, category: cardiovascular, title: 胸痛正在持续或休息不缓解, all: [chest_pain, ongoing]}
@@ -290,13 +326,16 @@ rules:
   - {id: EM-DVT-HOT, level: emergency, category: cardiovascular, title: 小腿红肿发烫（疑似深静脉血栓）, all: [calf_swelling, red_hot]}
   # ---- 晕厥 ----
   - {id: EM-COLLAPSE, level: emergency, category: syncope, title: 晕倒或意识丧失, all: [collapse]}
+  - {id: EM-UNRESPONSIVE, level: emergency, category: syncope, title: 倒下或晕后叫不醒、没反应, all: [unresponsive, collapse_context]}
   - {id: RF-PRESYNCOPE, level: red_flag, category: syncope, title: 眼前发黑, all: [presyncope]}
   - {id: RF-DIZZY, level: red_flag, category: syncope, title: 头晕, all: [dizziness]}
   # ---- 呼吸 ----
   - {id: EM-CYANOSIS, level: emergency, category: respiratory, title: 嘴唇或脸色发紫, all: [cyanosis]}
   - {id: EM-DYSPNEA-ONGOING, level: emergency, category: respiratory, title: 呼吸困难休息不缓解, all: [dyspnea, ongoing]}
   - {id: EM-DYSPNEA-SEVERE, level: emergency, category: respiratory, title: 严重的呼吸困难（喘不上气，快憋死、窒息感）, all: [dyspnea, dyspnea_severe]}
-  - {id: RF-DYSPNEA-REST, level: red_flag, category: respiratory, title: 休息或轻微活动时也喘不上气, all: [dyspnea, at_rest]}
+  - {id: EM-DYSPNEA-SUDDEN, level: emergency, category: respiratory, title: 突然喘不上气, all: [dyspnea, sudden]}
+  - {id: RF-DYSPNEA-REST, level: red_flag, category: respiratory, title: 休息或轻微活动时也喘不上气、夜里憋醒, all: [dyspnea_rest]}
+  - {id: RF-DYSPNEA-IDLE, level: red_flag, category: respiratory, title: 什么都没做也喘不上气, all: [dyspnea, at_rest]}
   - {id: RF-DYSPNEA-WORSE, level: red_flag, category: respiratory, title: 气短比以前明显加重, all: [dyspnea, change_worse]}
   - {id: EM-ASTHMA-NORELIEF, level: emergency, category: respiratory, title: 哮喘用了急救药仍不缓解, all: [asthma, reliever_fail]}
   - {id: RF-ASTHMA, level: red_flag, category: respiratory, title: 运动中哮喘发作, all: [asthma]}

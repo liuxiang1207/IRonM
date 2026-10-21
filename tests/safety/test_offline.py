@@ -22,6 +22,7 @@ from tests.safety.test_emergency import (
     NEGATIONS,
     ORDINARY,
     PARAPHRASES,
+    TRADEOFFS,
     UNIFIED,
 )
 
@@ -48,6 +49,7 @@ def _random_texts(n: int) -> list[str]:
         *neg.exceptions,
         *neg.recurrence,
         *neg.recent,
+        *neg.remote,
         neg.past_after,
         *neg.past_not_followed_by,
         *"，。！？；、,.!? \n～~\uff61\ufe50\ufe52\ufe54\ufe56\ufe57",
@@ -84,7 +86,7 @@ def _cases() -> list[str]:
     red_flags = yaml.safe_load((ROOT / "tests/safety/red_flags.yaml").read_text("utf-8"))
     texts = [c["text"] for c in red_flags["cases"]]
     texts += [t for t, _ in PARAPHRASES] + ORDINARY + [t for t, _ in NEGATIONS] + UNIFIED
-    texts += [t for t, _ in BLOOD_PRESSURE]
+    texts += [t for t, _ in BLOOD_PRESSURE] + [t for t, _ in TRADEOFFS]
     texts += [f"胸口痛{chr(c)}还在疼" for c in PUNCTUATION]  # 每个标点映射两边都要一致
     return texts + _random_texts(2000)
 

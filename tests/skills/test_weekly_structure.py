@@ -7,7 +7,10 @@ import pytest
 from ironm.contracts.agents import ProposalOutput
 from ironm.contracts.roles import AgentId, OutputKind
 from ironm.contracts.screening import Tier
-from tests.skills.helpers import proposed, run_agent
+from tests.skills.helpers import BOOK, SKILLS, proposed, run_agent
+
+[START] = [s for s in SKILLS if s.manifest.id == "weekly_structure"]
+StartParams = START.rule_params["R-TR-START"]
 
 
 def _plan(tier: Tier | None, **kwargs: Any) -> Any:
@@ -91,3 +94,20 @@ def test_unchanged_plan_no_opinion() -> None:
 @pytest.mark.parametrize("tier", [Tier.C, Tier.D, Tier.PAUSED, Tier.NOT_APPLICABLE, None])
 def test_not_loaded_without_plan_tier(tier: Tier | None) -> None:
     assert _plan(tier) is None
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"cardio_start_min_conservative": 0},
+        {"cardio_start_min_conservative": -50},
+        {"cardio_start_min_conservative": 200},  # 保守起点高于普通起点
+        {"cardio_target_min": 60},  # 目标低于起点
+        {"cardio_target_min": 10080},  # 超出合理上限 600
+    ],
+)
+def test_bad_cardio_params_rejected(params: dict[str, Any]) -> None:
+    base = dict(BOOK.get("R-TR-START").params_as(StartParams))
+    StartParams.model_validate(base)  # 规则表中的参数本身合法
+    with pytest.raises(ValueError, match="有氧起点"):
+        StartParams.model_validate({**base, **params})

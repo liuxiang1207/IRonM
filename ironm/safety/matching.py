@@ -101,15 +101,17 @@ class Negation(ContractModel):
     # 说法后紧跟这个字：以前发生过（拒答词表等不需要时不写）
     past_after: Term | None = None
     past_not_followed_by: tuple[Term, ...] = ()  # 再接这些字时不是“以前发生过”（“晕倒过去”）
-    recurrence: tuple[Term, ...] = ()  # 句中任一分句有这些字样：以前发生过的也照常算（“又”）
-    # 同一分句里有这些字样才照常算（“今天晕倒过一次”）；“去年晕倒过，最近想减肥”不算
+    recurrence: tuple[Term, ...] = ()  # 句中有这些复发说法：以前发生过的也照常算（“又疼”）
+    # 句中有这些近期字样：以前发生过的也照常算（“今天跑步时，晕倒过一次”）……
     recent: tuple[Term, ...] = ()
+    # ……但所在分句里有这些久远的时间时不算（“去年晕倒过一次，最近想开始减肥”）
+    remote: tuple[Term, ...] = ()
 
     @model_validator(mode="after")
     def _check(self) -> Self:
         past = [] if self.past_after is None else [self.past_after]
         words = [*self.before, *self.exceptions, *past, *self.past_not_followed_by]
-        for word in [*words, *self.recurrence, *self.recent]:
+        for word in [*words, *self.recurrence, *self.recent, *self.remote]:
             check_term(word)
         return self
 
@@ -190,7 +192,8 @@ class Phrasebook(ContractModel):
         parts = clauses(text)
         neg = self.negation
         again = any(w in c for c in parts for w in neg.recurrence)
-        marked = [(c, again or any(w in c for w in neg.recent)) for c in parts]
+        recent = any(w in c for c in parts for w in neg.recent)
+        marked = [(c, again or (recent and not any(w in c for w in neg.remote))) for c in parts]
         return frozenset(
             s.id for s in self.symptoms if any(s.matches(c, neg, r) for c, r in marked)
         )

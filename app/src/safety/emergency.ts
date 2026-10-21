@@ -34,6 +34,7 @@ export interface Negation {
   past_not_followed_by: string[];
   recurrence: string[];
   recent: string[];
+  remote: string[];
 }
 
 export interface LevelText {
@@ -187,9 +188,11 @@ function symptomMatches(symptom: Symptom, clause: string, neg: Negation, pastCou
 export function assess(book: TermBook, text: string): Assessment {
   const parts = clauses(book, text);
   const neg = book.negation;
-  // 再次发生的字样对整句起作用，近期字样只对它所在的分句起作用
-  const again = parts.some((c) => neg.recurrence.some((w) => c.includes(w)));
-  const marked = parts.map((c): [string, boolean] => [c, again || neg.recent.some((w) => c.includes(w))]);
+  // 以前发生过的照常算：句中有复发说法；或句中有近期字样且所在分句没有久远的时间
+  const has = (c: string, words: string[]) => words.some((w) => c.includes(w));
+  const again = parts.some((c) => has(c, neg.recurrence));
+  const recent = parts.some((c) => has(c, neg.recent));
+  const marked = parts.map((c): [string, boolean] => [c, again || (recent && !has(c, neg.remote))]);
   const present = new Set(
     book.symptoms.filter((s) => marked.some(([c, r]) => symptomMatches(s, c, neg, r))).map((s) => s.id),
   );

@@ -16,6 +16,7 @@ from ironm.skills.view import SnapshotView
 
 RULE = "R-TR-START"
 MAX_WEEK_MINUTES = 7 * 24 * 60  # 当前每周运动分钟超出 0–10080 视为未知
+MAX_CARDIO_TARGET = 600  # 有氧目标的合理上限（参数写错时启动失败）
 CONSERVATIVE = frozenset({Tier.B, Tier.COLLABORATIVE})
 
 
@@ -45,9 +46,9 @@ class StartParams(BaseModel):
             raise ValueError("力量训练次数应满足 1 ≤ 默认 ≤ 最多 ≤ 7")
         if not 0 < self.reps_low <= self.reps_high or not 1 <= self.rpe_low <= self.rpe_high <= 10:
             raise ValueError("次数与 RPE 范围不合理")
-        floors = (self.cardio_start_min, self.cardio_start_min_conservative)
-        if not 0 < max(floors) <= self.cardio_target_min <= MAX_WEEK_MINUTES:
-            raise ValueError("有氧起点应满足 0 < 起点 ≤ 目标 ≤ 10080")
+        start, conservative = self.cardio_start_min, self.cardio_start_min_conservative
+        if not 0 < conservative <= start <= self.cardio_target_min <= MAX_CARDIO_TARGET:
+            raise ValueError("有氧起点应满足 0 < 保守起点 ≤ 起点 ≤ 目标 ≤ 600")
         return self
 
 
