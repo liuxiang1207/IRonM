@@ -13,8 +13,11 @@
 
 import json
 import re
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -24,13 +27,16 @@ from ironm.contracts.roles import AgentId
 from ironm.core.body import bmi
 from ironm.core.log import get_logger
 from ironm.core.numbers import numbers_in, unregistered
+from ironm.knowledge.kb import Retriever
 from ironm.knowledge.qa_cards import CardBook, PartKind, QACard
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
+from ironm.orchestrator.compose import compose
 from ironm.orchestrator.domains import DOMAIN_WEIGHTS, select_domains
 from ironm.orchestrator.intent import Concern, Intent, IntentResult
-from ironm.orchestrator.opinions import Collected, Opinion
-from ironm.rules.loader import RuleBook
+from ironm.orchestrator.opinions import collect_opinions
+from ironm.orchestrator.qa_parts import AnswerPart
+from ironm.rules.loader import RULES_DIR, RuleBook, load_rules
 from ironm.safety.matching import clauses
 
 __all__ = ["MAX_CARDS", "AnswerPart", "QAResult", "RunRecord", "answer_question"]
@@ -41,6 +47,8 @@ PROMPT_PATH = Path(__file__).parent / "prompts" / "answer_l1.md"
 MAX_CARDS = 3  # 交给模型改写的问答卡最多几张
 
 _log = get_logger("ironm.qa")
+_DEFAULT_TZ = ZoneInfo("Asia/Shanghai")
+_NO_RULES = load_rules(RULES_DIR)  # 测试等未传规则表时用内置规则
 
 
 class RunRecord(ContractModel):
@@ -60,21 +68,10 @@ class RunRecord(ContractModel):
     layer: Literal["l0", "l1", "general", "plan_note"]
     degraded: bool
     number_rewrites: int  # 数字校验后重写的次数
-
-
-class AnswerPart(ContractModel):
-    kind: Literal[
-        "conclusion",
-        "for_you",
-        "why",
-        "how",
-        "caution",
-        "uncertain",
-        "clarify",
-        "notice",
-        "answer",
-    ]
-    text: Annotated[str, Field(min_length=1)]
+    # 各专业 Agent 的状态（model / tool / card / missing）与依据编号；不含原话
+    agents: tuple[tuple[AgentId, str], ...] = ()
+    agent_basis: tuple[str, ...] = ()
+    composed_by_model: bool = False
 
 
 class QAResult(ContractModel):
@@ -98,6 +95,7 @@ class _Texts(BaseModel):
     caution_special: str
     bmi_measured: str
     bmi_stated: str
+    partial: str
 
 
 _HEIGHT_RE = re.compile(r"身高(1\d{2}(?:\.\d)?)|(1\d{2}(?:\.\d)?)(?:cm|厘米|公分)")
@@ -188,6 +186,13 @@ def _l1(
     return None, rewrites
 
 
+def _cards_cited(citations: Sequence[Mapping[str, Any]], cards: CardBook) -> tuple[str, ...]:
+    """回答里用到的问答卡（知识库段落 card:<编号>，或兜底时直接用的卡）。"""
+    known = {c.id for c in cards.cards}
+    refs = (str(c["ref"]).removeprefix("card:") for c in citations)
+    return tuple(dict.fromkeys(r for r in refs if r in known))
+
+
 def answer_question(
     text: str,
     intent: IntentResult,
@@ -200,11 +205,15 @@ def answer_question(
     page: str | None = None,
     page_domain: AgentId | None = None,
     context_item: str | None = None,
-    opinions: Collected | None = None,
+    retriever: Retriever | None = None,
+    profile: Mapping[str, Any] | None = None,
+    as_of: datetime | None = None,
+    tz: ZoneInfo | None = None,
 ) -> QAResult:
-    """page 不为空时是功能页提问：只查 page_domain（本功能的领域）与安全类的卡。
+    """page 不为空时是功能页提问：只调用本功能的 Agent（page_domain），只查它与安全类的卡。
 
-    opinions 不为空时（问答类 Skill 已产出意见），先按意见组织回答；没有意见时退回问答卡。
+    有 retriever 时，专业问题由选中的 Agent 并行作答、管家整合；命中安全类的卡时直接用卡；
+    Agent 都没有意见（或没有 retriever）时退回问答卡。
     """
     fixed = _Texts.model_validate(texts.model_dump())
     if intent.intent not in DOMAIN_WEIGHTS:
@@ -221,16 +230,64 @@ def answer_question(
     ranked = sorted(found, key=lambda cs: (cs[0].agent != _SAFETY, cs[0].agent != primary, -cs[1]))
     matched = [c for c, _ in ranked]
 
-    if opinions is not None and opinions.opinions:
-        return _from_opinions(
-            text, intent, opinions, fixed, domains, primary, page, context_item, request_id
-        )
-
     cautions = []
     if "discomfort" in intent.concerns:
         cautions.append(fixed.caution_discomfort)
     if "special_population" in intent.concerns:
         cautions.append(fixed.caution_special)
+    safety_card = bool(matched) and matched[0].agent == _SAFETY
+    tried: tuple[tuple[AgentId, str], ...] = ()  # 作答过的 Agent（都没有意见时也记下）
+    basis: tuple[str, ...] = ()
+    if retriever is not None and not safety_card and intent.intent is not Intent.PLAN:
+        agents = [page_domain] if page is not None else [domains.primary, *domains.related]
+        collected = collect_opinions(
+            [a for a in agents if a is not None],
+            text=text,
+            profile=profile or {},
+            context_item=context_item,
+            retriever=retriever,
+            cards=cards,
+            rulebook=rulebook or _NO_RULES,
+            gateway=gateway,
+            request_id=request_id,
+            as_of=as_of or datetime.now(UTC),
+            tz=tz or _DEFAULT_TZ,
+        )
+        tried = tuple((a.agent, a.status) for a in collected.answers)
+        basis = tuple(dict.fromkeys(b for a in collected.answers for b in (*a.passages, *a.tools)))
+        if collected.with_opinion:
+            composed = compose(
+                text,
+                collected.answers,
+                cautions=cautions,
+                partial_notice=fixed.partial,
+                gateway=gateway,
+                request_id=request_id,
+            )
+            by_model = composed.by_model or any(a.status == "model" for a in collected.answers)
+            record = RunRecord(
+                request_id=request_id,
+                intent=intent.intent,
+                concerns=intent.concerns,
+                domain_scores=domains.scores,
+                primary_domain=primary,
+                related_domains=() if page is not None else domains.related,
+                page=page,
+                context_item=context_item,
+                matched_cards=tuple(c.id for c in matched),
+                card_ids=_cards_cited(composed.citations, cards),
+                personal=(),
+                layer="l1" if by_model else "l0",
+                degraded=composed.partial,
+                number_rewrites=composed.rewrites,
+                agents=tried,
+                agent_basis=basis,
+                composed_by_model=composed.by_model,
+            )
+            _log.info(
+                "qa.answered", request_id=request_id, status="agents", count=len(composed.parts)
+            )
+            return QAResult(parts=composed.parts, record=record, citations=composed.citations)
     caution_parts = [AnswerPart(kind="caution", text=c) for c in cautions]
     personal = _personal(text)
     for_you = (
@@ -285,75 +342,8 @@ def answer_question(
         layer=layer,  # type: ignore[arg-type]
         degraded=degraded,
         number_rewrites=rewrites,
+        agents=tried,
+        agent_basis=basis,
     )
     _log.info("qa.answered", request_id=request_id, status=layer, count=len(parts))
     return QAResult(parts=tuple(parts), record=record)
-
-
-def _from_opinions(
-    text: str,
-    intent: IntentResult,
-    collected: Collected,
-    fixed: _Texts,
-    domains: Any,
-    primary: AgentId | None,
-    page: str | None,
-    context_item: str | None,
-    request_id: str,
-) -> QAResult:
-    """按问答类 Skill 的意见组织回答（spec [2026-10-21] 统一链路）。
-
-    - 一条意见：直接用它的结论、怎么做、注意；不调用模型改写
-    - 多条意见：主领域在前，其余作为补充；冲突不隐藏，按安全 > 主领域 > 相关排列
-    - 安全提示（身体不适、特殊人群）附在注意里
-    - 依据（Citation）原样带出，供用户逐层展开
-    """
-    cautions: list[str] = []
-    if "discomfort" in intent.concerns:
-        cautions.append(fixed.caution_discomfort)
-    if "special_population" in intent.concerns:
-        cautions.append(fixed.caution_special)
-
-    def order(o: Opinion) -> tuple[int, int]:
-        return (0 if o.agent == primary else 1, 0)
-
-    ordered = sorted(collected.opinions, key=order)
-    first = ordered[0].item
-    parts: list[AnswerPart] = [AnswerPart(kind="conclusion", text=first.conclusion)]
-    for extra in ordered[1:]:
-        parts.append(AnswerPart(kind="answer", text=extra.item.conclusion))
-    if first.how:
-        parts.append(AnswerPart(kind="how", text=first.how))
-    for extra in ordered[1:]:
-        if extra.item.how:
-            parts.append(AnswerPart(kind="how", text=extra.item.how))
-    notes = [c for c in (first.caution, *cautions) if c]
-    notes += [e.item.caution for e in ordered[1:] if e.item.caution]
-    parts.extend(AnswerPart(kind="caution", text=n) for n in notes)
-    if first.uncertain:
-        parts.append(AnswerPart(kind="uncertain", text=first.uncertain))
-
-    citations = tuple(
-        {"agent": o.agent.value, "skill": o.skill, **c.model_dump()}
-        for o in ordered
-        for c in o.item.citations
-    )
-    silent = tuple(f"{a.value}:{r}" for a, r in collected.silent)
-    record = RunRecord(
-        request_id=request_id,
-        intent=intent.intent,
-        concerns=intent.concerns,
-        domain_scores=domains.scores,
-        primary_domain=primary,
-        related_domains=() if page is not None else domains.related,
-        page=page,
-        context_item=context_item,
-        matched_cards=(),
-        card_ids=(),
-        personal=(),
-        layer="l1",
-        degraded=bool(silent),
-        number_rewrites=0,
-    )
-    _log.info("qa.answered", request_id=request_id, status="opinions", count=len(parts))
-    return QAResult(parts=tuple(parts), record=record, citations=citations, silent=silent)

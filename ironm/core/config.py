@@ -21,6 +21,8 @@ class Settings(BaseModel):
     db_path: Path = Path("data/ironm.sqlite")
     rules_dir: Path = Path("rules")
     models_path: Path = Path("config/models.yaml")
+    # 知识库资料目录（不进仓库）；不设时只用问答卡与动作库（spec [2026-10-21] §12）
+    kb_dir: Path | None = None
 
 
 def load_settings(environ: Mapping[str, str]) -> Settings:

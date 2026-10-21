@@ -128,3 +128,16 @@ def test_bad_passages_rejected(tmp_path: Path, body: str) -> None:
 def test_duplicate_ids_rejected() -> None:
     with pytest.raises(KnowledgeLoadError, match="重复"):
         KnowledgeBase([KB.passages[0], KB.passages[0]])
+
+
+def test_pinned_cards_come_first_once_and_bypass_threshold() -> None:
+    """问答卡触发词命中的卡排在最前、不重复；只认本领域的段落。"""
+    r = Retriever(KB)
+    query = "增肌一周练几次，蛋白质一天吃多少"  # 两个领域混在一句里，片段覆盖被稀释
+    assert "card:QA-STRENGTH-FREQUENCY" not in _ids(query, _A.TRAINING_PLANNER, r)
+    pinned = ["card:QA-STRENGTH-FREQUENCY", "card:QA-PROTEIN"]
+    got = [x.passage.passage_id for x in r.search(query, _A.TRAINING_PLANNER, pinned=pinned)]
+    assert got[0] == "card:QA-STRENGTH-FREQUENCY" and "card:QA-PROTEIN" not in got
+    both = ["card:QA-PROTEIN-POWDER", "card:QA-PROTEIN"]
+    got = [x.passage.passage_id for x in r.search(query, _A.NUTRITIONIST, pinned=both)]
+    assert got[:2] == both and len(got) == len(set(got))

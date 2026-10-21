@@ -66,8 +66,9 @@ def test_model_unavailable_still_answers_and_is_recorded(client: tuple[TestClien
     assert body["intent"] == "training_knowledge"
     with closing(connect(db)) as conn:
         calls = ModelCallStore(conn).for_request(body["request_id"])
-    # 安全复核与意图识别各一次，都因没有密钥而用了兜底
-    assert [c.stage.value for c in calls] == ["safety_review", "intent_l3"]
+    # 安全复核、意图识别、各专业 Agent 作答，都因没有密钥而用了兜底
+    stages = [c.stage.value for c in calls]
+    assert stages[:2] == ["safety_review", "intent_l3"] and set(stages[2:]) <= {"answer"}
     assert all(c.error_type == "MissingApiKey" and c.fallback_used for c in calls)
 
 

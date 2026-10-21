@@ -22,18 +22,24 @@ from ironm.contracts.roles import AgentId
 from ironm.core.yamlfile import load_yaml
 from ironm.knowledge.exercises import Library
 from ironm.knowledge.qa_cards import CardBook
+from ironm.rules.loader import RuleBook
 from ironm.safety.matching import clauses
 
 __all__ = [
+    "RETRIEVAL_RULE",
     "Embedder",
     "KnowledgeBase",
     "KnowledgeLoadError",
     "Passage",
     "Reranker",
+    "RetrievalParams",
     "Retrieved",
     "Retriever",
     "load_passages",
+    "retriever_from_rules",
 ]
+
+RETRIEVAL_RULE = "R-QA-RETRIEVAL"
 
 type Level = Literal["guideline", "review", "study", "expert", "card", "library"]
 type Text = Annotated[str, Field(min_length=1)]
@@ -203,7 +209,9 @@ class Retriever:
             embedder.embed([p.title + p.text for p in kb.passages]) if embedder else None
         )
 
-    def search(self, query: str, domain: AgentId) -> list[Retrieved]:
+    def search(self, query: str, domain: AgentId, *, pinned: Iterable[str] = ()) -> list[Retrieved]:
+        """pinned：按问答卡触发词命中的段落编号。问答卡是人工精选、优先级最高的条目，
+        命中即排在最前（分数记 1.0），不受重排门槛限制；只认本领域、已审定的段落。"""
         allowed = frozenset(
             i
             for i, p in enumerate(self._kb.passages)
@@ -211,6 +219,12 @@ class Retriever:
         )
         if not allowed:
             return []
+        order = {pid: n for n, pid in enumerate(dict.fromkeys(pinned))}
+        top = sorted(
+            (Retrieved(self._kb.passages[i], 1.0) for i in allowed
+             if self._kb.passages[i].passage_id in order),
+            key=lambda r: order[r.passage.passage_id],
+        )  # fmt: skip
         lists = [[i for i, _ in self._kb.bm25(query, allowed)[: self._recall_k]]]
         if self._embedder is not None and self._vectors is not None:
             [qv] = self._embedder.embed([query])
@@ -225,10 +239,14 @@ class Retriever:
         candidates = [self._kb.passages[i] for i, _ in sorted(fused.items(), key=lambda x: -x[1])]
         scores = self._reranker.score(query, candidates)
         kept = sorted(
-            (Retrieved(p, s) for p, s in zip(candidates, scores, strict=True) if s >= self._min),
+            (
+                Retrieved(p, s)
+                for p, s in zip(candidates, scores, strict=True)
+                if s >= self._min and p.passage_id not in order
+            ),
             key=lambda r: -r.score,
         )
-        return kept[: self._keep_k]
+        return [*top, *kept][: self._keep_k]
 
 
 def load_passages(folder: Path | None) -> list[Passage]:
@@ -246,3 +264,19 @@ def load_passages(folder: Path | None) -> list[Passage]:
         except (ValidationError, ValueError) as e:
             raise KnowledgeLoadError(f"{path}：知识段落有误：{e}") from e
     return out
+
+
+class RetrievalParams(ContractModel):
+    recall_k: Annotated[int, Field(ge=1, le=200)]
+    keep_k: Annotated[int, Field(ge=1, le=20)]
+    min_score: Annotated[float, Field(ge=0, le=1)]
+
+
+def retriever_from_rules(
+    kb: KnowledgeBase, rulebook: RuleBook, *, embedder: Embedder | None = None
+) -> Retriever:
+    """按规则表 R-QA-RETRIEVAL 的参数建检索器；参数不合规时抛错（启动时失败）。"""
+    p = rulebook.get(RETRIEVAL_RULE).params_as(RetrievalParams)
+    return Retriever(
+        kb, embedder=embedder, recall_k=p.recall_k, keep_k=p.keep_k, min_score=p.min_score
+    )

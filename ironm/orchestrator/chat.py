@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,14 +26,14 @@ from ironm.core.clock import Clock
 from ironm.core.ids import IdGenerator
 from ironm.core.log import get_logger
 from ironm.core.yamlfile import load_yaml
+from ironm.knowledge.kb import Retriever
 from ironm.knowledge.qa_cards import CardBook
 from ironm.llm.gateway import Gateway
 from ironm.memory.conversation import compress, context
 from ironm.memory.profile import ProfileService
 from ironm.memory.repo import MemoryRepo
-from ironm.orchestrator.domains import select_domains
+from ironm.orchestrator.general import general_answer
 from ironm.orchestrator.intent import Concern, Intent, IntentBook, recognize
-from ironm.orchestrator.opinions import collect_opinions
 from ironm.orchestrator.pages import PAGE_AGENTS, PAGE_DEFAULT, Page, PageContext
 from ironm.orchestrator.qa import AnswerPart, RunRecord, answer_question
 from ironm.orchestrator.safety_review import review_safety
@@ -62,7 +63,9 @@ ANSWER_TEXTS_PATH = Path(__file__).with_name("answer_texts.yaml")
 
 _log = get_logger("ironm.chat")
 
-type Layer = Literal["safety", "clarify", "template", "l0", "l1", "general", "plan_note", "handoff"]
+type Layer = Literal[
+    "safety", "clarify", "template", "chat", "l0", "l1", "general", "plan_note", "handoff"
+]
 
 
 class AnswerTexts(BaseModel):
@@ -83,6 +86,8 @@ class AnswerTexts(BaseModel):
     bmi_measured: Annotated[str, Field(min_length=1)]
     bmi_stated: Annotated[str, Field(min_length=1)]
     page_handoff: Annotated[str, Field(min_length=1)]
+    partial: Annotated[str, Field(min_length=1)]
+    app_help: Annotated[str, Field(min_length=1)]
 
 
 def load_answer_texts(path: Path = ANSWER_TEXTS_PATH) -> AnswerTexts:
@@ -119,6 +124,9 @@ class ChatReply(ContractModel):
     handoff: PageContext | None = None  # 转入管家对话时带上的上下文
 
 
+_DEFAULT_TZ = ZoneInfo("Asia/Shanghai")
+
+
 @dataclass(frozen=True)
 class ChatDeps:
     kit: SafetyKit
@@ -133,10 +141,9 @@ class ChatDeps:
     memory: MemoryRepo
     profiles: ProfileService
     gateway: Gateway | None = None  # 没有时只用词表识别意图
-    # 问答类 Skill（spec [2026-10-21] 统一链路）；为空时问答只查卡
-    skills: tuple[Any, ...] = ()
-    scene: Any = None  # ScenePack
-    tier: Any = None  # 本次分层结果（TierResult）
+    # 知识库检索（spec [2026-10-21] §12）；为空时专业问题只查问答卡
+    retriever: Retriever | None = None
+    tz: ZoneInfo = _DEFAULT_TZ
 
 
 def respond(
@@ -223,7 +230,7 @@ def respond(
             # 带着页面上下文的含糊问题（“这个动作我做得怎么样”）：按所在页面理解，不追问
             result = result.model_copy(update={"intent": PAGE_DEFAULT[seen_page], "clarify": False})
         intent, concerns = result.intent, result.concerns
-        templates = (Intent.CHITCHAT, Intent.OUT_OF_SCOPE)
+        templates = (Intent.CHITCHAT, Intent.APP_HELP, Intent.OUT_OF_SCOPE)
         # 安全类问题（命中安全官的卡）在任何页面都就地回答：安全官本来就参与每个功能页
         safety_card = any(c.agent == AgentId.SAFETY_OFFICER for c, _ in deps.cards.matches(text))
         page_domain = None if page is None else PAGE_AGENTS[page].get(intent)
@@ -233,14 +240,20 @@ def respond(
             layer, answer = "handoff", (AnswerPart(kind="notice", text=deps.texts.page_handoff),)
         elif result.clarify or intent is Intent.UNKNOWN:
             layer, answer = "clarify", (AnswerPart(kind="clarify", text=deps.texts.clarify),)
-        elif intent is Intent.CHITCHAT:
-            layer, answer = "template", (AnswerPart(kind="answer", text=deps.texts.chitchat),)
+        elif intent in (Intent.CHITCHAT, Intent.APP_HELP):
+            # 基本通用问题：通用 Agent 直接回答，不检索；模型不可用或出现数字时用固定说法
+            kind: Literal["chitchat", "app_help"] = (
+                "chitchat" if intent is Intent.CHITCHAT else "app_help"
+            )
+            fallback = deps.texts.chitchat if kind == "chitchat" else deps.texts.app_help
+            said, by_model = general_answer(
+                text, kind, gateway=deps.gateway, request_id=request_id, fallback=fallback
+            )
+            layer = "chat" if by_model else "template"
+            answer = (AnswerPart(kind="answer", text=said),)
         elif intent is Intent.OUT_OF_SCOPE:
             layer, answer = "template", (AnswerPart(kind="answer", text=deps.texts.out_of_scope),)
         else:
-            collected = _collect(
-                deps, profile, result, text, page_context.item if page_context else None
-            )
             qa = answer_question(
                 text,
                 result,
@@ -252,13 +265,14 @@ def respond(
                 page=page,
                 page_domain=page_domain,
                 context_item=page_context.item if page_context else None,
-                opinions=collected,
+                retriever=deps.retriever,
+                profile=profile,
+                as_of=deps.clock.now(),
+                tz=deps.tz,
             )
             citations = qa.citations
-            # 意见路径没有产出时（如动作库里没有这个动作）也要如实标出，而不是静默退回
-            silent = qa.silent or tuple(
-                f"{a.value}:{r}" for a, r in (collected.silent if collected else ())
-            )
+            # 没有给出意见的 Agent 如实标出（不含原话）
+            silent = tuple(f"{a.value}:{st}" for a, st in qa.record.agents if st == "missing")
             deps.record_run(user_id, qa.record)
             layer, answer, degraded = qa.record.layer, qa.parts, qa.record.degraded
     if noted:
@@ -323,42 +337,3 @@ def after_reply(
         )
     except Exception as e:
         _log.exception("chat.after_reply_failed", e, request_id=reply.request_id)
-
-
-def _collect(
-    deps: ChatDeps,
-    profile: dict[str, Any],
-    result: Any,
-    text: str,
-    context_item: str | None,
-) -> Any:
-    """跑问答类 Skill 收集意见；没有 Skill、没有分层或出错时返回 None（退回查卡）。"""
-    if not deps.skills or deps.tier is None or deps.scene is None:
-        return None
-    from ironm.orchestrator.snapshots import chat_snapshot
-
-    try:
-        domains = select_domains(result, deps.rulebook)
-        agents = [
-            a
-            for a in (domains.primary, *domains.related)
-            if a is not None and a != AgentId.SAFETY_OFFICER
-        ]
-        if not agents:
-            return None
-        snap = chat_snapshot(profile, deps.tier, deps.clock.now())
-        return collect_opinions(
-            agents=agents,
-            snapshot=snap,
-            skills=deps.skills,
-            rulebook=deps.rulebook,
-            intent=result.intent.value,
-            scene=deps.scene,
-            tier=deps.tier,
-            text=text,
-            context_item=context_item,
-            cards=deps.cards,
-        )
-    except Exception as e:  # 问答类 Skill 出错不影响回答（退回查卡）
-        _log.exception("chat.opinions_failed", e)
-        return None

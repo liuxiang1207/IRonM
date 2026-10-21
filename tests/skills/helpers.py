@@ -8,7 +8,7 @@ from ironm.contracts.agents import AgentOutput
 from ironm.contracts.common import deep_thaw
 from ironm.contracts.roles import AgentId
 from ironm.contracts.screening import Tier, TierResult
-from ironm.contracts.skills import ScenePack, SkillMode
+from ironm.contracts.skills import ScenePack
 from ironm.contracts.snapshot import Snapshot
 from ironm.contracts.unknown import Unknown, UnknownReason
 from ironm.rules.loader import RULES_DIR, load_rules
@@ -88,7 +88,6 @@ def run_agent(
     intent: str,
     tier: Tier | None,
     *,
-    mode: SkillMode = SkillMode.PLAN,
     text: str = "",
     context_item: str | None = None,
     scene: ScenePack = ScenePack.FAT_LOSS,
@@ -105,7 +104,6 @@ def run_agent(
         intent=intent,
         scene=scene,
         tier=tier_result(tier),
-        mode=mode,
     )
     outputs = Agent(agent).execute(
         snapshot(tier, **(profile or {}), **kwargs),

@@ -15,6 +15,7 @@
 - habit_motivation：坚持、动力、时间安排
 - wellness：养生保健、中医、传统做法
 - chitchat：打招呼、感谢、闲聊
+- app_help：问 App 怎么用、功能在哪里
 - out_of_scope：与健身健康无关
 - unknown：看不出在问什么
 

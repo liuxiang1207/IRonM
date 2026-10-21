@@ -59,7 +59,17 @@ SPECS: dict[AgentId, AgentSpec] = {
     _A.NUTRITIONIST: AgentSpec(
         _A.NUTRITIONIST,
         "营养师：饮食、热量、蛋白质、外卖与食堂、补剂",
-        ("sex", "birth_date", "height_cm", "weight_kg", "activity", "conditions", "goal"),
+        (
+            "sex",
+            "birth_date",
+            "height_cm",
+            "weight_kg",
+            "waist_cm",
+            "activity",
+            "high_protein",
+            "conditions",
+            "goal",
+        ),
         ("bmi", "calorie_target"),
     ),
     _A.RECOVERY: AgentSpec(_A.RECOVERY, "恢复师：睡眠、酸痛、疲劳与休息安排", (), ()),
@@ -200,7 +210,9 @@ def answer_as(
 ) -> AgentAnswer:
     spec = SPECS[agent]
     visible = {k: profile[k] for k in spec.data if k in profile}  # 只给声明能读的字段
-    passages = retriever.search(text, agent)
+    # 问答卡的触发词命中时，卡作为人工精选的条目优先召回
+    pinned = [f"card:{c.id}" for c, _ in cards.matches(text) if c.agent == agent]
+    passages = retriever.search(text, agent, pinned=pinned)
     tools = run_tools(
         spec.tools,
         ToolInput(

@@ -61,6 +61,12 @@ cases:
     - {text: 中医说我体寒，适合练什么}
     - {text: 断食排毒有用吗}
     - {text: 艾灸能祛湿吗}
+  app_help:
+    - {text: 这个app怎么记录体重}
+    - {text: 训练记录在哪里看}
+    - {text: 怎么打卡}
+    - {text: 提醒怎么设置}
+    - {text: 怎么改资料}
   chitchat:
     - {text: 你好}
     - {text: 谢谢你}

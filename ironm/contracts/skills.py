@@ -30,14 +30,6 @@ class ScenePack(StrEnum):
     MAINTENANCE = "maintenance"  # 维持期
 
 
-class SkillMode(StrEnum):
-    """Skill 服务于哪条链路。问答与计划共用一条链路，但触发方式不同。"""
-
-    PLAN = "plan"  # 计划：产出计划字段，处方类
-    ANSWER = "answer"  # 问答：产出带来源的意见，非处方类
-    BOTH = "both"  # 两者都用（如热量计算既给目标也回答问题）
-
-
 class Triggers(ContractModel):
     intents: tuple[Text, ...] = Field(min_length=1)
 
@@ -55,7 +47,6 @@ class SkillManifest(ContractModel):
     description: Text
     triggers: Triggers
     applies_to: AppliesTo
-    mode: SkillMode = SkillMode.PLAN  # 默认按计划类处理，保持既有 Skill 不变
     requires_data: tuple[DataKey, ...] = ()  # 平台按此裁剪快照
     produces: tuple[PlanField, ...] = ()  # 产出的计划字段；须归所属 Agent 负责
     priority: Annotated[int, Field(ge=0)] = 100  # 同一 Agent 内数字小者优先
@@ -69,21 +60,9 @@ class SkillManifest(ContractModel):
         return f"{self.id}@{self.version}"
 
     @model_validator(mode="after")
-    def _check_mode(self) -> Self:
-        if self.mode is SkillMode.ANSWER and self.prescriptive:
-            raise ValueError(f"{self.id}：问答类 Skill 不能是处方类（问答只给说明，不改计划）")
-        if self.mode is SkillMode.ANSWER and self.produces:
-            raise ValueError(f"{self.id}：问答类 Skill 不能产出计划字段")
-        if self.mode is SkillMode.PLAN and not self.prescriptive and self.produces:
-            raise ValueError(f"{self.id}：产计划字段的 Skill 必须是处方类")
-        return self
-
-    @model_validator(mode="after")
     def _check(self) -> Self:
         if self.prescriptive and self.applies_to.unknown_tier:
             raise ValueError(f"{self.id}：处方类 Skill 不能在分层未知时加载")
-        if self.mode is SkillMode.ANSWER and not self.applies_to.population_tiers:
-            raise ValueError(f"{self.id}：问答类 Skill 必须声明适用的分层")
         if self.produces and not self.prescriptive:
             raise ValueError(f"{self.id}：产出计划字段的 Skill 必须是处方类")
         stolen = [f for f in self.produces if FIELD_OWNERS[f] != self.owner_agent]

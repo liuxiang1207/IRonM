@@ -30,6 +30,7 @@ from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.knowledge.baseline import BASELINE_PATH, load_baseline
 from ironm.knowledge.exercises import LIBRARY_PATH, load_library
+from ironm.knowledge.kb import KnowledgeBase, load_passages, retriever_from_rules
 from ironm.knowledge.qa_cards import load_cards
 from ironm.llm.config import load_models
 from ironm.llm.gateway import Gateway
@@ -201,7 +202,11 @@ def create_app(
     profile_terms = load_profile_terms()  # 画像候选的说法（§8）
     rulebook.get(MEMORY_RULE).params_as(MemoryParams)
     env = os.environ if environ is None else environ
-    load_library(library_path)  # 动作库：启动时校验（spec §27）
+    library = load_library(library_path)  # 动作库：启动时校验（spec §27）
+    # 知识库与检索（spec [2026-10-21] §12）：问答卡 + 动作库 + 资料目录的段落，启动时建索引
+    retriever = retriever_from_rules(
+        KnowledgeBase.from_sources(cards, library, load_passages(settings.kb_dir)), rulebook
+    )
     load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
     # Skill 头信息与它们用到的规则参数：启动时校验（spec §28、§30）
     validate_skill_rules(load_skills(skills_dir), rulebook)
@@ -260,6 +265,7 @@ def create_app(
             memory=memory,
             profiles=ProfileService(memory, terms=profile_terms, ids=id_gen, now=clock.now),
             gateway=Gateway(models, environ=env, clock=clock, ids=id_gen, record=calls.add),
+            retriever=retriever,
         )
 
     def save_turn(user: str, text: str, reply: ChatReply) -> None:

@@ -16,6 +16,8 @@ from ironm.contracts.screening import SafetyFlag
 from ironm.core.clock import FixedClock
 from ironm.core.config import load_settings
 from ironm.core.ids import SeededIdGenerator
+from ironm.knowledge.exercises import default_library
+from ironm.knowledge.kb import KnowledgeBase, retriever_from_rules
 from ironm.knowledge.qa_cards import default_cards
 from ironm.memory.profile import ProfileService
 from ironm.memory.profile import load_terms as load_profile_terms
@@ -29,6 +31,12 @@ from ironm.store.safety import SafetyFlagStore
 from tests.memory_helpers import memory_db
 
 NOW = datetime(2026, 10, 21, 9, tzinfo=UTC)
+
+
+# 完整链路：问答卡 + 动作库建成的知识库（spec [2026-10-21] §12）
+RETRIEVER = retriever_from_rules(
+    KnowledgeBase.from_sources(default_cards(), default_library()), load_rules(RULES_DIR)
+)
 
 
 def _deps(flags: list[tuple[str, str, SafetyFlag]], memory: MemoryStore | None = None) -> ChatDeps:
@@ -48,6 +56,7 @@ def _deps(flags: list[tuple[str, str, SafetyFlag]], memory: MemoryStore | None =
         profiles=ProfileService(
             memory, terms=load_profile_terms(), ids=ids, now=FixedClock(NOW).now
         ),
+        retriever=RETRIEVER,
     )
 
 

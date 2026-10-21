@@ -53,6 +53,7 @@ class Intent(StrEnum):
     HABIT_MOTIVATION = "habit_motivation"
     WELLNESS = "wellness"
     CHITCHAT = "chitchat"
+    APP_HELP = "app_help"  # App 怎么用
     OUT_OF_SCOPE = "out_of_scope"
     UNKNOWN = "unknown"  # 归不进任何领域
 

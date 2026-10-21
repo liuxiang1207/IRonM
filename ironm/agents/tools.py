@@ -108,7 +108,13 @@ def calorie_tool(inp: ToolInput) -> ToolResult | None:
     )
     tier = classify(screening, as_of=inp.as_of, tz=inp.tz, rulebook=inp.rulebook)
     result = calorie_target(
-        screening, activity, tier, as_of=inp.as_of, tz=inp.tz, rulebook=inp.rulebook
+        screening,
+        activity,
+        tier,
+        as_of=inp.as_of,
+        tz=inp.tz,
+        rulebook=inp.rulebook,
+        high_protein=inp.profile.get("high_protein") is True,
     )
     if result.status != "ok" or not is_known(result.target_kcal) or not is_known(result.macros):
         return None

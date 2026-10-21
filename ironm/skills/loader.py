@@ -19,7 +19,7 @@ from ironm.contracts.agents import AgentOutput
 from ironm.contracts.plan import PlanField
 from ironm.contracts.roles import AgentId
 from ironm.contracts.screening import TierResult
-from ironm.contracts.skills import ScenePack, SkillManifest, SkillMode
+from ironm.contracts.skills import ScenePack, SkillManifest
 from ironm.contracts.unknown import is_known
 from ironm.core.yamlfile import load_yaml_text
 from ironm.rules.loader import RuleBook
@@ -168,11 +168,11 @@ def select(
     intent: str,
     scene: ScenePack,
     tier: TierResult,
-    mode: SkillMode = SkillMode.PLAN,
 ) -> Selection:
-    """按所属 Agent、意图、场景包、人群分层、链路（计划 / 问答）选出本次加载的 Skill。
+    """按所属 Agent、意图、场景包、人群分层选出本次加载的 Skill。
 
-    同一计划字段只由优先的 Skill 产出；问答类 Skill 不产出计划字段。
+    Skill 只用于计划链路，问答不加载 Skill（spec [2026-10-21] §12）。同一计划字段只由优先的
+    Skill 产出。
     """
     candidates = sorted(
         (s for s in skills if s.manifest.owner_agent == agent),
@@ -182,7 +182,7 @@ def select(
     skipped: list[tuple[str, str]] = []
     taken: set[PlanField] = set()
     for s in candidates:
-        reason = _mismatch(s.manifest, intent, scene, tier, mode)
+        reason = _mismatch(s.manifest, intent, scene, tier)
         if reason is None and taken & set(s.manifest.produces):
             reason = "field_conflict"
         if reason is not None:
@@ -198,13 +198,7 @@ def _mismatch(
     intent: str,
     scene: ScenePack,
     tier: TierResult,
-    mode: SkillMode = SkillMode.PLAN,
 ) -> str | None:
-    if mode is SkillMode.ANSWER:
-        if m.mode is SkillMode.PLAN:
-            return "mode_mismatch"
-    elif m.mode is SkillMode.ANSWER:
-        return "mode_mismatch"
     if intent not in m.triggers.intents:
         return "intent_mismatch"
     if scene not in m.applies_to.scene_packs:
@@ -214,7 +208,6 @@ def _mismatch(
         return None if m.applies_to.unknown_tier and not m.prescriptive else "tier_unknown"
     if m.prescriptive and not plan_allowed(tier.tier):
         return "tier_no_plan"
-    # 问答类不是处方类，不受“不可给计划”的拦截；但仍受分层匹配约束
     if tier.tier not in m.applies_to.population_tiers:
         return "tier_mismatch"
     return None
