@@ -357,6 +357,7 @@ def _collect(
             tier=deps.tier,
             text=text,
             context_item=context_item,
+            cards=deps.cards,
         )
     except Exception as e:  # 问答类 Skill 出错不影响回答（退回查卡）
         _log.exception("chat.opinions_failed", e)

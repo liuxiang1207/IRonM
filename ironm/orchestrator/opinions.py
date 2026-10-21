@@ -10,10 +10,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from ironm.agents.base import Agent
+from ironm.agents.knowledge import card_opinion, cards_for
 from ironm.contracts.agents import OpinionOutput
 from ironm.contracts.roles import AgentId, OutputKind
 from ironm.contracts.skills import ScenePack, SkillMode
 from ironm.contracts.snapshot import Snapshot
+from ironm.knowledge.qa_cards import CardBook
 from ironm.rules.loader import RuleBook
 from ironm.skills.loader import LoadedSkill, select
 
@@ -48,8 +50,13 @@ def collect_opinions(
     tier: Any,
     text: str,
     context_item: str | None = None,
+    cards: CardBook | None = None,
 ) -> Collected:
-    """按给出的 Agent 顺序逐个收集意见（Agent 之间互不可见，顺序只影响排列）。"""
+    """按给出的 Agent 顺序逐个收集意见（Agent 之间互不可见，顺序只影响排列）。
+
+    Skill 是增强，不是前提：没有匹配的 Skill 时，Agent 回退到查本领域的问答卡。
+    cards 为空时才真的“本次无意见”。
+    """
     opinions: list[Opinion] = []
     ran: list[AgentId] = []
     silent: list[tuple[AgentId, str]] = []
@@ -59,7 +66,13 @@ def collect_opinions(
             skills, agent=agent, intent=intent, scene=scene, tier=tier, mode=SkillMode.ANSWER
         )
         if not selection.loaded:
-            silent.append((agent, "no_matching_skill"))
+            # 没有 Skill 不等于答不了：回退到 Agent 自带的知识库查询
+            fallback = _from_cards(agent, cards, text)
+            if fallback is None:
+                silent.append((agent, "no_matching_knowledge"))
+                continue
+            opinions.append(fallback)
+            ran.append(agent)
             continue
         used.extend(selection.versions)
         outputs = Agent(agent).execute(
@@ -75,14 +88,31 @@ def collect_opinions(
             opinions.extend(got)
             ran.append(agent)
         else:
+            # Skill 明确说“不知道”（如动作库里没这个动作）时，不再用卡片硬凑
             reason = next(
                 (o.reason_code for o in outputs if o.kind is OutputKind.NO_OPINION),
                 None,
             )
-            silent.append((agent, reason or "no_opinion"))
+            fallback = None if reason else _from_cards(agent, cards, text)
+            if fallback is None:
+                silent.append((agent, reason or "no_opinion"))
+            else:
+                opinions.append(fallback)
+                ran.append(agent)
     return Collected(
         opinions=tuple(opinions),
         ran=tuple(ran),
         silent=tuple(silent),
         skills=tuple(dict.fromkeys(used)),
     )
+
+
+def _from_cards(agent: AgentId, cards: CardBook | None, text: str) -> Opinion | None:
+    """Agent 自带的兜底：查本领域的问答卡并转成意见。"""
+    if cards is None:
+        return None
+    found = cards_for(cards, agent, text)
+    opinion = card_opinion(agent, found)
+    if opinion is None:
+        return None
+    return Opinion(agent=agent, skill="knowledge@1.0.0", item=opinion)
