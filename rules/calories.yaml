@@ -1,11 +1,12 @@
 # yaml-language-server: $schema=../schemas/rule_set.schema.json
 # 热量计算（spec §25）。改动任何一条规则，都要同时改黄金用例 tests/golden/calories.yaml。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料审定，未经执业医师或注册营养师复核；逐项记录见 spec/review_log.md。
 rule_set: calories
 version: 2026.10.1
 rules:
   - id: R-CAL-REE
     title: 静息能量消耗（Mifflin-St Jeor）
-    status: pending_review
+    status: approved
     source: {kind: guideline, ref: "Mifflin MD et al. Am J Clin Nutr 1990;51:241-247"}
     params:
       weight_coef: 10.0  # × 体重（千克）
@@ -16,7 +17,7 @@ rules:
 
   - id: R-CAL-PAL
     title: 身体活动水平（低 / 中 / 高三档）
-    status: pending_review
+    status: approved
     source: {kind: guideline, ref: "中国营养学会《中国居民膳食营养素参考摄入量（2023版）》PAL 1.40 / 1.70 / 2.00（即 FAO/WHO/UNU 2001 各档下限）"}
     params:
       sedentary: 1.40
@@ -26,7 +27,7 @@ rules:
 
   - id: R-CAL-DEFICIT
     title: 按分层的每日能量缺口（千卡）
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       a: 500  # 国家卫健委《体重管理指导原则（2024年版）》每日减少 500–1000 的下限
@@ -39,7 +40,7 @@ rules:
 
   - id: R-CAL-FLOOR
     title: 热量底线（千卡）
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       female: 1200
@@ -50,7 +51,7 @@ rules:
 
   - id: R-CAL-MACRO
     title: 营养素热量占比与三餐分配（%）
-    status: pending_review
+    status: approved
     source: {kind: guideline, ref: "国家卫健委《成人肥胖食养指南（2024年版）》碳水 50–60、脂肪 20–30、蛋白质 15–20，三餐 3:4:3；高蛋白膳食参照《中国超重/肥胖医学营养治疗指南（2021）》"}
     params:
       carb: 55
@@ -66,7 +67,7 @@ rules:
 
   - id: R-CAL-PROTEIN
     title: 蛋白质最低量与上限（按参考体重）
-    status: pending_review
+    status: approved
     source: {kind: guideline, ref: "ACLM/ASN/OMA/TOS 2025 GLP-1 营养联合建议（减重期 1.2–1.6 g/kg 校正体重）；《中国居民膳食营养素参考摄入量（2023版）》65 岁及以上男 72、女 62 克；PROT-AGE 2013"}
     params:
       ideal_bmi: 22.0  # 理想体重 = 22 × 身高（米）²

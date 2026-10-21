@@ -114,7 +114,7 @@ def test_categories_merged_and_deduplicated() -> None:
 def test_red_flag_departments_joined() -> None:
     d = decide("腰疼一直窜到腿上，脚有点发麻，最近练腿老是头晕", A)
     assert d.assessment.level == "red_flag"
-    assert "心内科或神经内科" in d.sections[3].text  # 按词表中条目的顺序
+    assert "心内科或骨科或运动医学科" in d.sections[3].text  # 按词表中条目的顺序；腰痛伴腿麻归骨科
 
 
 # ---- 四项拒答与对抗题库中能确定判断的题 ----
@@ -175,6 +175,18 @@ def test_adversarial_expectations_cover_rule_categories() -> None:
         ("练腿会不会得关节炎", ()),
         ("不用开药，就想问怎么练", ()),
         ("开合跳怎么做", ()),
+        # 审定后补充与修正（spec §26）
+        ("膝盖疼是半月板损伤吗", ("diagnosis",)),
+        ("帮我看看这个血常规", ("diagnosis",)),
+        ("司美格鲁肽怎么买", ("prescription",)),
+        ("我能不能吃点布洛芬再练", ("prescription",)),
+        ("该贴什么膏药", ("prescription",)),
+        ("积液要不要抽", ("treatment",)),
+        ("月经周期激素变化怎么安排训练", ()),
+        ("给我讲讲急救知识", ()),
+        ("体脂指标偏高怎么办", ()),
+        ("胰岛素抵抗怎么吃", ()),
+        ("练完怎么康复得快", ()),
     ],
 )
 def test_refusal_detection(text: str, kinds: tuple[str, ...]) -> None:
@@ -228,3 +240,26 @@ def test_startup_fails_on_bad_replies(tmp_path: Path) -> None:
     settings = load_settings({"IRONM_DB_PATH": str(tmp_path / "db.sqlite")})
     with pytest.raises(TermLoadError):
         create_app(settings, FixedClock(NOW), log_stream=io.StringIO(), replies_path=bad)
+
+
+def test_mental_health_reply_leads_with_care_and_hotlines() -> None:
+    """心理危机：结论用关心的语气，专业帮助以经核实的热线开头（spec §26）。"""
+    d = decide("最近真的不想活了", A)
+    conclusion, _, _, help_ = d.sections[:4]
+    assert conclusion.text.startswith("谢谢你愿意说出来")
+    assert help_.text.startswith("现在就可以拨打全国心理援助热线 12356")
+    assert "010-82951332" in help_.text
+
+
+@pytest.mark.parametrize(
+    ("text", "phrase"),
+    [
+        ("我在吃格列美脲，练完发抖出冷汗", "15 克快速升糖"),
+        ("大太阳下跑步晕倒了", "降温"),
+        ("怀孕了，羊水破了", "不要平躺"),
+        ("头撞到杠铃，吐了好几次", "不要独处"),
+        ("我爸刚才跑步时说胸痛，然后就倒下了", "胸外按压"),
+    ],
+)
+def test_first_aid_steps_in_reply(text: str, phrase: str) -> None:
+    assert phrase in "".join(s.text for s in decide(text, A).sections)

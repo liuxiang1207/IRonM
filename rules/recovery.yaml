@@ -1,36 +1,37 @@
 # yaml-language-server: $schema=../schemas/rule_set.schema.json
 # 恢复：每日精力对当天训练量的调整。精力只能让训练量下降，不能超过原计划。
 # 改动任何一条规则，都要同时改对应测试。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料审定，未经执业医师或注册营养师复核；逐项记录见 spec/review_log.md。
 rule_set: recovery
 version: 2026.10.1
 rules:
   - id: R-RC-ENERGY-5
     title: 精力充沛：照常训练（不因精力好而加量）
-    status: pending_review
+    status: approved
     source: {kind: design}
     params: {mode: full, volume_factor: 1.0, rpe_cap_delta: 0}
 
   - id: R-RC-ENERGY-4
     title: 精力良好：照常训练
-    status: pending_review
+    status: approved
     source: {kind: design}
     params: {mode: full, volume_factor: 1.0, rpe_cap_delta: 0}
 
   - id: R-RC-ENERGY-3
     title: 精力一般：降低难度
-    status: pending_review
+    status: approved
     source: {kind: design}
     params: {mode: reduced, volume_factor: 0.8, rpe_cap_delta: -1}
 
   - id: R-RC-ENERGY-2
     title: 精力疲惫：只留轻松训练
-    status: pending_review
+    status: approved
     source: {kind: design}
     params: {mode: easy, volume_factor: 0.5, rpe_cap_delta: -2, rpe_cap_max: 6}
 
   - id: R-RC-ENERGY-1
     title: 精力很差：只做最低任务或休息
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       mode: minimum

@@ -50,6 +50,28 @@ PARAPHRASES = [
     ("膝盖肿了好几天，摸着发烫", "red_flag"),
     ("肩膀疼得睡不着", "red_flag"),
     ("量了血压 185/100，没什么感觉", "red_flag"),
+    # 审定后补充（spec §26）
+    ("最近真的不想活了", "red_flag"),
+    ("我割腕了", "emergency"),
+    ("练完全身起风团，喉咙发紧", "emergency"),
+    ("运动后全身起风团，喘不上气", "emergency"),
+    ("跑完身上起了荨麻疹", "red_flag"),
+    ("哮喘发作了，喷了药也不管用", "emergency"),
+    ("跑步时哮喘犯了", "red_flag"),
+    ("头撞到杠铃，吐了好几次", "emergency"),
+    ("卧推时杠铃砸到头了", "red_flag"),
+    ("突然一只眼睛黑了看不清", "emergency"),
+    ("右手突然没劲，拿不住东西", "emergency"),
+    ("血压190/115，喘不上气", "emergency"),
+    ("我在吃格列美脲，练完发抖出冷汗", "emergency"),
+    ("怀孕了，羊水破了", "emergency"),
+    ("怀孕5个月，跑步时有点头晕", "red_flag"),
+    ("我中暑了，头痛恶心", "red_flag"),
+    ("大太阳下跑步晕倒了", "emergency"),
+    ("今天吃了泻药", "red_flag"),
+    ("吐血了", "emergency"),
+    ("最近大便是黑的，柏油样", "red_flag"),
+    ("打了减肥针，肚子疼到后背", "red_flag"),
 ]
 
 # 含关键字但没有症状：健身语境里的常见说法不能被拦下
@@ -63,6 +85,15 @@ ORDINARY = [
     "跑步时心跳很快正常吗",
     "血压计哪个牌子好",
     "晕车好难受",
+    # 审定后修正的误报（spec §26）
+    "发力时把气吐出来",
+    "呼气时把气吐掉",
+    "吃完就吐槽教练",
+    "我有胰岛素抵抗，练完腿有点酸",
+    "早上迷迷糊糊起来去跑步",
+    "喝了可乐老想尿尿",
+    "手机没有反应了",
+    "我还在坚持跑步",
 ]
 
 
@@ -136,8 +167,9 @@ def test_unified_text() -> None:
 
 
 BLOOD_PRESSURE = [
-    ("血压179/119", "none"),
+    ("血压179/109", "none"),
     ("血压180/90", "red_flag"),
+    ("血压150/110", "red_flag"),  # 3 级高血压：舒张压 ≥ 110
     ("血压150/120", "red_flag"),
     ("血压190/120", "red_flag"),
     ("血压190/120，头痛", "emergency"),
@@ -238,9 +270,9 @@ def test_duplicate_yaml_key_rejected(tmp_path: Path) -> None:
         load_terms(path)
 
 
-def test_bundled_book_is_valid_and_pending_review() -> None:
+def test_bundled_book_is_valid_and_reviewed() -> None:
     book = load_terms(TERMS_PATH)
-    assert book.review == "pending_review"
+    assert book.review == "approved"
     assert {r.level for r in book.rules} == {"emergency", "red_flag"}
 
 

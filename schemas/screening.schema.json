@@ -4,6 +4,9 @@
       "description": "筛查问卷中可申报的健康状况。各自归入哪一层写在规则表里。",
       "enum": [
         "hypertension",
+        "hypertension_uncontrolled",
+        "diabetes_no_medication",
+        "cerebrovascular_disease",
         "recent_injury",
         "weight_loss_drug_supervised",
         "weight_loss_drug_unsupervised",

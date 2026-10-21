@@ -1,12 +1,13 @@
 # yaml-language-server: $schema=../schemas/rule_set.schema.json
 # 数据质量：异常值“待确认”、数据新鲜度、调整所需的最低数据量。
 # 改动任何一条规则，都要同时改对应测试。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料审定，未经执业医师或注册营养师复核；逐项记录见 spec/review_log.md。
 rule_set: data_quality
 version: 2026.10.1
 rules:
   - id: R-DQ-WEIGHT-JUMP
     title: 体重短期跳变标“待确认”
-    status: pending_review
+    status: approved
     source:
       kind: design
     params:
@@ -21,7 +22,7 @@ rules:
 
   - id: R-DQ-KCAL-RANGE
     title: 单日热量异常标“待确认”
-    status: pending_review
+    status: approved
     source:
       kind: design
     params:
@@ -30,7 +31,7 @@ rules:
 
   - id: R-DQ-WEIGHT-STALE
     title: 超过 10 天没有新称重，体重类指标标“已过期”
-    status: pending_review
+    status: approved
     source:
       kind: design
     params:
@@ -38,7 +39,7 @@ rules:
 
   - id: R-DQ-DIET-ADJ-MIN-DATA
     title: 饮食调整的最低数据量
-    status: pending_review
+    status: approved
     source:
       kind: borrowed
       ref: MacroFactor：数据不足时保持目标，并提示还差什么

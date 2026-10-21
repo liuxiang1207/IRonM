@@ -32,7 +32,10 @@ TIER_ORDER: tuple[Tier, ...] = tuple(Tier)
 class Condition(StrEnum):
     """筛查问卷中可申报的健康状况。各自归入哪一层写在规则表里。"""
 
-    HYPERTENSION = "hypertension"  # 高血压
+    HYPERTENSION = "hypertension"  # 高血压（已在治疗、控制中）
+    HYPERTENSION_UNCONTROLLED = "hypertension_uncontrolled"  # 未控制的高血压（≥ 180/110 或未治疗）
+    DIABETES_NO_MEDICATION = "diabetes_no_medication"  # 糖尿病，未用药
+    CEREBROVASCULAR_DISEASE = "cerebrovascular_disease"  # 脑卒中或短暂性脑缺血发作史
     RECENT_INJURY = "recent_injury"  # 近期受伤
     WEIGHT_LOSS_DRUG_SUPERVISED = "weight_loss_drug_supervised"  # 医生指导下使用减重药物
     WEIGHT_LOSS_DRUG_UNSUPERVISED = "weight_loss_drug_unsupervised"  # 未在医生指导下使用减重药物

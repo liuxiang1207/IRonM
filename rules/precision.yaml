@@ -1,11 +1,12 @@
 # yaml-language-server: $schema=../schemas/rule_set.schema.json
 # 精度判定：按近 4 周实际记录，判定各领域 P0–P3。改动任何一条规则，都要同时改黄金用例。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料审定，未经执业医师或注册营养师复核；逐项记录见 spec/review_log.md。
 rule_set: precision
 version: 2026.10.1
 rules:
   - id: R-PR-BODY
     title: 体重领域精度
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       window_days: 28
@@ -18,7 +19,7 @@ rules:
 
   - id: R-PR-TRAINING
     title: 训练领域精度
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       window_days: 28
@@ -28,7 +29,7 @@ rules:
 
   - id: R-PR-DIET
     title: 饮食领域精度
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       window_days: 28
@@ -39,7 +40,7 @@ rules:
 
   - id: R-PR-RECOVERY
     title: 恢复领域精度（设备接入前最高 P1）
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       window_days: 28

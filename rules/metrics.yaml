@@ -1,11 +1,12 @@
 # yaml-language-server: $schema=../schemas/rule_set.schema.json
 # 指标计算的统计参数。改动任何一条规则，都要同时改对应测试。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料审定，未经执业医师或注册营养师复核；逐项记录见 spec/review_log.md。
 rule_set: metrics
 version: 2026.10.1
 rules:
   - id: R-MT-WEIGHT-TREND
     title: 体重趋势回归的置信水平与最少读数
-    status: pending_review
+    status: approved
     source:
       kind: design
     params:
@@ -17,7 +18,7 @@ rules:
 
   - id: R-MT-TRAINING-COMPLETION
     title: 训练完成度的计分
-    status: pending_review
+    status: approved
     source:
       kind: design
     params:
@@ -30,7 +31,7 @@ rules:
 
   - id: R-MT-JUDGEMENT-WINDOW
     title: 体重判断窗口：先定需要多确定，再算需要多久
-    status: pending_review
+    status: approved
     source: {kind: design}
     params:
       target_half_width_kg_per_week: 0.25  # 趋势可信范围半宽不超过此值才能据以调整饮食

@@ -98,11 +98,15 @@ class Negation(ContractModel):
         rest = tail[len(self.past_after) :]
         return any(rest.startswith(w) for w in self.past_not_followed_by)
 
-    def found(self, clause: str, term: str, past_counts: bool) -> bool:
-        """term 在分句里是否有一处算出现。"""
+    def found(
+        self, clause: str, term: str, past_counts: bool, not_followed_by: tuple[str, ...] = ()
+    ) -> bool:
+        """term 在分句里是否有一处算出现；后面紧跟 not_followed_by 中的字时这一处不算。"""
         i = clause.find(term)
         while i != -1:
-            if self.counts(clause, i, i + len(term), past_counts):
+            end = i + len(term)
+            followed = any(clause.startswith(w, end) for w in not_followed_by)
+            if not followed and self.counts(clause, i, end, past_counts):
                 return True
             i = clause.find(term, i + 1)
         return False
@@ -116,6 +120,8 @@ class Symptom(ContractModel):
     terms: tuple[Term, ...] = ()
     combos: tuple[tuple[tuple[Term, ...], ...], ...] = ()
     blood_pressure: BloodPressure | None = None
+    # 说法后紧跟这些字时这一处不算（如“吃完就吐”后接“槽”）
+    not_followed_by: tuple[Term, ...] = ()
 
     @model_validator(mode="after")
     def _check(self) -> Self:
@@ -125,6 +131,7 @@ class Symptom(ContractModel):
             if len(combo) < 2 or any(not group for group in combo):
                 raise ValueError(f"症状 {self.id} 的组合至少两组，且每组至少一个说法")
         words = [*self.terms, *(t for combo in self.combos for g in combo for t in g)]
+        words += self.not_followed_by
         if self.blood_pressure is not None:
             words += self.blood_pressure.context
         for word in words:
@@ -133,7 +140,7 @@ class Symptom(ContractModel):
 
     def matches(self, clause: str, negation: Negation, past_counts: bool) -> bool:
         def found(term: str) -> bool:
-            return negation.found(clause, term, past_counts)
+            return negation.found(clause, term, past_counts, self.not_followed_by)
 
         if any(found(t) for t in self.terms):
             return True

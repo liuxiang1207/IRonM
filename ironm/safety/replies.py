@@ -67,6 +67,8 @@ class CategoryText(ContractModel):
     stop: Term
     department: Term
     bring: tuple[Term, ...] = Field(min_length=1)
+    conclusion: Term | None = None  # 替换级别的结论句（如心理危机用关心的语气）
+    help_extra: Term | None = None  # 放在专业帮助的开头（如热线电话）
 
 
 class Titles(ContractModel):
@@ -109,6 +111,8 @@ class Replies(ContractModel):
             *(self.titles.model_dump().values()),
             *(c.stop for c in self.categories.values()),
             *(c.department for c in self.categories.values()),
+            *(c.conclusion for c in self.categories.values() if c.conclusion),
+            *(c.help_extra for c in self.categories.values() if c.help_extra),
             *(b for c in self.categories.values() for b in c.bring),
             *self.refusals.values(),
             *self.missing_labels.values(),
@@ -134,9 +138,12 @@ def four_section(replies: Replies, assessment: Assessment) -> tuple[ReplySection
     departments = "或".join(_unique(c.department for c in cats))
     bring = "、".join(_unique(b for c in cats for b in c.bring))
     help_text = level.help.replace("{departments}", departments).replace("{bring}", bring)
+    help_text = "".join(_unique(c.help_extra for c in cats if c.help_extra)) + help_text
+    # 第一个带自己结论句的类别优先（按命中条目的顺序）
+    conclusion = next((c.conclusion for c in cats if c.conclusion), level.conclusion)
     t = replies.titles
     return (
-        ReplySection(kind="conclusion", title=t.conclusion, text=level.conclusion),
+        ReplySection(kind="conclusion", title=t.conclusion, text=conclusion),
         ReplySection(kind="stop", title=t.stop, text=stop),
         ReplySection(kind="cannot_judge", title=t.cannot_judge, text=level.cannot_judge),
         ReplySection(kind="help", title=t.help, text=help_text),

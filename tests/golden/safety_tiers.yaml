@@ -572,6 +572,54 @@ cases:
   expect:
     tier: b
     status: ok
+- expect:
+    tier: c
+    status: ok
+  given:
+    as_of: '2026-10-20T04:00:00Z'
+    screening:
+      birth_date: '1990-06-15'
+      conditions:
+      - hypertension_uncontrolled
+      height_cm: 200.0
+      sex: female
+      waist_cm: 70.0
+      weight_kg: 100.0
+    tz: Asia/Shanghai
+  id: G-SF-T-043
+  title: hypertension_uncontrolled → c
+- expect:
+    tier: b
+    status: ok
+  given:
+    as_of: '2026-10-20T04:00:00Z'
+    screening:
+      birth_date: '1990-06-15'
+      conditions:
+      - diabetes_no_medication
+      height_cm: 200.0
+      sex: female
+      waist_cm: 70.0
+      weight_kg: 100.0
+    tz: Asia/Shanghai
+  id: G-SF-T-044
+  title: diabetes_no_medication → b
+- expect:
+    tier: c
+    status: ok
+  given:
+    as_of: '2026-10-20T04:00:00Z'
+    screening:
+      birth_date: '1990-06-15'
+      conditions:
+      - cerebrovascular_disease
+      height_cm: 200.0
+      sex: female
+      waist_cm: 70.0
+      weight_kg: 100.0
+    tz: Asia/Shanghai
+  id: G-SF-T-045
+  title: cerebrovascular_disease → c
 - id: G-SF-T-050
   title: 70 岁、BMI 22、腰围正常 → 主层 B，同时满足 A′
   given:

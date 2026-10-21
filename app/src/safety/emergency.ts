@@ -16,6 +16,7 @@ export interface Symptom {
   terms: string[];
   combos: string[][][];
   blood_pressure: BloodPressure | null;
+  not_followed_by: string[];
 }
 
 export interface EmergencyRule {
@@ -45,6 +46,8 @@ export interface CategoryText {
   stop: string;
   department: string;
   bring: string[];
+  conclusion: string | null;
+  help_extra: string | null;
 }
 
 export interface Replies {
@@ -129,17 +132,26 @@ function counts(neg: Negation, clause: string, start: number, end: number, pastC
   return neg.past_not_followed_by.some((w) => rest.startsWith(w));
 }
 
-function found(neg: Negation, clause: string, term: string, pastCounts: boolean): boolean {
+// 后面紧跟 notFollowedBy 中的字时这一处不算
+function found(
+  neg: Negation,
+  clause: string,
+  term: string,
+  pastCounts: boolean,
+  notFollowedBy: string[],
+): boolean {
   let i = clause.indexOf(term);
   while (i !== -1) {
-    if (counts(neg, clause, i, i + term.length, pastCounts)) return true;
+    const end = i + term.length;
+    const followed = notFollowedBy.some((w) => clause.startsWith(w, end));
+    if (!followed && counts(neg, clause, i, end, pastCounts)) return true;
     i = clause.indexOf(term, i + 1);
   }
   return false;
 }
 
 function symptomMatches(symptom: Symptom, clause: string, neg: Negation, pastCounts: boolean): boolean {
-  const f = (t: string) => found(neg, clause, t, pastCounts);
+  const f = (t: string) => found(neg, clause, t, pastCounts, symptom.not_followed_by);
   if (symptom.terms.some(f)) return true;
   if (symptom.combos.some((combo) => combo.every((group) => group.some(f)))) return true;
   // 血压按数值判断，不受否定影响
@@ -176,9 +188,12 @@ export function fourSection(book: TermBook, assessment: Assessment): ReplySectio
   const stop = unique([level.stop, ...cats.map((c) => c.stop)]).join("");
   const departments = unique(cats.map((c) => c.department)).join("或");
   const bring = unique(cats.flatMap((c) => c.bring)).join("、");
-  const help = level.help.replace("{departments}", departments).replace("{bring}", bring);
+  const extra = unique(cats.flatMap((c) => (c.help_extra ? [c.help_extra] : []))).join("");
+  const help = extra + level.help.replace("{departments}", departments).replace("{bring}", bring);
+  // 第一个带自己结论句的类别优先（按命中条目的顺序）
+  const conclusion = cats.find((c) => c.conclusion)?.conclusion ?? level.conclusion;
   return [
-    { kind: "conclusion", title: r.titles.conclusion, text: level.conclusion },
+    { kind: "conclusion", title: r.titles.conclusion, text: conclusion },
     { kind: "stop", title: r.titles.stop, text: stop },
     { kind: "cannot_judge", title: r.titles.cannot_judge, text: level.cannot_judge },
     { kind: "help", title: r.titles.help, text: help },

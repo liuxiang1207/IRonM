@@ -1,13 +1,16 @@
-# 急症词表（spec §21）。只能由人修改；改动后必须跑红旗测试集。
+# 急症词表（spec §21、§22、§26）。只能由人修改；改动后必须跑红旗测试集并重新生成 App 离线数据（make offline）。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料审定，未经执业医师复核；逐项记录见 spec/review_log.md。
 # 两层：
 #   symptoms 症状：terms 任一说法出现即命中；combos 每项是几组词，同一分句里每组都出现才命中；
 #            blood_pressure 按数值判断（同一分句里要有 context 中的字样）。
 #   rules 判定条目：all 中的症状在同一句话里都出现时给出 level。多条命中取最高一级。
 # 说法要写成统一后的形式：半角、小写、不含空白与分句符号。
 # 依据：ACSM 运动前健康筛查（第 10 版）的症状清单；AHA 心脏病发作与卒中（BE FAST）警示信号；
-#       中暑、低血糖、横纹肌溶解、马尾综合征、深静脉血栓、孕期危险信号的通行就医标准。
-version: "0.2"
-review: pending_review
+#       中暑、低血糖、横纹肌溶解、马尾综合征、深静脉血栓、孕期危险信号（ACOG 804）的通行就医标准；
+#       严重过敏、哮喘（GINA）、脑震荡（CRT6）、自伤与轻生的危机处理。
+# 每个症状可写 not_followed_by：说法后紧跟这些字时这一处不算（如“吃完就吐”后接“槽”）。
+version: "1.0"
+review: approved
 
 # 否定与“以前发生过”：只取消紧挨着的一处说法；拿不准时按出现处理。血压数值不受影响。
 negation:
@@ -37,13 +40,17 @@ symptoms:
     terms: [冷汗, 虚汗, 大汗淋漓]
   - id: ongoing
     name: 正在持续、休息不缓解或加重
-    terms: [还在疼, 还在痛, 还疼, 还痛, 还在, 到现在, 不缓解, 没缓解, 不见好, 没好转, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
+    # 不单用“还在”：“我还在坚持跑步”“现在还在喘”不是症状持续
+    terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 一直疼, 一直痛, 一直闷, 持续, 到现在, 不缓解, 没缓解, 不见好, 没好转, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
   - id: sudden
     name: 突然发生
     terms: [突然, 一下子, 猛地, 突发]
   - id: collapse
     name: 晕倒或意识丧失
-    terms: [晕倒, 昏倒, 晕过去, 昏过去, 倒下, 倒地, 晕厥, 昏厥, 失去意识, 没了意识, 不省人事, 叫不醒, 没反应了, 没有反应]
+    terms: [晕倒, 昏倒, 晕过去, 昏过去, 倒下, 倒地, 晕厥, 昏厥, 失去意识, 没了意识, 不省人事, 叫不醒]
+    combos:
+      # “没反应”须说的是人（“手机没有反应了”不算）
+      - [[人, 他, 她, 叫, 喊], [没反应, 没有反应]]
   - id: seizure
     name: 抽搐
     terms: [抽搐, 抽风, 口吐白沫]
@@ -85,26 +92,36 @@ symptoms:
     name: 一侧脸或肢体麻木无力
     terms: [嘴歪, 口角歪, 口眼歪斜, 半身不遂, 偏瘫]
     combos:
-      - [[一边, 半边, 一侧, 单侧], [脸, 手, 胳膊, 腿, 身子, 身体], [麻, 没力, 无力, 没劲, 不听使唤, 动不了, 抬不起]]
+      - [[一边, 半边, 一侧, 单侧, 左边, 右边, 左半边, 右半边, 左手, 右手], [脸, 手, 胳膊, 腿, 身子, 身体], [麻, 没力, 无力, 没劲, 不听使唤, 动不了, 抬不起, 拿不住]]
+  - id: vision_loss
+    name: 视力突然丧失或重影
+    terms: [看不见, 看不清, 视物模糊, 重影, 一只眼睛黑, 眼前一片黑]
   - id: dark_urine
     name: 尿色像酱油或浓茶
     terms: [酱油色, 茶色尿, 可乐色]
     combos:
-      - [[尿, 小便], [酱油, 茶色, 可乐, 深褐, 发黑, 黑色, 咖啡色, 浓茶]]
+      # 须说颜色（“喝了可乐老想尿尿”不算）
+      - [[尿, 小便], [酱油, 茶色, 可乐色, 像可乐, 深褐, 发黑, 黑色, 咖啡色, 浓茶色, 像浓茶]]
   - id: confusion
     name: 意识不清
-    terms: [迷迷糊糊, 意识模糊, 神志不清, 意识不清, 糊里糊涂, 胡言乱语, 认不出人, 答非所问]
+    terms: [意识模糊, 神志不清, 意识不清, 胡言乱语, 认不出人, 答非所问]
     combos:
       - [[脑子, 意识, 神志, 头脑], [不清, 迷糊, 模糊, 糊涂, 发懵]]
+      # “迷迷糊糊”须说的是人（“早上迷迷糊糊起来去跑步”不算）
+      - [[人, 脑子, 整个人], [迷迷糊糊, 糊里糊涂]]
   - id: heat_exposure
     name: 高温或暴晒环境
     terms: [大太阳, 太阳下, 烈日, 高温, 暴晒, 中暑, 天很热, 天太热, 天气热, 闷热, 桑拿天, 三伏天]
   - id: no_sweat_hot
     name: 不再出汗或体温很高
     terms: [不出汗, 不怎么出汗, 不太出汗, 没有汗, 没汗了, 停止出汗, 皮肤很烫, 体温很高, 身上发烫]
+  - id: heat_illness
+    name: 中暑的一般表现
+    terms: [恶心, 想吐, 呕吐, 头痛, 头疼, 抽筋, 乏力, 浑身无力]
   - id: diabetes
     name: 糖尿病或用降糖药
-    terms: [糖尿病, 降糖药, 胰岛素, 低血糖, 血糖低, 血糖很低, 二甲双胍]
+    # 不单用“胰岛素”：“胰岛素抵抗”不是用胰岛素；磺脲类（格列××）同样会引起低血糖
+    terms: [糖尿病, 降糖药, 打胰岛素, 用胰岛素, 注射胰岛素, 胰岛素针, 胰岛素泵, 低血糖, 血糖低, 血糖很低, 二甲双胍, 格列, 磺脲]
   - id: hypo_signs
     name: 低血糖表现
     terms: [发抖, 手抖, 冷汗, 虚汗, 心慌, 头晕, 眼前发黑, 饿得发慌, 浑身无力]
@@ -135,13 +152,16 @@ symptoms:
       - [[孕], [周]]
   - id: pregnancy_warning
     name: 孕期危险信号
-    terms: [见红, 出血, 流血, 破水, 阴道流液, 肚子疼, 肚子痛, 腹痛, 宫缩, 肚子发紧, 胎动少, 胎动减少, 胎动变少, 头痛, 视物模糊, 看东西模糊]
+    terms: [见红, 出血, 流血, 破水, 羊水, 阴道流液, 肚子疼, 肚子痛, 腹痛, 宫缩, 肚子发紧, 胎动少, 胎动减少, 胎动变少, 头痛, 视物模糊, 看东西模糊]
+  - id: pregnancy_caution
+    name: 孕期其他危险信号（ACOG）
+    terms: [头晕, 眩晕, 胸痛, 胸闷, 喘不上气, 小腿肿, 小腿疼, 腿肚子疼, 站不稳, 没力气]
   - id: bp_crisis
     name: 血压极高
     blood_pressure:
       context: [血压, 高压, 低压, mmhg]
       systolic_at_least: 180
-      diastolic_at_least: 120
+      diastolic_at_least: 110  # 3 级高血压 ≥ 180/110
   - id: calf_swelling
     name: 小腿肿
     combos:
@@ -175,13 +195,58 @@ symptoms:
     terms: [疼醒, 痛醒, 疼得睡不着, 痛得睡不着, 半夜疼, 夜间痛, 夜里疼, 夜里痛]
   - id: purge
     name: 催吐或用泻药
-    # 不单用“去吐”：会命中“去吐槽”
-    terms: [催吐, 抠喉, 抠嗓子, 吐掉, 吐出来, 故意吐, 吃完就吐, 吃了就吐, 吃完就去吐, 吃了就去吐, 吃完去吐, 吃完饭就吐, 吃泻药, 用泻药]
+    # 不单用“去吐”“吐出来”“吐掉”：“去吐槽”“发力时把气吐出来”不是催吐
+    terms: [催吐, 抠喉, 抠嗓子, 故意吐, 吃完就吐, 吃了就吐, 吃完就去吐, 吃了就去吐, 吃完去吐, 吃完饭就吐, 吃泻药, 用泻药, 吃了泻药, 用了泻药, 喝泻药, 番泻叶]
+    combos:
+      - [[吃, 饭, 东西, 食物], [吐出来, 吐掉]]
+    not_followed_by: [槽]
+  - id: self_harm_act
+    name: 正在或已经自伤
+    terms: [割腕, 吃了很多安眠药, 吞药, 吃了一整瓶, 遗书, 准备自杀, 正在自杀, 跳楼]
+  - id: self_harm_idea
+    name: 轻生想法
+    terms: [想死, 不想活, 活着没意思, 活不下去, 自杀, 轻生, 结束生命, 想消失, 伤害自己, 自残]
+  - id: hives
+    name: 全身风团或面部肿胀
+    terms: [风团, 荨麻疹, 全身起疹子, 全身起疙瘩, 全身痒, 嘴唇肿, 眼睛肿]
+  - id: throat_swelling
+    name: 喉咙发紧或肿
+    terms: [喉咙发紧, 嗓子发紧, 喉咙肿, 嗓子肿, 舌头肿, 咽不下去]
+  - id: asthma
+    name: 哮喘
+    terms: [哮喘, 喘鸣, 嗓子里有哨音]
+  - id: reliever_fail
+    name: 用了急救药不缓解
+    terms: [喷了药也, 喷了也, 喷了没用, 吸了药也, 药不管用]
+  - id: head_injury
+    name: 头部受伤
+    terms: [脑震荡, 撞到头, 砸到头, 磕到头, 摔到头, 头撞, 头被砸]
+  - id: head_red
+    name: 头部受伤后的危险信号（CRT6）
+    terms: [吐了, 呕吐, 越来越疼, 犯困, 嗜睡, 想睡, 记不清, 断片, 重影, 脖子疼]
+  - id: hematemesis
+    name: 吐血
+    terms: [吐血, 呕血]
+  - id: gi_bleed
+    name: 便血或黑便
+    terms: [便血, 黑便, 柏油样]
+  - id: abdominal_severe
+    name: 腹部剧痛
+    combos:
+      - [[肚子, 腹部, 胃, 上腹], [剧痛, 疼得厉害, 疼得直不起腰, 疼到后背]]
   - id: purge_complication
     name: 催吐后的电解质紊乱表现
     terms: [心慌, 头晕, 抽筋, 手脚麻, 没力气, 浑身无力, 心跳乱, 晕]
 
 rules:
+  # ---- 心理危机（放在最前：同时命中其他类别时，回答以关心与热线开头）----
+  - {id: EM-SELF-HARM-ACT, level: emergency, category: mental_health, title: 正在或已经自伤, all: [self_harm_act]}
+  - {id: RF-SELF-HARM, level: red_flag, category: mental_health, title: 轻生想法, all: [self_harm_idea]}
+  # ---- 严重过敏 ----
+  - {id: EM-ANAPHYLAXIS-AIRWAY, level: emergency, category: allergy, title: 喉咙发紧或肿（严重过敏）, all: [throat_swelling]}
+  - {id: EM-ANAPHYLAXIS-BREATH, level: emergency, category: allergy, title: 全身风团伴呼吸困难, all: [hives, dyspnea]}
+  - {id: EM-ANAPHYLAXIS-FAINT, level: emergency, category: allergy, title: 全身风团伴头晕, all: [hives, dizziness]}
+  - {id: RF-HIVES, level: red_flag, category: allergy, title: 全身风团或面部肿胀, all: [hives]}
   # ---- 心血管 ----
   - {id: EM-CHEST-ONGOING, level: emergency, category: cardiovascular, title: 胸痛正在持续或休息不缓解, all: [chest_pain, ongoing]}
   - {id: EM-CHEST-SUDDEN, level: emergency, category: cardiovascular, title: 突发胸痛, all: [chest_pain, sudden]}
@@ -195,6 +260,8 @@ rules:
   - {id: EM-BP-HEADACHE, level: emergency, category: cardiovascular, title: 血压极高伴头痛, all: [bp_crisis, headache]}
   - {id: EM-BP-CHEST, level: emergency, category: cardiovascular, title: 血压极高伴胸痛, all: [bp_crisis, chest_pain]}
   - {id: EM-BP-DIZZY, level: emergency, category: cardiovascular, title: 血压极高伴头晕, all: [bp_crisis, dizziness]}
+  - {id: EM-BP-DYSPNEA, level: emergency, category: cardiovascular, title: 血压极高伴呼吸困难, all: [bp_crisis, dyspnea]}
+  - {id: EM-BP-VISION, level: emergency, category: cardiovascular, title: 血压极高伴视物异常, all: [bp_crisis, vision_loss]}
   - {id: RF-BP, level: red_flag, category: cardiovascular, title: 血压极高, all: [bp_crisis]}
   - {id: EM-DVT-UNILATERAL, level: emergency, category: cardiovascular, title: 一侧小腿肿（疑似深静脉血栓）, all: [calf_swelling, unilateral]}
   - {id: EM-DVT-HOT, level: emergency, category: cardiovascular, title: 小腿红肿发烫（疑似深静脉血栓）, all: [calf_swelling, red_hot]}
@@ -206,16 +273,21 @@ rules:
   - {id: EM-CYANOSIS, level: emergency, category: respiratory, title: 嘴唇或脸色发紫, all: [cyanosis]}
   - {id: EM-DYSPNEA-ONGOING, level: emergency, category: respiratory, title: 呼吸困难休息不缓解, all: [dyspnea, ongoing]}
   - {id: RF-DYSPNEA-WORSE, level: red_flag, category: respiratory, title: 气短比以前明显加重, all: [dyspnea, change_worse]}
+  - {id: EM-ASTHMA-NORELIEF, level: emergency, category: respiratory, title: 哮喘用了急救药仍不缓解, all: [asthma, reliever_fail]}
+  - {id: RF-ASTHMA, level: red_flag, category: respiratory, title: 运动中哮喘发作, all: [asthma]}
   # ---- 神经 ----
   - {id: EM-SEIZURE, level: emergency, category: neuro, title: 抽搐, all: [seizure]}
   - {id: EM-THUNDERCLAP, level: emergency, category: neuro, title: 突发剧烈头痛, all: [headache, sudden, severe]}
   - {id: RF-HEADACHE-SEVERE, level: red_flag, category: neuro, title: 剧烈头痛, all: [headache, severe]}
   - {id: EM-STROKE-SPEECH, level: emergency, category: neuro, title: 说话不清（卒中征象）, all: [speech]}
   - {id: EM-STROKE-WEAK, level: emergency, category: neuro, title: 一侧脸或肢体麻木无力（卒中征象）, all: [one_side_weak]}
+  - {id: EM-STROKE-VISION, level: emergency, category: neuro, title: 突然看不见或重影（卒中征象）, all: [vision_loss, sudden]}
+  - {id: EM-HEAD-INJURY, level: emergency, category: neuro, title: 头部受伤后呕吐、嗜睡等（CRT6 危险信号）, all: [head_injury, head_red]}
+  - {id: RF-HEAD-INJURY, level: red_flag, category: neuro, title: 头部受伤, all: [head_injury]}
   - {id: EM-CONFUSION, level: emergency, category: neuro, title: 意识不清, all: [confusion]}
   - {id: EM-CAUDA-BLADDER, level: emergency, category: neuro, title: 腰痛伴大小便失控（马尾综合征征象）, all: [back_pain, bladder_loss]}
   - {id: EM-CAUDA-SADDLE, level: emergency, category: neuro, title: 腰痛伴会阴发麻（马尾综合征征象）, all: [back_pain, saddle_numb]}
-  - {id: RF-SCIATICA, level: red_flag, category: neuro, title: 腰痛伴腿脚发麻, all: [back_pain, leg_numb]}
+
   # ---- 骨骼肌肉 ----
   - {id: EM-DARK-URINE, level: emergency, category: musculoskeletal, title: 尿色像酱油（疑似横纹肌溶解）, all: [dark_urine]}
   - {id: EM-JOINT-FEVER, level: emergency, category: musculoskeletal, title: 关节肿伴发烧（疑似关节感染）, all: [joint_swelling, fever]}
@@ -224,12 +296,21 @@ rules:
   - {id: RF-INJURY-CANT-BEAR, level: red_flag, category: musculoskeletal, title: 受伤后不能负重, all: [injury, cant_bear]}
   - {id: RF-FRACTURE, level: red_flag, category: musculoskeletal, title: 疑似骨折或脱位, all: [fracture_signs]}
   - {id: RF-NIGHT-PAIN, level: red_flag, category: musculoskeletal, title: 夜间疼醒, all: [night_pain]}
+  - {id: RF-SCIATICA, level: red_flag, category: musculoskeletal, title: 腰痛伴腿脚发麻（骨科 / 脊柱外科）, all: [back_pain, leg_numb]}
   # ---- 中暑、代谢 ----
   - {id: EM-HEAT-NOSWEAT, level: emergency, category: heat, title: 高温下不再出汗或体温很高, all: [heat_exposure, no_sweat_hot]}
+  - {id: EM-HEAT-CONFUSION, level: emergency, category: heat, title: 高温下意识不清, all: [heat_exposure, confusion]}
+  - {id: EM-HEAT-COLLAPSE, level: emergency, category: heat, title: 高温下晕倒, all: [heat_exposure, collapse]}
+  - {id: RF-HEAT-ILLNESS, level: red_flag, category: heat, title: 高温下恶心、头痛、抽筋等, all: [heat_exposure, heat_illness]}
   - {id: RF-HEAT-DIZZY, level: red_flag, category: heat, title: 高温下头晕, all: [heat_exposure, dizziness]}
   - {id: EM-HYPOGLYCEMIA, level: emergency, category: metabolic, title: 糖尿病人出现低血糖表现, all: [diabetes, hypo_signs]}
   # ---- 孕期 ----
-  - {id: EM-PREGNANCY, level: emergency, category: pregnancy, title: 孕期出血、腹痛等危险信号, all: [pregnancy, pregnancy_warning]}
+  - {id: EM-PREGNANCY, level: emergency, category: pregnancy, title: 孕期出血、腹痛、破水等危险信号, all: [pregnancy, pregnancy_warning]}
+  - {id: RF-PREGNANCY, level: red_flag, category: pregnancy, title: 孕期头晕、胸闷、小腿肿痛等, all: [pregnancy, pregnancy_caution]}
+  # ---- 消化道 ----
+  - {id: EM-HEMATEMESIS, level: emergency, category: abdominal, title: 吐血, all: [hematemesis]}
+  - {id: RF-GI-BLEED, level: red_flag, category: abdominal, title: 便血或黑便（补铁也会黑便）, all: [gi_bleed]}
+  - {id: RF-ABDOMEN, level: red_flag, category: abdominal, title: 腹部剧痛（减重针用户注意胰腺炎）, all: [abdominal_severe]}
   # ---- 进食障碍 ----
   - {id: EM-PURGE-COMPLICATION, level: emergency, category: eating_disorder, title: 催吐后心慌、头晕、抽筋（电解质紊乱）, all: [purge, purge_complication]}
   - {id: RF-PURGE, level: red_flag, category: eating_disorder, title: 催吐或用泻药, all: [purge]}
