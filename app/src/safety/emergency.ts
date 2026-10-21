@@ -33,6 +33,7 @@ export interface Negation {
   past_after: string | null;
   past_not_followed_by: string[];
   recurrence: string[];
+  recent: string[];
 }
 
 export interface LevelText {
@@ -85,14 +86,25 @@ export interface Assessment {
 const RANK: Record<Level, number> = { none: 0, red_flag: 1, emergency: 2 };
 
 // 统一文字（全角转半角、英文转小写）后按分句符号切开，再去掉空白；空分句丢弃。
-// 全角 ASCII（U+FF01–FF5E）转半角、全角空格转空格、英文字母转小写，其余字符不变。
+// 全角 ASCII（U+FF01–FF5E）转半角、全角空格转空格、小号与半角标点转常用写法、英文字母转小写，其余字符不变。
 // 不用 normalize("NFKC")：各运行环境的 Unicode 版本不同，结果会与服务端不一致。
+// 小号与半角标点转成对应的常用写法：｡ ﹐ ﹒ ﹔ ﹖ ﹗（与服务端 PUNCTUATION 相同）
+const PUNCTUATION: Record<number, number> = {
+  0xff61: 0x3002,
+  0xfe50: 0x2c,
+  0xfe52: 0x2e,
+  0xfe54: 0x3b,
+  0xfe56: 0x3f,
+  0xfe57: 0x21,
+};
+
 export function unify(text: string): string {
   let out = "";
   for (const ch of text) {
     let code = ch.codePointAt(0) ?? 0;
     if (code >= 0xff01 && code <= 0xff5e) code -= 0xfee0;
     else if (code === 0x3000) code = 0x20;
+    else code = PUNCTUATION[code] ?? code;
     if (code >= 0x41 && code <= 0x5a) code += 0x20;
     out += String.fromCodePoint(code);
   }
@@ -175,9 +187,11 @@ function symptomMatches(symptom: Symptom, clause: string, neg: Negation, pastCou
 export function assess(book: TermBook, text: string): Assessment {
   const parts = clauses(book, text);
   const neg = book.negation;
-  const pastCounts = parts.some((c) => neg.recurrence.some((w) => c.includes(w)));
+  // 再次发生的字样对整句起作用，近期字样只对它所在的分句起作用
+  const again = parts.some((c) => neg.recurrence.some((w) => c.includes(w)));
+  const marked = parts.map((c): [string, boolean] => [c, again || neg.recent.some((w) => c.includes(w))]);
   const present = new Set(
-    book.symptoms.filter((s) => parts.some((c) => symptomMatches(s, c, neg, pastCounts))).map((s) => s.id),
+    book.symptoms.filter((s) => marked.some(([c, r]) => symptomMatches(s, c, neg, r))).map((s) => s.id),
   );
   const fired = book.rules.filter((r) => r.all.every((s) => present.has(s)));
   let level: Level = "none";

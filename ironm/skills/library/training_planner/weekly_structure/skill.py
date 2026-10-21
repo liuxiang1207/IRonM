@@ -33,6 +33,7 @@ class StartParams(BaseModel):
     rpe_high: int
     cardio_start_min: int
     cardio_start_min_conservative: int
+    cardio_target_min: int  # 有氧起点的上限：当前已超过的按此值
     review_days: int
 
     @model_validator(mode="after")
@@ -44,6 +45,9 @@ class StartParams(BaseModel):
             raise ValueError("力量训练次数应满足 1 ≤ 默认 ≤ 最多 ≤ 7")
         if not 0 < self.reps_low <= self.reps_high or not 1 <= self.rpe_low <= self.rpe_high <= 10:
             raise ValueError("次数与 RPE 范围不合理")
+        floors = (self.cardio_start_min, self.cardio_start_min_conservative)
+        if not 0 < max(floors) <= self.cardio_target_min <= MAX_WEEK_MINUTES:
+            raise ValueError("有氧起点应满足 0 < 起点 ≤ 目标 ≤ 10080")
         return self
 
 
@@ -89,7 +93,7 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
     if not (valid and 0 <= current <= MAX_WEEK_MINUTES):  # type: ignore[operator]
         current = None
     base = current if isinstance(current, int) else 0
-    cardio = max(base + step, floor)
+    cardio = min(max(base + step, floor), p.cardio_target_min)
     cardio_cap = _max_limit(rules, "weekly_cardio_minutes")
     if cardio_cap is not None:
         cardio = min(cardio, int(cardio_cap))
@@ -135,10 +139,11 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
             to_value=cardio,
             reason_facts=(
                 f"当前每周运动：{current if isinstance(current, int) else '未知'} 分钟",
+                f"第一版有氧不超过每周 {p.cardio_target_min} 分钟",
                 f"每周有氧上限：{int(cardio_cap) if cardio_cap is not None else '无'}",
             ),
             rule_id=RULE,
-            expected_effect="逐步接近每周 250 分钟的减脂有氧目标",
+            expected_effect=f"逐步接近每周 {p.cardio_target_min} 分钟以内的减脂有氧目标",
             rollback_condition=rollback,
         ),
     ]

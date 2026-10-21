@@ -20,8 +20,9 @@ rules:
       rpe_high: 7
       cardio_start_min: 90
       cardio_start_min_conservative: 60  # B 与协作层
+      cardio_target_min: 300  # 有氧起点的上限：ACSM 减重立场每周 200–300 分钟；已超过的按此值（冲刺 2 复核 M4）
       review_days: 14
-    note: 有氧起点 = 当前每周运动分钟 + 安全官规则中按分层的每周增量（R-SF-TIER-LIMITS：A 30、B 20）；RPE 上限、每周有氧上限另受安全官约束，取更严者。
+    note: 有氧起点 = 当前每周运动分钟 + 安全官规则中按分层的每周增量（R-SF-TIER-LIMITS：A 30、B 20），不超过 cardio_target_min；RPE 上限、每周有氧上限另受安全官约束，取更严者。
 
   - id: R-EX-MINIMUM
     title: 最低任务

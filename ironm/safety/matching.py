@@ -29,8 +29,13 @@ _BP_HIGH_RE = re.compile(r"高压([0-9]+)")
 _BP_LOW_RE = re.compile(r"低压([0-9]+)")
 
 
+# 小号与半角标点转成对应的常用写法（冲刺 2 复核 N4）：｡ ﹐ ﹒ ﹔ ﹖ ﹗
+PUNCTUATION = {0xFF61: 0x3002, 0xFE50: 0x2C, 0xFE52: 0x2E, 0xFE54: 0x3B, 0xFE56: 0x3F, 0xFE57: 0x21}
+
+
 def unify(text: str) -> str:
-    """全角 ASCII（U+FF01–FF5E）转半角、全角空格转空格、英文字母转小写，其余字符不变。
+    """全角 ASCII（U+FF01–FF5E）转半角、全角空格转空格、小号与半角标点转常用写法、
+    英文字母转小写，其余字符不变（上标数字等不转）。
 
     不用 Unicode 规范化：不同运行环境的 Unicode 版本不同，结果会不一致（冲刺 2 末审查 L1）。
     App 离线版按同样的码点规则实现。
@@ -42,6 +47,8 @@ def unify(text: str) -> str:
             code -= 0xFEE0
         elif code == 0x3000:
             code = 0x20
+        else:
+            code = PUNCTUATION.get(code, code)
         if 0x41 <= code <= 0x5A:
             code += 0x20
         out.append(chr(code))
@@ -94,13 +101,15 @@ class Negation(ContractModel):
     # 说法后紧跟这个字：以前发生过（拒答词表等不需要时不写）
     past_after: Term | None = None
     past_not_followed_by: tuple[Term, ...] = ()  # 再接这些字时不是“以前发生过”（“晕倒过去”）
-    recurrence: tuple[Term, ...] = ()  # 句中有这些字样：以前发生过的也照常算
+    recurrence: tuple[Term, ...] = ()  # 句中任一分句有这些字样：以前发生过的也照常算（“又”）
+    # 同一分句里有这些字样才照常算（“今天晕倒过一次”）；“去年晕倒过，最近想减肥”不算
+    recent: tuple[Term, ...] = ()
 
     @model_validator(mode="after")
     def _check(self) -> Self:
         past = [] if self.past_after is None else [self.past_after]
         words = [*self.before, *self.exceptions, *past, *self.past_not_followed_by]
-        for word in [*words, *self.recurrence]:
+        for word in [*words, *self.recurrence, *self.recent]:
             check_term(word)
         return self
 
@@ -180,9 +189,10 @@ class Phrasebook(ContractModel):
         """这句话里出现的症状编号。"""
         parts = clauses(text)
         neg = self.negation
-        past_counts = any(w in c for c in parts for w in neg.recurrence)
+        again = any(w in c for c in parts for w in neg.recurrence)
+        marked = [(c, again or any(w in c for w in neg.recent)) for c in parts]
         return frozenset(
-            s.id for s in self.symptoms if any(s.matches(c, neg, past_counts) for c in parts)
+            s.id for s in self.symptoms if any(s.matches(c, neg, r) for c, r in marked)
         )
 
     def check_rules(self, rules: Iterable[tuple[str, tuple[str, ...]]]) -> None:

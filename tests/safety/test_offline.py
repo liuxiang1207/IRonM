@@ -14,6 +14,7 @@ import yaml
 
 from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH, assess, load_terms
+from ironm.safety.matching import PUNCTUATION, clauses
 from ironm.safety.offline import OFFLINE_PATH, render
 from ironm.safety.replies import four_section
 from tests.safety.test_emergency import (
@@ -46,9 +47,10 @@ def _random_texts(n: int) -> list[str]:
         *neg.before,
         *neg.exceptions,
         *neg.recurrence,
+        *neg.recent,
         neg.past_after,
         *neg.past_not_followed_by,
-        *"，。！？；、,.!? \n～~",
+        *"，。！？；、,.!? \n～~\uff61\ufe50\ufe52\ufe54\ufe56\ufe57",
         *["我", "今天", "跑步", "有点", "很", "了", "的", "也", "但是", "ＭＭＨＧ", "Ｂ"],
         *["血压", "高压", "低压", "190/120", "１８０／９０", "179/119", "1900/80", "12", "/"],
     ]
@@ -83,6 +85,7 @@ def _cases() -> list[str]:
     texts = [c["text"] for c in red_flags["cases"]]
     texts += [t for t, _ in PARAPHRASES] + ORDINARY + [t for t, _ in NEGATIONS] + UNIFIED
     texts += [t for t, _ in BLOOD_PRESSURE]
+    texts += [f"胸口痛{chr(c)}还在疼" for c in PUNCTUATION]  # 每个标点映射两边都要一致
     return texts + _random_texts(2000)
 
 
@@ -106,7 +109,9 @@ def test_offline_matches_server() -> None:
     for t in texts:
         a = assess(t)
         sections = [s.model_dump(mode="json") for s in four_section(replies, a)]
-        server.append({"assessment": a.model_dump(mode="json"), "sections": sections})
+        server.append(
+            {"assessment": a.model_dump(mode="json"), "sections": sections, "clauses": clauses(t)}
+        )
     mismatches = [(t, s, o) for t, s, o in zip(texts, server, offline, strict=True) if s != o]
     assert not mismatches, f"共 {len(mismatches)} 处不一致，例如：{mismatches[:3]}"
     # 随机句子确实覆盖到三种级别，比对才有意义

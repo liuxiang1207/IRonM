@@ -54,6 +54,11 @@ def test_slots_and_intensity() -> None:
         (Tier.B, 0, 60),
         (Tier.B, 50, 70),
         (Tier.A, 10**6, 90),
+        # 不超过每周 300 分钟的目标（冲刺 2 复核 M4）
+        (Tier.A, 280, 300),
+        (Tier.A, 300, 300),
+        (Tier.A, 10080, 300),
+        (Tier.A_PRIME, 600, 300),
     ],
 )
 def test_cardio_start(tier: Tier, current: int | None, minutes: int) -> None:
