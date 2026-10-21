@@ -6,7 +6,7 @@ description: 饮食模式：用户选过的优先，否则按饮食精度选，�
 triggers:
   intents: [goal.create, plan.adjust]
 applies_to:
-  scene_packs: [fat_loss]
+  scene_packs: [fat_loss, strength, fitness, habits, maintenance]
   population_tiers: [a, a_prime, b, collaborative]
 requires_data: [precision, current_plan, profile.diet_mode_preference]
 produces: [diet_mode]

@@ -6,7 +6,7 @@ description: 热量底线：给出每日热量目标的下限约束
 triggers:
   intents: [goal.create, review.biweekly, nutrition.plateau, plan.adjust]
 applies_to:
-  scene_packs: [fat_loss]
+  scene_packs: [fat_loss, strength, fitness, habits, maintenance]
   population_tiers: [a, a_prime, b, collaborative]
 requires_data: [profile.sex]
 produces: []

@@ -6,7 +6,7 @@ description: 饮食关系警示：有进食障碍史或信号时，不设热量�
 triggers:
   intents: [goal.create, review.weekly, review.biweekly, nutrition.plateau, plan.adjust]
 applies_to:
-  scene_packs: [fat_loss]
+  scene_packs: [fat_loss, strength, fitness, habits, maintenance]
   population_tiers: [a, a_prime, b, collaborative, c, d, not_applicable, paused]
   unknown_tier: true
 requires_data: [profile.conditions, profile.derived_conditions]

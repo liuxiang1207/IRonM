@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from ironm.contracts.agents import Constraint, Proposal
 from ironm.contracts.rules import RuleParamError
 from ironm.contracts.screening import SafetyFlag, Tier
+from ironm.contracts.skills import ScenePack
 from ironm.engine.rule_params import validate_rule_params
 from ironm.knowledge.baseline import BASELINE_PATH, BaselineLoadError, load_baseline
 from ironm.orchestrator.first_plan import first_plan
@@ -34,6 +35,7 @@ GYM, OLDER, PREGNANT, NEW = PERSONAS.values()
 
 def _plan(profile: dict[str, Any], **kw: Any) -> Any:
     skills = kw.pop("skills", SKILLS)
+    kw.setdefault("scene", ScenePack.FAT_LOSS)  # 冲刺 2 的用例按减脂目标写
     return first_plan(profile, as_of=AS_OF, tz=TZ, rulebook=BOOK, skills=skills, **kw)
 
 

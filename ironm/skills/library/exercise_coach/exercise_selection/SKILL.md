@@ -6,7 +6,7 @@ description: 选动作：把每个训练槽位落成具体动作，附要点与�
 triggers:
   intents: [goal.create, plan.adjust, training.too_tired]
 applies_to:
-  scene_packs: [fat_loss]
+  scene_packs: [fat_loss, strength, fitness, habits, maintenance]
   population_tiers: [a, a_prime, b, collaborative]
 requires_data: [current_plan, profile.environment, profile.restrictions, profile.training_level]
 produces: [exercise_selection, minimum_task, alternative_version]

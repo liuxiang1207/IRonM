@@ -6,7 +6,7 @@ description: 建档追问：找出分层与热量计算缺少的信息，按对�
 triggers:
   intents: [goal.create, profile.update, review.weekly]
 applies_to:
-  scene_packs: [fat_loss]
+  scene_packs: [fat_loss, strength, fitness, habits, maintenance]
   population_tiers: [a, a_prime, b, collaborative, c, d, not_applicable, paused]
   unknown_tier: true
 requires_data: [profile.conditions, profile.birth_date, profile.height_cm, profile.weight_kg, profile.sex, profile.activity, profile.waist_cm]

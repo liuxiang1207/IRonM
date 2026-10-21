@@ -46,8 +46,16 @@ def _pairs(limit: object, value: object) -> list[tuple[float, list[float]]]:
     raise _Uncomparable
 
 
+# 按星期几排的字段：取值是星期几的编号（0–6），上下限约束的是“每周几天”，比较天数
+DAY_LIST_FIELDS = frozenset({"weigh_in_days", "training_schedule"})
+
+
 def _violates(c: Constraint, value: object) -> bool:
     limit = deep_thaw(c.value)
+    if c.field in DAY_LIST_FIELDS and c.op in ("max", "min"):
+        if not isinstance(value, list | tuple):
+            raise _Uncomparable
+        value = len(value)
     if c.op == "exclude":
         if c.field == "daily_kcal_target" and limit == "deficit":
             return True  # 不设缺口：这时不给热量目标，按平常吃

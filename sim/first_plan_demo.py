@@ -5,6 +5,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from ironm.contracts.common import deep_thaw
+from ironm.contracts.skills import ScenePack
 from ironm.knowledge.baseline import default_baseline
 from ironm.orchestrator.first_plan import FirstPlan, first_plan
 from ironm.rules.loader import RULES_DIR, load_rules
@@ -109,7 +110,9 @@ def main() -> None:
     rulebook, skills = load_rules(RULES_DIR), load_skills()
     print("# 冲刺 2 演示：建档 → 筛查 → 追问 → 约束 → 提案 → 复核 → 第一版计划 → 依据卡 → 基线测试")
     for name, profile in PERSONAS.items():
-        result = first_plan(profile, as_of=AS_OF, tz=TZ, rulebook=rulebook, skills=skills)
+        result = first_plan(
+            profile, as_of=AS_OF, tz=TZ, rulebook=rulebook, skills=skills, scene=ScenePack.FAT_LOSS
+        )
         show(name, result)
 
 

@@ -36,6 +36,16 @@ class StartParams(BaseModel):
     cardio_start_min_conservative: int
     cardio_target_min: int  # 有氧起点的上限：当前已超过的按此值
     review_days: int
+    # 每周哪几天练（0 = 周一 … 6 = 周日）：days_N 是每周练 N 次时的安排
+    days_1: tuple[int, ...]
+    days_2: tuple[int, ...]
+    days_3: tuple[int, ...]
+    days_4: tuple[int, ...]
+    days_5: tuple[int, ...]
+
+    def schedule(self, n: int) -> tuple[int, ...]:
+        days: tuple[int, ...] = getattr(self, f"days_{n}")
+        return days
 
     @model_validator(mode="after")
     def _check(self) -> Self:
@@ -49,6 +59,12 @@ class StartParams(BaseModel):
         start, conservative = self.cardio_start_min, self.cardio_start_min_conservative
         if not 0 < conservative <= start <= self.cardio_target_min <= MAX_CARDIO_TARGET:
             raise ValueError("有氧起点应满足 0 < 保守起点 ≤ 起点 ≤ 目标 ≤ 600")
+        if self.strength_days_max > 5:
+            raise ValueError("训练日安排只写到每周 5 次")
+        for n in range(1, 6):
+            days = self.schedule(n)
+            if len(days) != n or len(set(days)) != n or not all(0 <= d <= 6 for d in days):
+                raise ValueError(f"每周练 {n} 次的安排应是 {n} 个不同的星期几（0–6）")
         return self
 
 
@@ -110,14 +126,27 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
     ]
     review = (view.as_of + timedelta(days=p.review_days)).date()
     rollback = "连续两周完成率低于一半，或训练后疼痛、过度疲劳时，回到更轻的安排并复核"
+    schedule = p.schedule(days)
+    weekdays = "、".join("一二三四五六日"[d] for d in schedule)
     changes = [
         Change(
             field="training_days_per_week",
             to_value=days,
             reason_facts=(f"可练天数：{available if isinstance(available, int) else '未知'}",),
             rule_id=RULE,
-            expected_effect="每周至少 2 天力量训练，保持减脂期的肌肉量",
+            expected_effect="每周至少 2 天力量训练，力量与肌肉量稳步提高",
             rollback_condition=rollback,
+        ),
+        Change(
+            field="training_schedule",
+            to_value=list(schedule),
+            reason_facts=(
+                f"每周 {days} 次：周{weekdays}",
+                "力量训练之间尽量隔开一天，留出恢复时间",
+            ),
+            rule_id=RULE,
+            expected_effect="固定的训练日更容易坚持",
+            rollback_condition="连续两周在安排的日子练不了时，按用户方便的日子重新安排",
         ),
         Change(
             field="session_slots",
@@ -144,7 +173,7 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
                 f"每周有氧上限：{int(cardio_cap) if cardio_cap is not None else '无'}",
             ),
             rule_id=RULE,
-            expected_effect=f"逐步接近每周 {p.cardio_target_min} 分钟以内的减脂有氧目标",
+            expected_effect=f"有氧逐步增加，不超过每周 {p.cardio_target_min} 分钟",
             rollback_condition=rollback,
         ),
     ]

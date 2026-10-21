@@ -6,7 +6,7 @@ description: 分层限制：按人群分层给出用力程度上限、有氧分�
 triggers:
   intents: [goal.create, review.weekly, review.biweekly, training.too_tired, plan.adjust]
 applies_to:
-  scene_packs: [fat_loss]
+  scene_packs: [fat_loss, strength, fitness, habits, maintenance]
   population_tiers: [a, a_prime, b, collaborative]
 requires_data: [tier]
 produces: []

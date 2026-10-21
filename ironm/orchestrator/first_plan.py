@@ -1,5 +1,7 @@
 """第一版计划（spec §31）：分层 → 追问 → 安全官约束 → 提案 → 复核 → 选动作 → 复核 → 计划。
 
+提案来自训练规划师、营养师、行为教练（称重、签到与提醒，spec [2026-10-21] §15）与动作教练。
+
 最后为每条通过的提案生成依据卡，并给出基线测试方案。演示链路：路由按固定顺序，不含意图识别、盲审与持久化。
 """
 
@@ -138,8 +140,12 @@ def first_plan(
     recent_injury: bool = False,
     flags: Iterable[SafetyFlag] = (),
     clearances: Iterable[datetime] = (),
+    scene: ScenePack = ScenePack.FITNESS,
 ) -> FirstPlan:
-    """flags / clearances：红旗记录与就医确认；有未确认的红旗时分层为暂停、不给计划。"""
+    """flags / clearances：红旗记录与就医确认；有未确认的红旗时分层为暂停、不给计划。
+
+    scene：按用户选的目标匹配 Skill（默认健身；只有减脂才有热量缺口，spec §34）。
+    """
     profile = _clean(profile)
     screening = _screening(profile, flags, clearances)
     tier = classify(screening, as_of=as_of, tz=tz, rulebook=rulebook)
@@ -157,7 +163,7 @@ def first_plan(
     outputs: list[AgentOutput] = []
 
     def run(agent: AgentId, snap: Snapshot) -> tuple[AgentOutput, ...]:
-        sel = select(skills, agent=agent, intent="goal.create", scene=ScenePack.FAT_LOSS, tier=tier)
+        sel = select(skills, agent=agent, intent="goal.create", scene=scene, tier=tier)
         result = Agent(agent).execute(snap, sel, rulebook)
         outputs.extend(result)
         return result
@@ -195,6 +201,7 @@ def first_plan(
     with_rules = _snapshot(profile, tier, as_of, tz, constraints)
     review(run(AgentId.TRAINING_PLANNER, with_rules))
     review(run(AgentId.NUTRITIONIST, with_rules))
+    review(run(AgentId.BEHAVIOR_COACH, with_rules))  # 称重日、签到日与提醒时间
     used = {
         o.skill.split("@")[0]: o.skill.split("@")[1]
         for o in outputs

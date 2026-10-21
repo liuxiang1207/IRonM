@@ -49,6 +49,7 @@ from ironm.orchestrator.chat import (
 )
 from ironm.orchestrator.domains import DOMAIN_RULE, DomainParams
 from ironm.orchestrator.intent import INTENT_RULE, IntentParams, load_intent_book
+from ironm.orchestrator.onboarding import Intake, history_view, onboard, plan_view, today_tasks
 from ironm.orchestrator.pages import PAGE_INTENTS, PageContext
 from ironm.orchestrator.qa import RunRecord
 from ironm.rules.loader import load_rules
@@ -62,6 +63,7 @@ from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.memory import MemoryStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
+from ironm.store.plans import PlanStore, VersionConflict
 from ironm.store.safety import ModelCallStore, RunStore, SafetyFlagStore
 
 log = get_logger("ironm.api")
@@ -250,7 +252,8 @@ def create_app(
     )
     load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
     # Skill 头信息与它们用到的规则参数：启动时校验（spec §28、§30）
-    validate_skill_rules(load_skills(skills_dir), rulebook)
+    skills = load_skills(skills_dir)
+    validate_skill_rules(skills, rulebook)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -559,6 +562,68 @@ def create_app(
             log.info("events.submitted", event_id=r["event_id"], status=r["status"])  # type: ignore[arg-type]
         log.info("events.batch_submitted", count=len(items), duration_ms=_ms(start))
         return JSONResponse(status_code=200, content={"results": ordered})
+
+    @app.post("/onboarding")
+    def onboarding(
+        body: Annotated[bytes, Depends(raw_body)],
+        user: Annotated[str, Depends(current_user)],
+        tz: str = "Asia/Shanghai",
+    ) -> JSONResponse:
+        """建档并生成第一版计划（spec [2026-10-21] §15）：计划、需要补充的信息或不能给计划。"""
+        zone = _zone(tz)
+        if zone is None:
+            return _invalid([_TZ_INVALID])
+        try:
+            raw = json.loads(body)
+            if not isinstance(raw, dict):
+                raise ValueError("请求体应是对象")
+            intake = Intake.from_request(raw)
+        except ValidationError as e:
+            return _invalid(_errors(e))
+        except ValueError:
+            return _invalid([{"loc": ["body"], "msg": "资料格式不对", "type": "invalid_body"}])
+        with closing(connect(settings.db_path)) as conn:
+            try:
+                result = onboard(
+                    user,
+                    intake,
+                    memory=MemoryStore(conn),
+                    plans=PlanStore(conn),
+                    flags=SafetyFlagStore(conn, id_gen).for_user(user),
+                    rulebook=rulebook,
+                    skills=skills,
+                    as_of=clock.now(),
+                    tz=zone,
+                )
+            except VersionConflict:
+                log.info("plan.onboarding", status="conflict")
+                return JSONResponse(status_code=409, content={"status": "conflict"})
+        log.info("plan.onboarding", status=result["status"])
+        return JSONResponse(content=result)
+
+    @app.get("/plan")
+    def get_plan(user: Annotated[str, Depends(current_user)]) -> JSONResponse:
+        with closing(connect(settings.db_path)) as conn:
+            stored = PlanStore(conn).latest(user)
+        if stored is None:
+            return JSONResponse(content={"status": "none"})
+        return JSONResponse(content={"status": "ok", "plan": plan_view(stored)})
+
+    @app.get("/plan/history")
+    def get_plan_history(user: Annotated[str, Depends(current_user)]) -> JSONResponse:
+        with closing(connect(settings.db_path)) as conn:
+            stored = PlanStore(conn).history(user)
+        return JSONResponse(content=history_view(stored))
+
+    @app.get("/plan/today")
+    def get_plan_today(tz: str, user: Annotated[str, Depends(current_user)]) -> JSONResponse:
+        """今日任务：按当前计划与用户时区的当天日期（spec §15）。"""
+        zone = _zone(tz)
+        if zone is None:
+            return _invalid([_TZ_INVALID])
+        with closing(connect(settings.db_path)) as conn:
+            stored = PlanStore(conn).latest(user)
+        return JSONResponse(content=today_tasks(stored, clock.now().astimezone(zone).date()))
 
     @app.get("/energy/today")
     def energy_today_view(

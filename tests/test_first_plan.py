@@ -11,6 +11,7 @@ import pytest
 from ironm.contracts.agents import Constraint, Proposal
 from ironm.contracts.common import deep_thaw
 from ironm.contracts.plan import PlanField
+from ironm.contracts.skills import ScenePack
 from ironm.orchestrator.evidence import EvidenceError, resolve_source
 from ironm.orchestrator.first_plan import FirstPlan, first_plan
 from ironm.orchestrator.review import review_proposal
@@ -27,6 +28,8 @@ GYM, OLDER, PREGNANT, NEW = PERSONAS.values()
 
 
 def _run(profile: dict[str, Any], **kw: Any) -> FirstPlan:
+    # 冲刺 2 的用例按减脂目标写（含热量目标）；健身等其他目标见文件末尾
+    kw.setdefault("scene", ScenePack.FAT_LOSS)
     return first_plan(profile, as_of=AS_OF, tz=TZ, rulebook=BOOK, skills=SKILLS, **kw)
 
 
@@ -111,6 +114,10 @@ def test_a_tier_full_plan_with_cards() -> None:
         "daily_kcal_target",
         "daily_protein_g_target",
         "diet_mode",
+        "training_schedule",  # spec [2026-10-21] §15：每周哪几天练、称重日、签到日与提醒
+        "weigh_in_days",
+        "checkin_day",
+        "reminder_schedule",
     }
     # 每条进入计划的提案都有依据卡，依据都有来源与审定状态
     assert {c.field.value for c in result.cards} == set(result.plan.fields)
@@ -224,9 +231,65 @@ def test_rejected_proposal_not_in_plan_and_has_no_card(tmp_path: Path) -> None:
     (folder / "SKILL.md").write_text(EXCLUDE_HABIT, encoding="utf-8")
     (folder / "skill.py").write_text(EXCLUDE_HABIT_RUN, encoding="utf-8")
     skills = (*SKILLS, *load_skills(tmp_path))
-    result = first_plan(GYM, as_of=AS_OF, tz=TZ, rulebook=BOOK, skills=skills)
+    result = first_plan(
+        GYM, as_of=AS_OF, tz=TZ, rulebook=BOOK, skills=skills, scene=ScenePack.FAT_LOSS
+    )
     rejected = [v for v in result.verdicts if v.result == "reject"]
     assert [v.proposal_id for v in rejected] == ["diet_mode:diet_mode"]
     assert rejected[0].reason_code == "violates:R-NU-DIET-MODE:diet_mode:exclude"
     assert result.plan is not None and PlanField.DIET_MODE not in result.plan.fields
     assert "diet_mode" not in {c.field.value for c in result.cards}
+
+
+# ---- 健身为主（spec §34）：按目标匹配 Skill，只有减脂才有热量缺口 ----
+
+
+@pytest.mark.parametrize(
+    "scene", [ScenePack.FITNESS, ScenePack.STRENGTH, ScenePack.HABITS, ScenePack.MAINTENANCE]
+)
+def test_non_fat_loss_goals_get_full_training_plan_without_calorie_target(
+    scene: ScenePack,
+) -> None:
+    result = _run(GYM, scene=scene)
+    assert result.plan is not None
+    fields = set(result.plan.fields)
+    assert {PlanField.TRAINING_DAYS_PER_WEEK, PlanField.SESSION_SLOTS} <= fields
+    assert {PlanField.EXERCISE_SELECTION, PlanField.DIET_MODE} <= fields
+    assert PlanField.DAILY_KCAL_TARGET not in fields  # 没选减脂：不给热量缺口与热量目标
+
+
+def test_default_scene_is_fitness() -> None:
+    result = first_plan(GYM, as_of=AS_OF, tz=TZ, rulebook=BOOK, skills=SKILLS)
+    assert result.plan is not None and PlanField.DAILY_KCAL_TARGET not in result.plan.fields
+    assert _run(GYM).plan is not None
+    assert PlanField.DAILY_KCAL_TARGET in _run(GYM).plan.fields  # type: ignore[union-attr]
+
+
+def test_plan_has_schedule_weigh_in_and_checkin() -> None:
+    plan = _run(GYM, scene=ScenePack.FITNESS).plan
+    assert plan is not None
+    fields = {k.value: deep_thaw(v) for k, v in plan.fields.items()}
+    assert fields["training_schedule"] == [0, 2, 4]  # 可练 5 天 → 每周 3 次：周一、三、五
+    assert fields["weigh_in_days"] == [0, 3] and fields["checkin_day"] == 6
+
+
+def test_weigh_in_cap_counts_days_not_weekday_numbers() -> None:
+    """进食障碍史：每周最多称 1 次——比的是天数，周四（编号 3）不会被当成超过 1。"""
+    from ironm.orchestrator.review import review_proposal
+
+    cap = Constraint.model_validate_json(
+        json.dumps({"field": "weigh_in_days", "op": "max", "value": 1, "rule_id": "R-SF-EATING",
+                    "reason_code": "eating_relationship_weigh_weekly_at_most"})
+    )  # fmt: skip
+
+    def proposal(days: list[int]) -> Proposal:
+        return Proposal.model_validate_json(
+            json.dumps({"proposal_id": "routine:weigh_in_days", "field": "weigh_in_days",
+                        "from_value": None, "to_value": days, "reason_facts": ["x"],
+                        "rule_id": "R-HB-ROUTINE", "expected_effect": "x",
+                        "rollback_condition": "x", "review_date": "2026-11-18",
+                        "evidence_ids": []})
+        )  # fmt: skip
+
+    assert review_proposal(proposal([3]), [cap]).result == "pass"
+    assert review_proposal(proposal([0, 3]), [cap]).result == "reject"
