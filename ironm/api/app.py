@@ -5,7 +5,7 @@ import os
 import re
 import sys
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import asynccontextmanager, closing
 from datetime import timedelta
 from pathlib import Path
@@ -28,7 +28,10 @@ from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.knowledge.baseline import BASELINE_PATH, load_baseline
 from ironm.knowledge.exercises import LIBRARY_PATH, load_library
-from ironm.orchestrator.chat import MAX_TEXT_CHARS, ChatDeps, respond
+from ironm.llm.config import load_models
+from ironm.llm.gateway import Gateway
+from ironm.orchestrator.chat import MAX_TEXT_CHARS, ChatDeps, load_answer_texts, respond
+from ironm.orchestrator.intent import INTENT_RULE, IntentParams, load_intent_book
 from ironm.rules.loader import load_rules
 from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
@@ -38,7 +41,7 @@ from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
-from ironm.store.safety import SafetyFlagStore
+from ironm.store.safety import ModelCallStore, SafetyFlagStore
 
 log = get_logger("ironm.api")
 
@@ -158,6 +161,7 @@ def create_app(
     baseline_path: Path = BASELINE_PATH,
     skills_dir: Path = SKILLS_DIR,
     ids: IdGenerator | None = None,
+    environ: Mapping[str, str] | None = None,
 ) -> FastAPI:
     """配置、规则表、安全文件、动作库或 Skill 有误时在这里直接失败。
 
@@ -169,6 +173,12 @@ def create_app(
     # 急症词表、拒答词表与回答模板：启动时校验并互相核对（spec §21–24）
     kit = load_kit(terms_path, refusals_path, replies_path)
     id_gen = ids or RandomIdGenerator()
+    # 问答链路（spec [2026-10-21] §2–§4）：模型配置、意图词表与参数、固定说法，启动时校验
+    models = load_models(settings.models_path)
+    intents = load_intent_book()
+    rulebook.get(INTENT_RULE).params_as(IntentParams)
+    texts = load_answer_texts()
+    env = os.environ if environ is None else environ
     load_library(library_path)  # 动作库：启动时校验（spec §27）
     load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
     # Skill 头信息与它们用到的规则参数：启动时校验（spec §28、§30）
@@ -216,10 +226,22 @@ def create_app(
         with closing(connect(settings.db_path)) as conn:
             flags = SafetyFlagStore(conn, id_gen)
 
+            calls = ModelCallStore(conn)
+
             def record_flag(u: str, req: str, flag: SafetyFlag) -> None:
                 flags.add(u, req, flag)
 
-            deps = ChatDeps(kit=kit, clock=clock, ids=id_gen, record_flag=record_flag)
+            gateway = Gateway(models, environ=env, clock=clock, ids=id_gen, record=calls.add)
+            deps = ChatDeps(
+                kit=kit,
+                clock=clock,
+                ids=id_gen,
+                record_flag=record_flag,
+                intents=intents,
+                rulebook=rulebook,
+                texts=texts,
+                gateway=gateway,
+            )
             reply = respond(user, request.text, deps)
         return JSONResponse(content=reply.model_dump(mode="json"))
 

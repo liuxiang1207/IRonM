@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=../schemas/rule_set.schema.json
+# 问答链路（spec [2026-10-21] §4）：意图识别的置信度与追问门槛。改动后须同时改 tests/test_intent.py。
+# 2026-10-21 由 Claude 受项目负责人委托设定，属设计取舍；逐项记录见 spec/review_log.md。
+rule_set: chat
+version: 2026.10.1
+rules:
+  - id: R-QA-INTENT
+    title: 意图识别的置信度与追问
+    status: approved
+    source: {kind: design}
+    params:
+      rule_conf_clear: 0.85  # 词表命中 2 个以上说法且领先第二名
+      rule_conf_single: 0.7  # 只命中 1 个说法、且没有并列
+      rule_conf_tie: 0.45  # 两个意图命中数相同
+      clarify_below: 0.5  # 合并后低于此值、又归不进任何领域：追问
+      clarify_min_chars: 3  # 消息至少这么多个字才追问（“好”“嗯”不追问）
+    note: 词表与模型都给出结果时取置信度高者，相同时取词表；身体不适、特殊人群两类关注点取两者之并，只升不降。

@@ -1,0 +1,75 @@
+# 意图测试集（spec [2026-10-21] §4）：每个意图至少 5 句。concerns 为应标出的关注点（可省略）。
+cases:
+  exercise_technique:
+    - {text: 深蹲的时候膝盖总是内扣怎么办}
+    - {text: 硬拉怎么发力才不伤腰}
+    - {text: 卧推握距多宽合适}
+    - {text: 引体向上做不了一个怎么练}
+    - {text: 俯卧撑标准吗，我的姿势是不是塌腰了}
+    - {text: 深蹲时膝盖疼怎么办, concerns: [discomfort]}
+  training_knowledge:
+    - {text: 增肌一周练几次比较好}
+    - {text: 先有氧还是先力量训练}
+    - {text: 每个动作做几组几次合适}
+    - {text: hiit和慢跑哪个更好}
+    - {text: 心率区间怎么算，配速要不要控制}
+  plan:
+    - {text: 帮我把每周训练改成5天}
+    - {text: 今天练什么}
+    - {text: 下周练的安排能不能调整一下}
+    - {text: 课表里的动作能换成哑铃吗}
+    - {text: 这周想加量，计划怎么改}
+  nutrition:
+    - {text: 晚饭吃什么比较好}
+    - {text: 一天要吃多少蛋白质}
+    - {text: 点外卖怎么选}
+    - {text: 晚上饿了能吃宵夜吗}
+    - {text: 奶茶的热量有多高}
+  supplements_drugs:
+    - {text: 肌酸要怎么吃}
+    - {text: 蛋白粉和肌酸可以一起喝吗}
+    - {text: 左旋肉碱有用吗}
+    - {text: 鱼油和维生素d需要补吗}
+    - {text: 打了减重针还能练吗, concerns: [special_population]}
+  personal_data:
+    - {text: 我的体重这两周为什么没变}
+    - {text: 体脂的趋势怎么样}
+    - {text: 是不是到平台期了，掉秤很慢}
+    - {text: 看一下我的进展数据}
+    - {text: 这周的完成率怎么样}
+  logging:
+    - {text: 帮我记一下，今天吃了两个包子}
+    - {text: 刚称了一下，65公斤}
+    - {text: 记录一下，刚练完腿}
+    - {text: 打卡，今天跑了5公里}
+    - {text: 刚吃了一碗面，帮我记}
+  recovery_sleep:
+    - {text: 最近睡不好，会影响增肌吗}
+    - {text: 练完第二天浑身酸痛正常吗, concerns: [discomfort]}  # 宁可让安全官参与
+    - {text: 休息日要不要做放松}
+    - {text: 泡沫轴怎么用来恢复}
+    - {text: 最近总是很累没精神}
+  habit_motivation:
+    - {text: 总是坚持不下来怎么办}
+    - {text: 最近很懒不想练}
+    - {text: 工作太忙没时间练}
+    - {text: 怎么养成运动习惯}
+    - {text: 三天打鱼两天晒网，想放弃了}
+  wellness:
+    - {text: 泡脚能养生吗}
+    - {text: 喝枸杞水有什么用}
+    - {text: 中医说我体寒，适合练什么}
+    - {text: 断食排毒有用吗}
+    - {text: 艾灸能祛湿吗}
+  chitchat:
+    - {text: 你好}
+    - {text: 谢谢你}
+    - {text: 早上好}
+    - {text: 你是谁}
+    - {text: 在吗}
+  out_of_scope:
+    - {text: 今天天气怎么样}
+    - {text: 推荐一只股票}
+    - {text: 帮我写代码}
+    - {text: 最近有什么好看的电影}
+    - {text: 帮我翻译一段英文}

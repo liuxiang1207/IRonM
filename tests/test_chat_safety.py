@@ -16,7 +16,9 @@ from ironm.contracts.screening import SafetyFlag
 from ironm.core.clock import FixedClock
 from ironm.core.config import load_settings
 from ironm.core.ids import SeededIdGenerator
-from ironm.orchestrator.chat import ChatDeps, respond
+from ironm.orchestrator.chat import ChatDeps, load_answer_texts, respond
+from ironm.orchestrator.intent import load_intent_book
+from ironm.rules.loader import RULES_DIR, load_rules
 from ironm.safety.decision import default_kit
 from ironm.store.db import connect
 from ironm.store.safety import SafetyFlagStore
@@ -30,6 +32,9 @@ def _deps(flags: list[tuple[str, str, SafetyFlag]]) -> ChatDeps:
         clock=FixedClock(NOW),
         ids=SeededIdGenerator(7),
         record_flag=lambda user, req, flag: flags.append((user, req, flag)),
+        intents=load_intent_book(),
+        rulebook=load_rules(RULES_DIR),
+        texts=load_answer_texts(),
     )
 
 
@@ -84,7 +89,8 @@ def test_reply_never_contains_user_text() -> None:
 def client(tmp_path: Path) -> Iterator[tuple[TestClient, Path, io.StringIO]]:
     db = tmp_path / "db.sqlite"
     logs = io.StringIO()
-    app = create_app(load_settings({"IRONM_DB_PATH": str(db)}), FixedClock(NOW), log_stream=logs)
+    settings = load_settings({"IRONM_DB_PATH": str(db)})
+    app = create_app(settings, FixedClock(NOW), log_stream=logs, environ={})
     with TestClient(app, headers={"X-IronM-User": "u1"}) as c:
         yield c, db, logs
 
@@ -126,6 +132,7 @@ def test_chat_endpoint_rejects_bad_text(
 
 
 def test_chat_endpoint_requires_user(tmp_path: Path) -> None:
-    app = create_app(load_settings({"IRONM_DB_PATH": str(tmp_path / "db.sqlite")}), FixedClock(NOW))
+    settings = load_settings({"IRONM_DB_PATH": str(tmp_path / "db.sqlite")})
+    app = create_app(settings, FixedClock(NOW), environ={})
     with TestClient(app) as c:
         assert c.post("/chat", json={"text": "你好"}).status_code == 401
