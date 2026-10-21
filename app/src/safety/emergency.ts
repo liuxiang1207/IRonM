@@ -19,7 +19,7 @@ export interface Symptom {
   not_followed_by: string[];
   not_preceded_by: string[];
   not_in_clause_with: string[];
-  context: boolean;
+  modifier: boolean;
 }
 
 export interface EmergencyRule {
@@ -28,7 +28,7 @@ export interface EmergencyRule {
   category: string;
   title: string;
   all: string[];
-  within: "clause" | "nearby" | "sentence";
+  within: "clause" | "sentence";
 }
 
 export interface Negation {
@@ -206,20 +206,24 @@ function pastCountsAt(neg: Negation, parts: string[], i: number): boolean {
   return again || (near && (here || !has(clause, neg.remote)));
 }
 
-// 条目是否成立：背景状况整句任何位置出现即可，其余症状须在条目范围内同时出现（与 TermBook.fires 对应）
+// 修饰词与核心症状之间最多相隔的分句数（与服务端 MODIFIER_REACH 相同）
+const MODIFIER_REACH = 2;
+
+// 条目是否成立（与 TermBook.fires 对应）：clause 全部在同一分句；sentence 整句任何位置，
+// 但修饰词须在某个核心症状前后 MODIFIER_REACH 个分句以内
 function fires(book: TermBook, rule: EmergencyRule, perClause: Set<string>[]): boolean {
-  const union = (sets: Set<string>[]) => new Set(sets.flatMap((x) => [...x]));
-  const anywhere = union(perClause);
-  const context = new Set(book.symptoms.filter((s) => s.context).map((s) => s.id));
-  if (!rule.all.filter((s) => context.has(s)).every((s) => anywhere.has(s))) return false;
-  const acute = rule.all.filter((s) => !context.has(s));
-  let windows: Set<string>[];
-  if (rule.within === "sentence") windows = [anywhere];
-  else {
-    const size = rule.within === "clause" ? 1 : 2;
-    windows = perClause.map((_, i) => union(perClause.slice(i, i + size)));
+  if (rule.within === "clause") return perClause.some((f) => rule.all.every((s) => f.has(s)));
+  if (!rule.all.every((s) => perClause.some((f) => f.has(s)))) return false;
+  const modifiers = new Set(book.symptoms.filter((s) => s.modifier).map((s) => s.id));
+  const mods = rule.all.filter((s) => modifiers.has(s));
+  const core = rule.all.filter((s) => !modifiers.has(s));
+  if (mods.length === 0) return true;
+  for (let i = 0; i < perClause.length; i++) {
+    if (core.length > 0 && !core.some((s) => perClause[i].has(s))) continue;
+    const near = new Set(perClause.slice(Math.max(0, i - MODIFIER_REACH), i + MODIFIER_REACH + 1).flatMap((f) => [...f]));
+    if (mods.every((s) => near.has(s))) return true;
   }
-  return windows.some((w) => acute.every((s) => w.has(s)));
+  return false;
 }
 
 export function assess(book: TermBook, text: string): Assessment {

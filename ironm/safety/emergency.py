@@ -41,9 +41,14 @@ type Level = Literal["emergency", "red_flag", "none"]
 _RANK: dict[Level, int] = {"none": 0, "red_flag": 1, "emergency": 2}
 
 
+# 修饰词与核心症状之间最多相隔的分句数（“头疼，是突然开始的，疼得从来没这么厉害”）
+MODIFIER_REACH = 2
+
+
 class EmergencyRule(ContractModel):
-    """all 中的症状都出现时给出 level。范围 within（背景状况不受限制，整句任何位置都算）：
-    clause 同一分句；nearby 同一分句或相邻两个分句（默认）；sentence 整句。
+    """all 中的症状都出现时给出 level。范围 within：
+    sentence（默认）整句任何位置，但修饰词须在某个核心症状前后 MODIFIER_REACH 个分句以内；
+    clause 全部在同一分句。
     """
 
     id: Annotated[str, Field(pattern=r"^(EM|RF)-[A-Z0-9]+(-[A-Z0-9]+)*$")]
@@ -51,7 +56,7 @@ class EmergencyRule(ContractModel):
     category: Term
     title: Term
     all: tuple[Term, ...] = Field(min_length=1)
-    within: Literal["clause", "nearby", "sentence"] = "nearby"
+    within: Literal["clause", "sentence"] = "sentence"
 
     @model_validator(mode="after")
     def _check(self) -> Self:
@@ -80,17 +85,23 @@ class TermBook(Phrasebook):
         return self
 
     def fires(self, rule: EmergencyRule, per_clause: list[frozenset[str]]) -> bool:
-        anywhere = frozenset().union(*per_clause)
-        context = {s.id for s in self.symptoms if s.context}
-        if not all(s in anywhere for s in rule.all if s in context):
+        if rule.within == "clause":
+            return any(all(s in found for s in rule.all) for found in per_clause)
+        if not all(any(s in found for found in per_clause) for s in rule.all):
             return False
-        acute = [s for s in rule.all if s not in context]
-        if rule.within == "sentence":
-            windows = [anywhere]
-        else:
-            size = 1 if rule.within == "clause" else 2
-            windows = [frozenset().union(*per_clause[i : i + size]) for i in range(len(per_clause))]
-        return any(all(s in w for s in acute) for w in windows)
+        modifiers = {s.id for s in self.symptoms if s.modifier}
+        mods = [s for s in rule.all if s in modifiers]
+        core = [s for s in rule.all if s not in modifiers]
+        if not mods:
+            return True
+        # 以任一含核心症状的分句为中心，修饰词都在前后 MODIFIER_REACH 个分句以内
+        anchors = [i for i, f in enumerate(per_clause) if not core or any(s in f for s in core)]
+        for i in anchors:
+            lo, hi = max(0, i - MODIFIER_REACH), i + MODIFIER_REACH + 1
+            near = frozenset().union(*per_clause[lo:hi])
+            if all(s in near for s in mods):
+                return True
+        return False
 
     def assess(self, text: str) -> Assessment:
         per_clause = self.present_by_clause(text)

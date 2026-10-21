@@ -19,6 +19,7 @@ from ironm.safety.offline import OFFLINE_PATH, render
 from ironm.safety.replies import four_section
 from tests.safety.test_emergency import (
     BLOOD_PRESSURE,
+    FAR_MODIFIERS,
     NEGATIONS,
     ORDINARY,
     PARAPHRASES,
@@ -88,6 +89,7 @@ def _cases() -> list[str]:
     texts = [c["text"] for c in red_flags["cases"]]
     texts += [t for t, _ in PARAPHRASES] + ORDINARY + [t for t, _ in NEGATIONS] + UNIFIED
     texts += [t for t, _ in BLOOD_PRESSURE] + [t for t, _ in TRADEOFFS]
+    texts += [t for t, _ in FAR_MODIFIERS]
     texts += [f"胸口痛{chr(c)}还在疼" for c in PUNCTUATION]  # 每个标点映射两边都要一致
     return texts + _random_texts(2000)
 

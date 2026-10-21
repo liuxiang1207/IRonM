@@ -3,9 +3,9 @@
 # 两层：
 #   symptoms 症状：terms 任一说法出现即命中；combos 每项是几组词，同一分句里每组都出现才命中；
 #            blood_pressure 按数值判断（同一分句里要有 context 中的字样）。
-#   rules 判定条目：all 中的症状都出现时给出 level，多条命中取最高一级。within 是范围：
-#            nearby（默认）同一分句或相邻两个分句，clause 同一分句，sentence 整句；
-#            标了 context 的背景状况（怀孕、糖尿病、高温等）整句任何位置出现都算。
+#   rules 判定条目：all 中的症状都出现时给出 level，多条命中取最高一级。范围 within：
+#            sentence（默认）整句任何位置，但标了 modifier 的修饰词（突然、持续、很厉害等）
+#            须在某个核心症状前后 2 个分句以内；clause 全部在同一分句。
 # 说法要写成统一后的形式：半角、小写、不含空白与分句符号。
 # 依据：ACSM 运动前健康筛查（第 10 版）的症状清单；AHA 心脏病发作与卒中（BE FAST）警示信号；
 #       中暑、低血糖、横纹肌溶解、马尾综合征、深静脉血栓、孕期危险信号（ACOG 804）的通行就医标准；
@@ -13,7 +13,7 @@
 # 每个症状可写 not_followed_by / not_preceded_by：说法后紧跟、前面紧挨着这些字时这一处不算
 # （如“吃完就吐”后接“槽”、“快晕过去”）；not_in_clause_with：分句里有这些字样时这个症状在该分句不算
 # （如放射痛的分句里有“练、酸”）。
-version: "1.5"
+version: "1.6"
 review: approved
 
 # 否定与“以前发生过”：只取消紧挨着的一处说法；拿不准时按出现处理。血压数值不受影响。
@@ -55,20 +55,25 @@ symptoms:
   - id: cold_sweat
     name: 出冷汗
     terms: [冷汗, 虚汗, 大汗淋漓]
+  - id: heavy_sweat
+    name: 出了一身汗（非运动）
     combos:
       - [[出了一身, 一身], [汗]]
-    not_in_clause_with: [跑, 练, 运动, 热, 健身, 骑, 跳, 动作, 训练]  # 运动出汗不算
+    not_in_clause_with: [跑, 练, 运动, 热, 健身, 骑, 跳, 动作, 训练]  # 运动出汗不算；只作用于这一说法，不影响“冷汗”
   - id: ongoing
     name: 正在持续、休息不缓解或加重
+    modifier: true  # 修饰词：须在核心症状前后 2 个分句以内
     # 不单用“还在”：“我还在坚持跑步”“现在还在喘”不是症状持续
     # 不单用“持续”：“健身持续了三个月”（第四轮复核）
     terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 还闷, 还是疼, 还是痛, 一直疼, 一直痛, 一直闷, 到现在, 不缓解, 没有缓解, 不见缓解, 休息了也, 也不行, 没缓解, 不见好, 没好转, 还没好, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
     combos:
       - [[持续], [分钟, 小时, 不断, 不停]]
+    not_in_clause_with: [体重, 瘦, 胖, 减]  # “到现在体重还没降”
   - id: sudden
     name: 突然发生
+    modifier: true  # 修饰词：须在核心症状前后 2 个分句以内
     terms: [突然, 一下子, 猛地, 突发]
-    not_in_clause_with: [想起, 想到, 发现, 突然想]  # “突然想起来没吃药”说的不是症状
+    not_in_clause_with: [想起, 想到, 突然想]  # “突然想起来没吃药”说的不是症状；不含“发现”（“突然发现一只眼睛看不见了”）
   - id: collapse
     name: 晕倒或意识丧失
     # 不用“倒在地上”“栽倒”：“练完腿直接倒在地上”“滑了一跤栽倒了”多是累了或摔了（冲刺 2 第二轮复核）
@@ -76,13 +81,14 @@ symptoms:
     combos:
       - [[地上], [一动不动, 不动了, 没反应, 没有反应]]
       - [[他, 她, 人], [失去知觉]]  # “手指失去知觉”是麻木
-    not_preceded_by: [快, 快要, 差点, 差一点, 险些]  # “快晕过去了”见眼前发黑（红旗）
+    # “做到快晕过去了”见眼前发黑（红旗）；“跑得太快晕倒了”照常算
+    not_preceded_by: [快要, 到快, 都快, 就快, 得快, 我快, 人快, 差点, 差一点, 险些]
     not_followed_by: [就睡, 睡]  # “到家直接倒下就睡”
   - id: unconscious
     name: 叫不醒
     terms: [叫不醒, 喊不醒, 叫不应, 喊不应, 拍不醒]
     not_followed_by: [我]  # “闹钟喊不醒我”
-    not_in_clause_with: [闹钟, 起床, 睡懒觉, 每天, 赖床]
+    not_in_clause_with: [闹钟, 睡懒觉, 每天, 赖床]  # 不含“起床”：“早上起床发现我爸叫不醒”
   - id: collapse_fell
     name: 突然倒了
     terms: [突然倒了, 一下子倒了]
@@ -96,12 +102,16 @@ symptoms:
     terms: [中风, 卒中, 脑梗, 脑溢血, 脑出血]
     not_followed_by: [后, 过, 康复, 病人, 患者, 病史, 的风险, 风险, 的人, 史]
     # 说的是病史、预防或风险时不算（“我爸去年中风，现在能做什么运动”“怎么预防中风”）
-    not_in_clause_with: [预防, 风险, 康复, 后遗症, 病史, 得过, 患过, 有过, 家族, 遗传, 以前, 之前, 去年, 前年, 曾经, 几年前, 年前]
+    # “以前中风”紧挨着才算病史；“几分钟之前我爸突然中风了”照常算
+    not_preceded_by: [以前, 之前, 曾经, 得过, 患过, 有过]
+    not_in_clause_with: [预防, 风险, 康复, 后遗症, 病史, 家族, 遗传, 去年, 前年, 几年前]
   - id: cardiac_named
     name: 直接说心梗、没呼吸、没心跳
     terms: [心梗, 心肌梗, 心脏病发作, 心脏骤停, 心跳骤停, 没有呼吸, 没呼吸了, 没了呼吸, 没有心跳, 没心跳, 心跳停了, 呼吸停了]
     not_followed_by: [后, 过, 康复, 病人, 患者, 病史, 的风险, 风险, 的人, 史, 支架]
-    not_in_clause_with: [预防, 风险, 康复, 后遗症, 病史, 得过, 患过, 有过, 家族, 遗传, 以前, 之前, 去年, 前年, 曾经, 几年前, 年前, 憋气]
+    # “以前中风”紧挨着才算病史；“几分钟之前我爸突然中风了”照常算
+    not_preceded_by: [以前, 之前, 曾经, 得过, 患过, 有过]
+    not_in_clause_with: [预防, 风险, 康复, 后遗症, 病史, 家族, 遗传, 去年, 前年, 几年前, 憋气]
   - id: unresponsive
     name: 叫人没反应
     # 单独出现不算（“我叫了外卖半天没反应”）；须与倒下、晕倒等同时出现。不用“不应”：“叫他起来跑步不应”
@@ -153,6 +163,7 @@ symptoms:
     terms: [什么都没做, 什么都没干, 啥也没干, 啥都没干]
   - id: change_worse
     name: 比以前明显变差
+    modifier: true  # 修饰词：须在核心症状前后 2 个分句以内
     terms: [以前不会, 以前不这样, 以前没有, 比以前, 越来越, 最近总, 最近老, 最近经常]
   - id: fast_heart
     name: 心跳很快
@@ -173,9 +184,11 @@ symptoms:
     combos:
       # 中间插字的说法（“头突然炸裂一样疼”）
       - [[头, 脑袋], [一样疼, 一样痛, 突然疼, 突然痛, 剧痛, 炸裂, 要裂开]]
-    not_in_clause_with: [头肌, 二头, 三头, 骨头, 回头, 拳头, 指头]
+    # “头”前面紧挨着这些字时是别的词（“二头肌疼”“回头”“骨头疼”），只排除这一处，不影响同一分句里的头痛
+    not_preceded_by: [二, 三, 肱二, 肱三, 骨, 回, 拳, 指, 里, 外, 码, 枕, 镜]
   - id: severe
     name: 程度剧烈
+    modifier: true  # 修饰词：须在核心症状前后 2 个分句以内
     terms: [剧烈, 炸开, 要炸, 炸裂, 裂开, 从来没有这么, 从来没这么, 从没这么, 受不了, 很厉害, 特别厉害, 非常厉害, 得厉害, 剧痛]
   - id: speech
     name: 说话不清
@@ -216,7 +229,6 @@ symptoms:
       - [[人, 脑子, 整个人], [迷迷糊糊, 糊里糊涂]]
   - id: heat_exposure
     name: 高温或暴晒环境
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [大太阳, 太阳下, 烈日, 高温, 暴晒, 中暑, 天很热, 天太热, 天气热, 闷热, 桑拿天, 三伏天]
   - id: no_sweat_hot
     name: 不再出汗或体温很高
@@ -226,7 +238,6 @@ symptoms:
     terms: [恶心, 想吐, 呕吐, 头痛, 头疼, 抽筋, 乏力, 浑身无力]
   - id: diabetes
     name: 糖尿病或用降糖药
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     # 不单用“胰岛素”：“胰岛素抵抗”不是用胰岛素；磺脲类（格列××）同样会引起低血糖
     terms: [糖尿病, 降糖药, 打胰岛素, 用胰岛素, 注射胰岛素, 胰岛素针, 胰岛素泵, 低血糖, 血糖低, 血糖很低, 二甲双胍, 格列, 磺脲]
   - id: hypo_signs
@@ -255,7 +266,6 @@ symptoms:
       - [[腿, 脚], [麻, 窜, 放射, 过电]]
   - id: pregnancy
     name: 怀孕
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [怀孕, 孕期, 孕妇, 怀着孕, 孕周, 孕早期, 孕中期, 孕晚期, 怀了宝宝, 怀二胎]
     combos:
       - [[孕], [周]]
@@ -267,7 +277,6 @@ symptoms:
     terms: [头晕, 眩晕, 胸痛, 胸闷, 喘不上气, 小腿肿, 小腿疼, 腿肚子疼, 站不稳, 没力气]
   - id: bp_crisis
     name: 血压极高
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     blood_pressure:
       context: [血压, 高压, 低压, mmhg]
       systolic_at_least: 180
@@ -278,10 +287,12 @@ symptoms:
       - [[小腿, 腿肚, 腓肠肌], [肿]]
   - id: unilateral
     name: 只有一侧
+    modifier: true  # 修饰词：须在核心症状前后 2 个分句以内
     # 不含“一边”：常见于“一边跑一边……”
     terms: [一侧, 单侧, 左小腿, 右小腿, 左腿, 右腿, 一条腿]
   - id: red_hot
     name: 局部发红发烫
+    modifier: true  # 修饰词：须在核心症状前后 2 个分句以内
     terms: [发烫, 发红, 红肿, 烫手, 摸着烫, 发热, 又红又肿]
   - id: joint_swelling
     name: 关节肿
@@ -295,7 +306,6 @@ symptoms:
     terms: [没法走路, 走不了路, 不能走路, 走不了, 站不起来, 不能着地, 不敢着地, 没法着地, 不能负重, 一瘸一拐, 瘸了]
   - id: injury
     name: 扭伤、拉伤、摔伤
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [扭了, 扭伤, 崴了, 崴脚, 拉伤, 撕裂, 摔了, 摔倒, 撞了, 咔的一声, 啪的一声, 听到响声]
     not_in_clause_with: [差点, 差一点, 险些]
   - id: fracture_signs
@@ -307,7 +317,6 @@ symptoms:
     terms: [疼醒, 痛醒, 疼得睡不着, 痛得睡不着, 半夜疼, 夜间痛, 夜里疼, 夜里痛]
   - id: purge
     name: 催吐或用泻药
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     # 不单用“去吐”“吐出来”“吐掉”：“去吐槽”“发力时把气吐出来”不是催吐
     terms: [催吐, 抠喉, 抠嗓子, 故意吐, 吃完就吐, 吃了就吐, 吃完就去吐, 吃了就去吐, 吃完去吐, 吃完饭就吐, 吃泻药, 用泻药, 吃了泻药, 用了泻药, 喝泻药, 番泻叶]
     combos:
@@ -339,7 +348,6 @@ symptoms:
     terms: [痒, 起疹子, 起风团]
   - id: allergen
     name: 常见过敏原或过敏
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     # 不用“蜂”单字：“喝了蜂蜜水”（第三轮复核）
     terms: [花生, 坚果, 虾, 蟹, 海鲜, 芒果, 蜜蜂, 马蜂, 黄蜂, 蛰, 蜇, 过敏, 吃了药, 打了针]
   - id: face_allergy
@@ -355,14 +363,12 @@ symptoms:
     not_in_clause_with: [感冒, 发炎, 上火, 咽炎, 扁桃体]  # 感冒嗓子肿不是严重过敏
   - id: asthma
     name: 哮喘
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [哮喘, 喘鸣, 嗓子里有哨音]
   - id: reliever_fail
     name: 用了急救药不缓解
     terms: [喷了药也, 喷了也, 喷了没用, 吸了药也, 药不管用]
   - id: head_injury
     name: 头部受伤
-    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [脑震荡, 撞到头, 砸到头, 磕到头, 摔到头, 头撞, 头被砸]
     not_in_clause_with: [差点, 差一点, 险些]  # “杠铃差点砸到头”
   - id: head_red
@@ -400,6 +406,7 @@ rules:
   - {id: EM-CHEST-SUDDEN, level: emergency, category: cardiovascular, title: 突发胸痛, all: [chest_pain, sudden], within: clause}  # “胸口有点闷，突然想起来没吃药”不算
   - {id: EM-CHEST-RADIATE, level: emergency, category: cardiovascular, title: 胸痛放射到左臂、下巴或后背, all: [chest_pain, radiating]}
   - {id: EM-CHEST-SWEAT, level: emergency, category: cardiovascular, title: 胸痛伴出冷汗, all: [chest_pain, cold_sweat]}
+  - {id: EM-CHEST-HEAVY-SWEAT, level: emergency, category: cardiovascular, title: 胸痛伴出了一身汗（非运动）, all: [chest_pain, heavy_sweat]}
   - {id: EM-CHEST-DYSPNEA, level: emergency, category: cardiovascular, title: 胸痛伴呼吸困难, all: [chest_pain, dyspnea]}
   - {id: RF-CHEST, level: red_flag, category: cardiovascular, title: 胸痛或胸闷, all: [chest_pain]}
   - {id: EM-TACHY-ONGOING, level: emergency, category: cardiovascular, title: 心跳很快停不下来, all: [fast_heart, ongoing]}

@@ -182,8 +182,8 @@ class Symptom(ContractModel):
     not_preceded_by: tuple[Term, ...] = ()  # 说法前紧挨着这些字时这一处不算（如“快晕过去”）
     # 分句里有这些字样时整个症状在这个分句不算（如放射痛的分句里有“练、酸”：多是肌肉酸痛）
     not_in_clause_with: tuple[Term, ...] = ()
-    # 背景状况（怀孕、糖尿病、高温等）：判定条目时整句任何位置出现都算，不受条目的范围限制
-    context: bool = False
+    # 修饰词（突然、持续、很厉害等）：判定条目时须在核心症状前后 MODIFIER_REACH 个分句以内
+    modifier: bool = False
 
     @model_validator(mode="after")
     def _check(self) -> Self:

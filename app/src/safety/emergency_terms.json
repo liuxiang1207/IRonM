@@ -2,7 +2,7 @@
  "format": 3,
  "separators": ",。!?;\n\r~",
  "whitespace": " \t\f\u000b             ​    　﻿",
- "version": "1.5",
+ "version": "1.6",
  "review": "approved",
  "negation": {
   "before": [
@@ -169,7 +169,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "radiating",
@@ -205,7 +205,7 @@
     "引体",
     "撸铁"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "cold_sweat",
@@ -215,6 +215,17 @@
     "虚汗",
     "大汗淋漓"
    ],
+   "combos": [],
+   "blood_pressure": null,
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "modifier": false
+  },
+  {
+   "id": "heavy_sweat",
+   "name": "出了一身汗（非运动）",
+   "terms": [],
    "combos": [
     [
      [
@@ -240,7 +251,7 @@
     "动作",
     "训练"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "ongoing",
@@ -294,8 +305,13 @@
    "blood_pressure": null,
    "not_followed_by": [],
    "not_preceded_by": [],
-   "not_in_clause_with": [],
-   "context": false
+   "not_in_clause_with": [
+    "体重",
+    "瘦",
+    "胖",
+    "减"
+   ],
+   "modifier": true
   },
   {
    "id": "sudden",
@@ -313,10 +329,9 @@
    "not_in_clause_with": [
     "想起",
     "想到",
-    "发现",
     "突然想"
    ],
-   "context": false
+   "modifier": true
   },
   {
    "id": "collapse",
@@ -369,14 +384,19 @@
     "睡"
    ],
    "not_preceded_by": [
-    "快",
     "快要",
+    "到快",
+    "都快",
+    "就快",
+    "得快",
+    "我快",
+    "人快",
     "差点",
     "差一点",
     "险些"
    ],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "unconscious",
@@ -396,12 +416,11 @@
    "not_preceded_by": [],
    "not_in_clause_with": [
     "闹钟",
-    "起床",
     "睡懒觉",
     "每天",
     "赖床"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "collapse_fell",
@@ -453,7 +472,7 @@
    ],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "stroke_named",
@@ -479,27 +498,27 @@
     "的人",
     "史"
    ],
-   "not_preceded_by": [],
+   "not_preceded_by": [
+    "以前",
+    "之前",
+    "曾经",
+    "得过",
+    "患过",
+    "有过"
+   ],
    "not_in_clause_with": [
     "预防",
     "风险",
     "康复",
     "后遗症",
     "病史",
-    "得过",
-    "患过",
-    "有过",
     "家族",
     "遗传",
-    "以前",
-    "之前",
     "去年",
     "前年",
-    "曾经",
-    "几年前",
-    "年前"
+    "几年前"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "cardiac_named",
@@ -533,28 +552,28 @@
     "史",
     "支架"
    ],
-   "not_preceded_by": [],
+   "not_preceded_by": [
+    "以前",
+    "之前",
+    "曾经",
+    "得过",
+    "患过",
+    "有过"
+   ],
    "not_in_clause_with": [
     "预防",
     "风险",
     "康复",
     "后遗症",
     "病史",
-    "得过",
-    "患过",
-    "有过",
     "家族",
     "遗传",
-    "以前",
-    "之前",
     "去年",
     "前年",
-    "曾经",
     "几年前",
-    "年前",
     "憋气"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "unresponsive",
@@ -586,7 +605,7 @@
    ],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "collapse_context",
@@ -632,7 +651,7 @@
     "喝得"
    ],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "seizure",
@@ -647,7 +666,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "presyncope",
@@ -668,7 +687,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "cyanosis",
@@ -697,7 +716,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "dyspnea",
@@ -732,7 +751,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "dyspnea_severe",
@@ -747,7 +766,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "dyspnea_sudden",
@@ -772,7 +791,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "dyspnea_rest",
@@ -829,7 +848,7 @@
    ],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "at_rest",
@@ -845,7 +864,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "change_worse",
@@ -865,7 +884,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": true
   },
   {
    "id": "fast_heart",
@@ -884,7 +903,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "palpitation",
@@ -917,7 +936,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "dizziness",
@@ -951,7 +970,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "headache",
@@ -983,17 +1002,23 @@
    ],
    "blood_pressure": null,
    "not_followed_by": [],
-   "not_preceded_by": [],
-   "not_in_clause_with": [
-    "头肌",
-    "二头",
-    "三头",
-    "骨头",
-    "回头",
-    "拳头",
-    "指头"
+   "not_preceded_by": [
+    "二",
+    "三",
+    "肱二",
+    "肱三",
+    "骨",
+    "回",
+    "拳",
+    "指",
+    "里",
+    "外",
+    "码",
+    "枕",
+    "镜"
    ],
-   "context": false
+   "not_in_clause_with": [],
+   "modifier": false
   },
   {
    "id": "severe",
@@ -1019,7 +1044,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": true
   },
   {
    "id": "speech",
@@ -1077,7 +1102,7 @@
     "其辞",
     "不清不楚"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "one_side_weak",
@@ -1190,7 +1215,7 @@
    ],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "vision_loss",
@@ -1208,7 +1233,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "dark_urine",
@@ -1242,7 +1267,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "confusion",
@@ -1287,7 +1312,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "heat_exposure",
@@ -1311,7 +1336,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": true
+   "modifier": false
   },
   {
    "id": "no_sweat_hot",
@@ -1332,7 +1357,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "heat_illness",
@@ -1352,7 +1377,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "diabetes",
@@ -1377,7 +1402,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": true
+   "modifier": false
   },
   {
    "id": "hypo_signs",
@@ -1398,7 +1423,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "back_pain",
@@ -1424,7 +1449,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "bladder_loss",
@@ -1456,7 +1481,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "saddle_numb",
@@ -1488,7 +1513,7 @@
    "not_in_clause_with": [
     "练"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "leg_numb",
@@ -1514,7 +1539,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "pregnancy",
@@ -1545,7 +1570,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": true
+   "modifier": false
   },
   {
    "id": "pregnancy_warning",
@@ -1574,7 +1599,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "pregnancy_caution",
@@ -1596,7 +1621,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "bp_crisis",
@@ -1616,7 +1641,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": true
+   "modifier": false
   },
   {
    "id": "calf_swelling",
@@ -1638,7 +1663,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "unilateral",
@@ -1657,7 +1682,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": true
   },
   {
    "id": "red_hot",
@@ -1676,7 +1701,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": true
   },
   {
    "id": "joint_swelling",
@@ -1701,7 +1726,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "fever",
@@ -1719,7 +1744,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "cant_bear",
@@ -1742,7 +1767,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "injury",
@@ -1770,7 +1795,7 @@
     "差一点",
     "险些"
    ],
-   "context": true
+   "modifier": false
   },
   {
    "id": "fracture_signs",
@@ -1787,7 +1812,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "night_pain",
@@ -1807,7 +1832,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "purge",
@@ -1850,7 +1875,7 @@
    ],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": true
+   "modifier": false
   },
   {
    "id": "self_harm_act",
@@ -1870,7 +1895,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "self_harm_idea",
@@ -1911,7 +1936,7 @@
    ],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "hives",
@@ -1940,7 +1965,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "face_swelling",
@@ -1962,7 +1987,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "itch",
@@ -1977,7 +2002,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "allergen",
@@ -2003,7 +2028,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": true
+   "modifier": false
   },
   {
    "id": "face_allergy",
@@ -2041,7 +2066,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "throat_swelling",
@@ -2085,7 +2110,7 @@
     "咽炎",
     "扁桃体"
    ],
-   "context": false
+   "modifier": false
   },
   {
    "id": "asthma",
@@ -2100,7 +2125,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": true
+   "modifier": false
   },
   {
    "id": "reliever_fail",
@@ -2117,7 +2142,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "head_injury",
@@ -2140,7 +2165,7 @@
     "差一点",
     "险些"
    ],
-   "context": true
+   "modifier": false
   },
   {
    "id": "head_red",
@@ -2162,7 +2187,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "hematemesis",
@@ -2176,7 +2201,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "gi_bleed",
@@ -2191,7 +2216,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "abdominal_severe",
@@ -2217,7 +2242,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   },
   {
    "id": "purge_complication",
@@ -2237,7 +2262,7 @@
    "not_followed_by": [],
    "not_preceded_by": [],
    "not_in_clause_with": [],
-   "context": false
+   "modifier": false
   }
  ],
  "rules": [
@@ -2249,7 +2274,7 @@
    "all": [
     "self_harm_act"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-SELF-HARM",
@@ -2259,7 +2284,7 @@
    "all": [
     "self_harm_idea"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-ANAPHYLAXIS-AIRWAY",
@@ -2269,7 +2294,7 @@
    "all": [
     "throat_swelling"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-ANAPHYLAXIS-BREATH",
@@ -2280,7 +2305,7 @@
     "hives",
     "dyspnea"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-ANAPHYLAXIS-FAINT",
@@ -2291,7 +2316,7 @@
     "hives",
     "dizziness"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-ANAPHYLAXIS-FACE",
@@ -2303,7 +2328,7 @@
     "allergen",
     "dyspnea"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-ALLERGY-FACE",
@@ -2313,7 +2338,7 @@
    "all": [
     "face_allergy"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-ALLERGY-ITCH",
@@ -2324,7 +2349,7 @@
     "face_swelling",
     "itch"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-HIVES",
@@ -2334,7 +2359,7 @@
    "all": [
     "hives"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CARDIAC-NAMED",
@@ -2344,7 +2369,7 @@
    "all": [
     "cardiac_named"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CHEST-ONGOING",
@@ -2355,7 +2380,7 @@
     "chest_pain",
     "ongoing"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CHEST-SUDDEN",
@@ -2377,7 +2402,7 @@
     "chest_pain",
     "radiating"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CHEST-SWEAT",
@@ -2388,7 +2413,18 @@
     "chest_pain",
     "cold_sweat"
    ],
-   "within": "nearby"
+   "within": "sentence"
+  },
+  {
+   "id": "EM-CHEST-HEAVY-SWEAT",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "胸痛伴出了一身汗（非运动）",
+   "all": [
+    "chest_pain",
+    "heavy_sweat"
+   ],
+   "within": "sentence"
   },
   {
    "id": "EM-CHEST-DYSPNEA",
@@ -2399,7 +2435,7 @@
     "chest_pain",
     "dyspnea"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-CHEST",
@@ -2409,7 +2445,7 @@
    "all": [
     "chest_pain"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-TACHY-ONGOING",
@@ -2420,7 +2456,7 @@
     "fast_heart",
     "ongoing"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-TACHY-DIZZY",
@@ -2431,7 +2467,7 @@
     "fast_heart",
     "dizziness"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-PALPITATION",
@@ -2441,7 +2477,7 @@
    "all": [
     "palpitation"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-BP-HEADACHE",
@@ -2452,7 +2488,7 @@
     "bp_crisis",
     "headache"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-BP-CHEST",
@@ -2463,7 +2499,7 @@
     "bp_crisis",
     "chest_pain"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-BP-DIZZY",
@@ -2474,7 +2510,7 @@
     "bp_crisis",
     "dizziness"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-BP-DYSPNEA",
@@ -2485,7 +2521,7 @@
     "bp_crisis",
     "dyspnea"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-BP-VISION",
@@ -2496,7 +2532,7 @@
     "bp_crisis",
     "vision_loss"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-BP",
@@ -2506,7 +2542,7 @@
    "all": [
     "bp_crisis"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-DVT-UNILATERAL",
@@ -2517,7 +2553,7 @@
     "calf_swelling",
     "unilateral"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-DVT-HOT",
@@ -2528,7 +2564,7 @@
     "calf_swelling",
     "red_hot"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-COLLAPSE",
@@ -2538,7 +2574,7 @@
    "all": [
     "collapse"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-UNCONSCIOUS",
@@ -2548,7 +2584,7 @@
    "all": [
     "unconscious"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-COLLAPSE-FELL",
@@ -2558,7 +2594,7 @@
    "all": [
     "collapse_fell"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-UNRESPONSIVE",
@@ -2569,7 +2605,7 @@
     "unresponsive",
     "collapse_context"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-PRESYNCOPE",
@@ -2579,7 +2615,7 @@
    "all": [
     "presyncope"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-DIZZY",
@@ -2589,7 +2625,7 @@
    "all": [
     "dizziness"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CYANOSIS",
@@ -2599,7 +2635,7 @@
    "all": [
     "cyanosis"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-DYSPNEA-ONGOING",
@@ -2610,7 +2646,7 @@
     "dyspnea",
     "ongoing"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-DYSPNEA-SEVERE",
@@ -2621,7 +2657,7 @@
     "dyspnea",
     "dyspnea_severe"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-DYSPNEA-SUDDEN",
@@ -2631,7 +2667,7 @@
    "all": [
     "dyspnea_sudden"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-DYSPNEA-REST",
@@ -2641,7 +2677,7 @@
    "all": [
     "dyspnea_rest"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-DYSPNEA-IDLE",
@@ -2652,7 +2688,7 @@
     "dyspnea",
     "at_rest"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-DYSPNEA-WORSE",
@@ -2663,7 +2699,7 @@
     "dyspnea",
     "change_worse"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-ASTHMA-NORELIEF",
@@ -2674,7 +2710,7 @@
     "asthma",
     "reliever_fail"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-ASTHMA",
@@ -2684,7 +2720,7 @@
    "all": [
     "asthma"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-SEIZURE",
@@ -2694,7 +2730,7 @@
    "all": [
     "seizure"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-THUNDERCLAP",
@@ -2706,7 +2742,7 @@
     "sudden",
     "severe"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-HEADACHE-SEVERE",
@@ -2717,7 +2753,7 @@
     "headache",
     "severe"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-STROKE-NAMED",
@@ -2727,7 +2763,7 @@
    "all": [
     "stroke_named"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-STROKE-SPEECH",
@@ -2737,7 +2773,7 @@
    "all": [
     "speech"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-STROKE-WEAK",
@@ -2747,7 +2783,7 @@
    "all": [
     "one_side_weak"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-STROKE-VISION",
@@ -2758,7 +2794,7 @@
     "vision_loss",
     "sudden"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-HEAD-INJURY",
@@ -2769,7 +2805,7 @@
     "head_injury",
     "head_red"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-HEAD-INJURY",
@@ -2779,7 +2815,7 @@
    "all": [
     "head_injury"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CONFUSION",
@@ -2789,7 +2825,7 @@
    "all": [
     "confusion"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CAUDA-BLADDER",
@@ -2800,7 +2836,7 @@
     "back_pain",
     "bladder_loss"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-CAUDA-SADDLE",
@@ -2811,7 +2847,7 @@
     "back_pain",
     "saddle_numb"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-DARK-URINE",
@@ -2821,7 +2857,7 @@
    "all": [
     "dark_urine"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-JOINT-FEVER",
@@ -2832,7 +2868,7 @@
     "joint_swelling",
     "fever"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-JOINT-HOT",
@@ -2843,7 +2879,7 @@
     "joint_swelling",
     "red_hot"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-JOINT-CANT-BEAR",
@@ -2854,7 +2890,7 @@
     "joint_swelling",
     "cant_bear"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-SUDDEN-CANT-BEAR",
@@ -2865,7 +2901,7 @@
     "sudden",
     "cant_bear"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-INJURY-CANT-BEAR",
@@ -2876,7 +2912,7 @@
     "injury",
     "cant_bear"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-FRACTURE",
@@ -2886,7 +2922,7 @@
    "all": [
     "fracture_signs"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-NIGHT-PAIN",
@@ -2896,7 +2932,7 @@
    "all": [
     "night_pain"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-SCIATICA",
@@ -2907,7 +2943,7 @@
     "back_pain",
     "leg_numb"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-HEAT-NOSWEAT",
@@ -2918,7 +2954,7 @@
     "heat_exposure",
     "no_sweat_hot"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-HEAT-CONFUSION",
@@ -2929,7 +2965,7 @@
     "heat_exposure",
     "confusion"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-HEAT-COLLAPSE",
@@ -2940,7 +2976,7 @@
     "heat_exposure",
     "collapse"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-HEAT-ILLNESS",
@@ -2951,7 +2987,7 @@
     "heat_exposure",
     "heat_illness"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-HEAT-DIZZY",
@@ -2962,7 +2998,7 @@
     "heat_exposure",
     "dizziness"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-HYPOGLYCEMIA",
@@ -2973,7 +3009,7 @@
     "diabetes",
     "hypo_signs"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-PREGNANCY",
@@ -2984,7 +3020,7 @@
     "pregnancy",
     "pregnancy_warning"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-PREGNANCY",
@@ -2995,7 +3031,7 @@
     "pregnancy",
     "pregnancy_caution"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-HEMATEMESIS",
@@ -3005,7 +3041,7 @@
    "all": [
     "hematemesis"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-GI-BLEED",
@@ -3015,7 +3051,7 @@
    "all": [
     "gi_bleed"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-ABDOMEN",
@@ -3025,7 +3061,7 @@
    "all": [
     "abdominal_severe"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "EM-PURGE-COMPLICATION",
@@ -3036,7 +3072,7 @@
     "purge",
     "purge_complication"
    ],
-   "within": "nearby"
+   "within": "sentence"
   },
   {
    "id": "RF-PURGE",
@@ -3046,7 +3082,7 @@
    "all": [
     "purge"
    ],
-   "within": "nearby"
+   "within": "sentence"
   }
  ],
  "replies": {
