@@ -28,3 +28,6 @@ scripts/
 # App（React Native + Expo）
 app/node_modules/
 app/.expo/
+
+# 知识库资料目录（可能有版权原文/摘录，不进公开仓库）
+kb/

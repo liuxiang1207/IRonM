@@ -61,3 +61,7 @@ demo:
 
 run:
 	$(UV) run uvicorn ironm.api.app:app --reload
+
+# 知识库检查（段落格式、重复、复审期、检索探针）；资料目录由 IRONM_KB_DIR 指定
+kb:
+	$(UV) run python tools/check_kb.py

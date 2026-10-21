@@ -16,6 +16,7 @@ import time
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Annotated, Literal, Protocol
 
@@ -60,7 +61,15 @@ class KnowledgeLoadError(ValueError):
 
 
 class Passage(ContractModel):
-    """一段知识。出处给用户看；证据级别决定表述的语气（指南说“建议”，单项研究说“有研究显示”）。"""
+    """一段知识。出处给用户看；证据级别决定表述的语气（指南说“建议”，单项研究说“有研究显示”）。
+
+    后五个字段为可选，供人工维护时使用：
+    - keywords：用户实际会说的口语说法，检索时加权命中
+    - caution：需要一并告诉用户的注意事项
+    - see_also：相关段落编号（内容上互相补充或对照）
+    - reviewed_at：最后审定日期；超过一年由检查脚本提示复审
+    - superseded_by：被哪一段取代；有值时不再作为依据
+    """
 
     passage_id: Annotated[str, Field(pattern=r"^[A-Za-z][A-Za-z0-9_.:\-]{0,120}$")]
     domain: AgentId
@@ -69,6 +78,16 @@ class Passage(ContractModel):
     source: Text
     level: Level
     review: Literal["pending_review", "approved"]
+    keywords: tuple[Text, ...] = ()
+    caution: Text | None = None
+    see_also: tuple[str, ...] = ()
+    reviewed_at: date | None = None
+    superseded_by: str | None = None
+
+
+def _indexable(p: Passage) -> str:
+    """参与检索的文本：标题 + 正文 + 口语关键词（用户在问答里多半用关键词里的说法）。"""
+    return " ".join([p.title, p.text, *p.keywords])
 
 
 def _grams(text: str) -> list[str]:
@@ -145,7 +164,7 @@ class CoverageReranker:
             return [0.0 for _ in passages]
         out = []
         for p in passages:
-            body = set(_grams(p.title + p.text))
+            body = set(_grams(_indexable(p)))
             out.append(sum(w for g, w in weight.items() if g in body) / total)
         return out
 
@@ -159,12 +178,12 @@ class Retrieved:
 class KnowledgeBase:
     def __init__(self, passages: Iterable[Passage]) -> None:
         # 被取代的段落保留（历史回答要能追溯），但不再参与检索
-        self.passages = tuple(passages)
+        self.passages = tuple(p for p in passages if p.superseded_by is None)
         ids = [p.passage_id for p in self.passages]
         dup = sorted({i for i in ids if ids.count(i) > 1})
         if dup:
             raise KnowledgeLoadError(f"知识段落编号重复：{dup}")
-        self._docs = [Counter(_grams(p.title + p.text)) for p in self.passages]
+        self._docs = [Counter(_grams(_indexable(p))) for p in self.passages]
         self._lengths = [sum(d.values()) for d in self._docs]
         self._avg = sum(self._lengths) / len(self._lengths) if self._lengths else 0.0
         df: Counter[str] = Counter()
