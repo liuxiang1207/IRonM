@@ -14,7 +14,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -29,6 +29,7 @@ from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
 from ironm.orchestrator.domains import DOMAIN_WEIGHTS, select_domains
 from ironm.orchestrator.intent import Concern, Intent, IntentResult
+from ironm.orchestrator.opinions import Collected, Opinion
 from ironm.rules.loader import RuleBook
 from ironm.safety.matching import clauses
 
@@ -79,6 +80,10 @@ class AnswerPart(ContractModel):
 class QAResult(ContractModel):
     parts: tuple[AnswerPart, ...]
     record: RunRecord
+    # 依据（可逐层展开）；来自问答类 Skill 的意见时为各意见的 Citation
+    citations: tuple[dict[str, Any], ...] = ()
+    # 没有给出意见的 Agent 与原因（如 unknown_exercise），回答里如实标注
+    silent: tuple[str, ...] = ()
 
 
 class _Texts(BaseModel):
@@ -195,8 +200,12 @@ def answer_question(
     page: str | None = None,
     page_domain: AgentId | None = None,
     context_item: str | None = None,
+    opinions: Collected | None = None,
 ) -> QAResult:
-    """page 不为空时是功能页提问：只查 page_domain（本功能的领域）与安全类的卡。"""
+    """page 不为空时是功能页提问：只查 page_domain（本功能的领域）与安全类的卡。
+
+    opinions 不为空时（问答类 Skill 已产出意见），先按意见组织回答；没有意见时退回问答卡。
+    """
     fixed = _Texts.model_validate(texts.model_dump())
     if intent.intent not in DOMAIN_WEIGHTS:
         raise ValueError(f"意图 {intent.intent} 不经过问答（由对话入口处理）")
@@ -211,6 +220,11 @@ def answer_question(
     found = [(c, s) for c, s in cards.matches(text) if c.agent == _SAFETY or c.agent in allowed]
     ranked = sorted(found, key=lambda cs: (cs[0].agent != _SAFETY, cs[0].agent != primary, -cs[1]))
     matched = [c for c, _ in ranked]
+
+    if opinions is not None and opinions.opinions:
+        return _from_opinions(
+            text, intent, opinions, fixed, domains, primary, page, context_item, request_id
+        )
 
     cautions = []
     if "discomfort" in intent.concerns:
@@ -274,3 +288,72 @@ def answer_question(
     )
     _log.info("qa.answered", request_id=request_id, status=layer, count=len(parts))
     return QAResult(parts=tuple(parts), record=record)
+
+
+def _from_opinions(
+    text: str,
+    intent: IntentResult,
+    collected: Collected,
+    fixed: _Texts,
+    domains: Any,
+    primary: AgentId | None,
+    page: str | None,
+    context_item: str | None,
+    request_id: str,
+) -> QAResult:
+    """按问答类 Skill 的意见组织回答（spec [2026-10-21] 统一链路）。
+
+    - 一条意见：直接用它的结论、怎么做、注意；不调用模型改写
+    - 多条意见：主领域在前，其余作为补充；冲突不隐藏，按安全 > 主领域 > 相关排列
+    - 安全提示（身体不适、特殊人群）附在注意里
+    - 依据（Citation）原样带出，供用户逐层展开
+    """
+    cautions: list[str] = []
+    if "discomfort" in intent.concerns:
+        cautions.append(fixed.caution_discomfort)
+    if "special_population" in intent.concerns:
+        cautions.append(fixed.caution_special)
+
+    def order(o: Opinion) -> tuple[int, int]:
+        return (0 if o.agent == primary else 1, 0)
+
+    ordered = sorted(collected.opinions, key=order)
+    first = ordered[0].item
+    parts: list[AnswerPart] = [AnswerPart(kind="conclusion", text=first.conclusion)]
+    for extra in ordered[1:]:
+        parts.append(AnswerPart(kind="answer", text=extra.item.conclusion))
+    if first.how:
+        parts.append(AnswerPart(kind="how", text=first.how))
+    for extra in ordered[1:]:
+        if extra.item.how:
+            parts.append(AnswerPart(kind="how", text=extra.item.how))
+    notes = [c for c in (first.caution, *cautions) if c]
+    notes += [e.item.caution for e in ordered[1:] if e.item.caution]
+    parts.extend(AnswerPart(kind="caution", text=n) for n in notes)
+    if first.uncertain:
+        parts.append(AnswerPart(kind="uncertain", text=first.uncertain))
+
+    citations = tuple(
+        {"agent": o.agent.value, "skill": o.skill, **c.model_dump()}
+        for o in ordered
+        for c in o.item.citations
+    )
+    silent = tuple(f"{a.value}:{r}" for a, r in collected.silent)
+    record = RunRecord(
+        request_id=request_id,
+        intent=intent.intent,
+        concerns=intent.concerns,
+        domain_scores=domains.scores,
+        primary_domain=primary,
+        related_domains=() if page is not None else domains.related,
+        page=page,
+        context_item=context_item,
+        matched_cards=(),
+        card_ids=(),
+        personal=(),
+        layer="l1",
+        degraded=bool(silent),
+        number_rewrites=0,
+    )
+    _log.info("qa.answered", request_id=request_id, status="opinions", count=len(parts))
+    return QAResult(parts=tuple(parts), record=record, citations=citations, silent=silent)

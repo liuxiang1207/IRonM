@@ -30,7 +30,9 @@ from ironm.llm.gateway import Gateway
 from ironm.memory.conversation import compress, context
 from ironm.memory.profile import ProfileService
 from ironm.memory.repo import MemoryRepo
+from ironm.orchestrator.domains import select_domains
 from ironm.orchestrator.intent import Concern, Intent, IntentBook, recognize
+from ironm.orchestrator.opinions import collect_opinions
 from ironm.orchestrator.pages import PAGE_AGENTS, PAGE_DEFAULT, Page, PageContext
 from ironm.orchestrator.qa import AnswerPart, RunRecord, answer_question
 from ironm.orchestrator.safety_review import review_safety
@@ -109,6 +111,10 @@ class ChatReply(ContractModel):
     answer: tuple[AnswerPart, ...]
     degraded: bool = False  # 是否降级（回答里已写明）
     candidates: tuple[CandidateView, ...] = ()
+    # 依据：来自问答类 Skill 的意见时，用户可逐层展开（spec [2026-10-21] 统一链路）
+    citations: tuple[dict[str, Any], ...] = ()
+    # 没有给出意见的 Agent 与原因，回答里如实标注
+    silent: tuple[str, ...] = ()
     page: Page | None = None  # 功能页提问时的页面
     handoff: PageContext | None = None  # 转入管家对话时带上的上下文
 
@@ -127,6 +133,10 @@ class ChatDeps:
     memory: MemoryRepo
     profiles: ProfileService
     gateway: Gateway | None = None  # 没有时只用词表识别意图
+    # 问答类 Skill（spec [2026-10-21] 统一链路）；为空时问答只查卡
+    skills: tuple[Any, ...] = ()
+    scene: Any = None  # ScenePack
+    tier: Any = None  # 本次分层结果（TierResult）
 
 
 def respond(
@@ -169,6 +179,8 @@ def respond(
     concerns: tuple[Concern, ...] = ()
     answer: tuple[AnswerPart, ...] = ()
     degraded = False
+    citations: tuple[dict[str, Any], ...] = ()
+    silent: tuple[str, ...] = ()
     handoff: PageContext | None = None
     layer: Layer
     if assessment.level != "none":
@@ -226,6 +238,9 @@ def respond(
         elif intent is Intent.OUT_OF_SCOPE:
             layer, answer = "template", (AnswerPart(kind="answer", text=deps.texts.out_of_scope),)
         else:
+            collected = _collect(
+                deps, profile, result, text, page_context.item if page_context else None
+            )
             qa = answer_question(
                 text,
                 result,
@@ -237,6 +252,12 @@ def respond(
                 page=page,
                 page_domain=page_domain,
                 context_item=page_context.item if page_context else None,
+                opinions=collected,
+            )
+            citations = qa.citations
+            # 意见路径没有产出时（如动作库里没有这个动作）也要如实标出，而不是静默退回
+            silent = qa.silent or tuple(
+                f"{a.value}:{r}" for a, r in (collected.silent if collected else ())
             )
             deps.record_run(user_id, qa.record)
             layer, answer, degraded = qa.record.layer, qa.parts, qa.record.degraded
@@ -262,6 +283,8 @@ def respond(
         concerns=concerns,
         sections=sections,
         answer=answer,
+        citations=citations,
+        silent=silent,
         degraded=degraded,
         page=page,
         handoff=handoff,
@@ -300,3 +323,41 @@ def after_reply(
         )
     except Exception as e:
         _log.exception("chat.after_reply_failed", e, request_id=reply.request_id)
+
+
+def _collect(
+    deps: ChatDeps,
+    profile: dict[str, Any],
+    result: Any,
+    text: str,
+    context_item: str | None,
+) -> Any:
+    """跑问答类 Skill 收集意见；没有 Skill、没有分层或出错时返回 None（退回查卡）。"""
+    if not deps.skills or deps.tier is None or deps.scene is None:
+        return None
+    from ironm.orchestrator.snapshots import chat_snapshot
+
+    try:
+        domains = select_domains(result, deps.rulebook)
+        agents = [
+            a
+            for a in (domains.primary, *domains.related)
+            if a is not None and a != AgentId.SAFETY_OFFICER
+        ]
+        if not agents:
+            return None
+        snap = chat_snapshot(profile, deps.tier, deps.clock.now())
+        return collect_opinions(
+            agents=agents,
+            snapshot=snap,
+            skills=deps.skills,
+            rulebook=deps.rulebook,
+            intent=result.intent.value,
+            scene=deps.scene,
+            tier=deps.tier,
+            text=text,
+            context_item=context_item,
+        )
+    except Exception as e:  # 问答类 Skill 出错不影响回答（退回查卡）
+        _log.exception("chat.opinions_failed", e)
+        return None
