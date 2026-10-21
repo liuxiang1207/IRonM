@@ -30,6 +30,7 @@ from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
 from ironm.safety.refusals import REFUSALS_PATH
 from ironm.safety.replies import REPLIES_PATH
+from ironm.skills.loader import SKILLS_DIR, load_skills
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
@@ -139,14 +140,19 @@ def create_app(
     refusals_path: Path = REFUSALS_PATH,
     replies_path: Path = REPLIES_PATH,
     library_path: Path = LIBRARY_PATH,
+    skills_dir: Path = SKILLS_DIR,
 ) -> FastAPI:
-    """配置、规则表、安全文件或动作库有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
+    """配置、规则表、安全文件、动作库或 Skill 有误时在这里直接失败。
+
+    迁移在服务启动时执行，失败则启动失败。
+    """
     configure_logging(settings, clock, log_stream)
     rulebook = load_rules(settings.rules_dir)
     validate_rule_params(rulebook)
     # 急症词表、拒答词表与回答模板：启动时校验并互相核对（spec §21–24）
     load_kit(terms_path, refusals_path, replies_path)
     load_library(library_path)  # 动作库：启动时校验（spec §27）
+    load_skills(skills_dir)  # Skill 头信息：启动时校验（spec §28）
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:

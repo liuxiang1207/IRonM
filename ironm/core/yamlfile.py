@@ -6,7 +6,7 @@ from pathlib import Path
 
 import yaml
 
-__all__ = ["load_yaml"]
+__all__ = ["load_yaml", "load_yaml_text"]
 
 
 class _StrictLoader(yaml.SafeLoader):
@@ -46,6 +46,11 @@ def _construct_mapping(loader: _StrictLoader, node: yaml.MappingNode) -> dict[Ha
 
 
 _StrictLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, _construct_mapping)
+
+
+def load_yaml_text(text: str) -> object:
+    """从文字读取 YAML（规则同 load_yaml）。"""
+    return yaml.load(text, Loader=_StrictLoader)
 
 
 def load_yaml(path: Path) -> object:

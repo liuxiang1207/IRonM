@@ -35,7 +35,7 @@ make run       # 本地启动（启动时自动执行迁移）；/healthz 存活
 | `IRONM_DB_PATH` | 数据库文件路径 | `data/ironm.sqlite` |
 | `IRONM_RULES_DIR` | 规则表目录 | `rules` |
 
-出现未知的 `IRONM_` 变量、非法取值，或规则表、急症词表、拒答词表、回答模板、动作库有误时，启动失败。
+出现未知的 `IRONM_` 变量、非法取值，或规则表、急症词表、拒答词表、回答模板、动作库、Skill 有误时，启动失败。
 
 ## 接口
 
@@ -57,7 +57,9 @@ ironm/
   contracts/   数据契约：记录、未知值、指标结果、Agent 输出、字段归属、快照、计划版本、模型调用
   safety/      急症词表、拒答词表、回答模板（*.yaml，只能由人修改）；急症判定、人群安全分层、三档输出与四段式：不依赖其他业务模块，离线可用
   knowledge/   动作库（exercises.yaml，50 个动作，只能由人修改）：按模式、器材、身体限制筛选、替代与降阶
-  rules/ engine/ llm/ skills/ agents/ memory/ orchestrator/ scheduler/ api/
+  skills/      Skill 加载器：读 SKILL.md 头信息，按意图、场景、人群分层选择，按声明的数据裁剪快照（library/ 下按 Agent 分目录）
+  agents/      Agent 基类：没有匹配的 Skill 时“本次无意见”，输出须来自本次加载的 Skill 版本
+  rules/ engine/ llm/ memory/ orchestrator/ scheduler/ api/
   store/       SQLite 连接、迁移执行器、记录仓储（只追加、去重、全文检索）
 migrations/    按编号的数据库迁移脚本
 rules/         规则表（YAML，每条带编号、审定状态、来源、参数）
