@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import sqlite3
 import sys
 import time
 from collections.abc import AsyncIterator, Iterator, Mapping
@@ -12,12 +13,13 @@ from pathlib import Path
 from typing import IO, Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ironm import __version__
 from ironm.contracts.events import EVENT_ADAPTER, EnergyCheckEvent, Event, WeightEvent
+from ironm.contracts.memory import Candidate
 from ironm.contracts.screening import SafetyFlag
 from ironm.core.clock import Clock, SystemClock, local_day_bounds
 from ironm.core.config import Settings, load_settings
@@ -31,7 +33,17 @@ from ironm.knowledge.exercises import LIBRARY_PATH, load_library
 from ironm.knowledge.qa_cards import load_cards
 from ironm.llm.config import load_models
 from ironm.llm.gateway import Gateway
-from ironm.orchestrator.chat import MAX_TEXT_CHARS, ChatDeps, load_answer_texts, respond
+from ironm.memory.conversation import MEMORY_RULE, MemoryParams
+from ironm.memory.profile import ProfileService
+from ironm.memory.profile import load_terms as load_profile_terms
+from ironm.orchestrator.chat import (
+    MAX_TEXT_CHARS,
+    ChatDeps,
+    ChatReply,
+    after_reply,
+    load_answer_texts,
+    respond,
+)
 from ironm.orchestrator.intent import INTENT_RULE, IntentParams, load_intent_book
 from ironm.orchestrator.qa import RunRecord
 from ironm.rules.loader import load_rules
@@ -42,6 +54,7 @@ from ironm.safety.replies import REPLIES_PATH
 from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
+from ironm.store.memory import MemoryStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
 from ironm.store.safety import ModelCallStore, RunStore, SafetyFlagStore
 
@@ -181,6 +194,8 @@ def create_app(
     rulebook.get(INTENT_RULE).params_as(IntentParams)
     texts = load_answer_texts()
     cards = load_cards()  # 问答卡（spec [2026-10-21] §6）
+    profile_terms = load_profile_terms()  # 画像候选的说法（§8）
+    rulebook.get(MEMORY_RULE).params_as(MemoryParams)
     env = os.environ if environ is None else environ
     load_library(library_path)  # 动作库：启动时校验（spec §27）
     load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
@@ -215,44 +230,92 @@ def create_app(
             raise HTTPException(status_code=401, detail="缺少当前用户")
         return x_ironm_user
 
+    def chat_deps(conn: sqlite3.Connection) -> ChatDeps:
+        """一次请求（或回答后的后台任务）用到的依赖；都用同一个连接。"""
+        flags = SafetyFlagStore(conn, id_gen)
+        calls = ModelCallStore(conn)
+        runs = RunStore(conn)
+        memory = MemoryStore(conn)
+
+        def record_flag(u: str, req: str, flag: SafetyFlag) -> None:
+            flags.add(u, req, flag)
+
+        def record_run(u: str, record: RunRecord) -> None:
+            runs.add(u, record.request_id, record.model_dump_json())
+
+        return ChatDeps(
+            kit=kit,
+            clock=clock,
+            ids=id_gen,
+            record_flag=record_flag,
+            record_run=record_run,
+            intents=intents,
+            cards=cards,
+            rulebook=rulebook,
+            texts=texts,
+            memory=memory,
+            profiles=ProfileService(memory, terms=profile_terms, ids=id_gen, now=clock.now),
+            gateway=Gateway(models, environ=env, clock=clock, ids=id_gen, record=calls.add),
+        )
+
+    def save_turn(user: str, text: str, reply: ChatReply) -> None:
+        """回答之后在后台保存这一轮对话并按需压缩（spec [2026-10-21] §8）。"""
+        with closing(connect(settings.db_path)) as conn:
+            after_reply(user, text, reply, chat_deps(conn), now=clock.now)
+
     @app.post("/chat")
     def chat(
         body: Annotated[bytes, Depends(raw_body)],
         user: Annotated[str, Depends(current_user)],
+        background: BackgroundTasks,
     ) -> JSONResponse:
-        """对话（spec [2026-10-21] §3）：先过急症与拒答检查；本人的急症或红旗记安全标记。"""
+        """对话（spec [2026-10-21] §3–§8）：先过急症与拒答检查，再识别意图、编排回答。"""
         try:
             request = ChatRequest.model_validate_json(body)
         except ValidationError as e:
             log.info("chat.submitted", status="invalid")
             return _invalid(_errors(e))
         with closing(connect(settings.db_path)) as conn:
-            flags = SafetyFlagStore(conn, id_gen)
-
-            calls = ModelCallStore(conn)
-            runs = RunStore(conn)
-
-            def record_flag(u: str, req: str, flag: SafetyFlag) -> None:
-                flags.add(u, req, flag)
-
-            def record_run(u: str, record: RunRecord) -> None:
-                runs.add(u, record.request_id, record.model_dump_json())
-
-            gateway = Gateway(models, environ=env, clock=clock, ids=id_gen, record=calls.add)
-            deps = ChatDeps(
-                kit=kit,
-                clock=clock,
-                ids=id_gen,
-                record_flag=record_flag,
-                record_run=record_run,
-                intents=intents,
-                cards=cards,
-                rulebook=rulebook,
-                texts=texts,
-                gateway=gateway,
-            )
-            reply = respond(user, request.text, deps)
+            reply = respond(user, request.text, chat_deps(conn))
+        background.add_task(save_turn, user, request.text, reply)
         return JSONResponse(content=reply.model_dump(mode="json"))
+
+    def candidate_json(c: Candidate) -> dict[str, Any]:
+        return {
+            "candidate_id": c.candidate_id,
+            "field": c.field,
+            "value": c.value,
+            "immediate": c.immediate,
+            "status": c.status,
+        }
+
+    @app.get("/profile")
+    def get_profile(user: Annotated[str, Depends(current_user)]) -> JSONResponse:
+        with closing(connect(settings.db_path)) as conn:
+            version, data = MemoryStore(conn).profile(user)
+        return JSONResponse(content={"version": version, "data": data})
+
+    @app.get("/profile/candidates")
+    def get_candidates(user: Annotated[str, Depends(current_user)]) -> JSONResponse:
+        """待确认的画像候选（spec [2026-10-21] §8）。"""
+        with closing(connect(settings.db_path)) as conn:
+            pending = MemoryStore(conn).candidates(user, "pending")
+        return JSONResponse(content={"candidates": [candidate_json(c) for c in pending]})
+
+    @app.post("/profile/candidates/{candidate_id}/{decision}")
+    def decide_candidate(
+        candidate_id: str, decision: str, user: Annotated[str, Depends(current_user)]
+    ) -> JSONResponse:
+        """确认（confirm）或否认（reject）一个候选；已生效的健康状况被否认时撤回。"""
+        if decision not in ("confirm", "reject"):
+            return JSONResponse(status_code=404, content={"status": "not_found"})
+        with closing(connect(settings.db_path)) as conn:
+            memory = MemoryStore(conn)
+            service = ProfileService(memory, terms=profile_terms, ids=id_gen, now=clock.now)
+            decided = service.decide(user, candidate_id, decision == "confirm")
+        if decided is None:
+            return JSONResponse(status_code=404, content={"status": "not_found"})
+        return JSONResponse(content=candidate_json(decided))
 
     @app.get("/chat/runs/{request_id}")
     def chat_run(request_id: str, user: Annotated[str, Depends(current_user)]) -> JSONResponse:

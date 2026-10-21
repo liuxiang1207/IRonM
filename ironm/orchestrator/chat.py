@@ -11,12 +11,14 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ironm.contracts.common import ContractModel
+from ironm.contracts.memory import Candidate
 from ironm.contracts.screening import SafetyFlag
 from ironm.core.clock import Clock
 from ironm.core.ids import IdGenerator
@@ -24,6 +26,9 @@ from ironm.core.log import get_logger
 from ironm.core.yamlfile import load_yaml
 from ironm.knowledge.qa_cards import CardBook
 from ironm.llm.gateway import Gateway
+from ironm.memory.conversation import compress, context
+from ironm.memory.profile import ProfileService
+from ironm.memory.repo import MemoryRepo
 from ironm.orchestrator.intent import Concern, Intent, IntentBook, recognize
 from ironm.orchestrator.qa import AnswerPart, RunRecord, answer_question
 from ironm.rules.loader import RuleBook
@@ -37,13 +42,16 @@ __all__ = [
     "MAX_TEXT_CHARS",
     "AnswerPart",
     "AnswerTexts",
+    "CandidateView",
     "ChatDeps",
     "ChatReply",
+    "after_reply",
     "load_answer_texts",
     "respond",
 ]
 
 MAX_TEXT_CHARS = 2000
+HISTORY_TURNS = 4  # 交给意图识别的最近几句用户消息
 ANSWER_TEXTS_PATH = Path(__file__).with_name("answer_texts.yaml")
 
 _log = get_logger("ironm.chat")
@@ -64,10 +72,21 @@ class AnswerTexts(BaseModel):
     plan_change: Annotated[str, Field(min_length=1)]
     caution_discomfort: Annotated[str, Field(min_length=1)]
     caution_special: Annotated[str, Field(min_length=1)]
+    profile_immediate: Annotated[str, Field(min_length=1)]
+    profile_pending: Annotated[str, Field(min_length=1)]
 
 
 def load_answer_texts(path: Path = ANSWER_TEXTS_PATH) -> AnswerTexts:
     return AnswerTexts.model_validate(load_yaml(path))
+
+
+class CandidateView(ContractModel):
+    """回答里列出的画像候选：用户可以据此确认或否认。"""
+
+    candidate_id: Annotated[str, Field(min_length=1)]
+    field: str
+    value: str | int
+    immediate: bool  # 已经生效（健康状况），等待确认
 
 
 class ChatReply(ContractModel):
@@ -82,6 +101,7 @@ class ChatReply(ContractModel):
     sections: tuple[ReplySection, ...]  # 安全与拒答模板
     answer: tuple[AnswerPart, ...]
     degraded: bool = False  # 是否降级（回答里已写明）
+    candidates: tuple[CandidateView, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -95,6 +115,8 @@ class ChatDeps:
     cards: CardBook
     rulebook: RuleBook
     texts: AnswerTexts
+    memory: MemoryRepo
+    profiles: ProfileService
     gateway: Gateway | None = None  # 没有时只用词表识别意图
 
 
@@ -105,6 +127,14 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
     refusals = deps.kit.refusals.detect(text)
     subject = subject_of(text)
     refusal_part = refusal_sections(deps.kit.replies, refusals.kinds)
+    # 画像：先读（判断特殊人群），再记下这句话里的变化（健康状况立即生效）
+    profile: dict[str, Any] = {}
+    noted: list[Candidate] = []
+    try:
+        profile = deps.profiles.profile(user_id)
+        noted = deps.profiles.note(user_id, request_id, text)
+    except Exception as e:  # 画像出错不影响回答（spec [2026-10-21] §8）
+        _log.exception("chat.profile_failed", e, request_id=request_id)
     flagged = False
     intent: Intent | None = None
     concerns: tuple[Concern, ...] = ()
@@ -125,13 +155,23 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
         sections = four_section(deps.kit.replies, assessment) + refusal_part
     else:
         sections = refusal_part
+        ctx = context(deps.memory, user_id)
+        history = tuple(m.text for m in ctx.recent if m.role == "user")[-HISTORY_TURNS:]
         result = recognize(
             text,
             book=deps.intents,
             rulebook=deps.rulebook,
             gateway=deps.gateway,
             request_id=request_id,
+            history=history,
         )
+        if (profile.get("conditions") or noted_conditions(noted)) and (
+            "special_population" not in result.concerns
+        ):
+            # 画像里有健康状况：按特殊人群处理（只升不降）
+            result = result.model_copy(
+                update={"concerns": (*result.concerns, "special_population")}
+            )
         intent, concerns = result.intent, result.concerns
         if result.clarify or intent is Intent.UNKNOWN:
             layer, answer = "clarify", (AnswerPart(kind="clarify", text=deps.texts.clarify),)
@@ -150,6 +190,10 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
             )
             deps.record_run(user_id, qa.record)
             layer, answer, degraded = qa.record.layer, qa.parts, qa.record.degraded
+    if noted:
+        immediate = any(c.immediate for c in noted)
+        note = deps.texts.profile_immediate if immediate else deps.texts.profile_pending
+        answer = (*answer, AnswerPart(kind="notice", text=note))
     _log.info(
         "chat.replied",
         request_id=request_id,
@@ -169,4 +213,38 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
         sections=sections,
         answer=answer,
         degraded=degraded,
+        candidates=tuple(
+            CandidateView(
+                candidate_id=c.candidate_id, field=c.field, value=c.value, immediate=c.immediate
+            )
+            for c in noted
+        ),
     )
+
+
+def noted_conditions(noted: list[Candidate]) -> bool:
+    return any(c.field == "conditions" for c in noted)
+
+
+def after_reply(
+    user_id: str, text: str, reply: ChatReply, deps: ChatDeps, *, now: Callable[[], datetime]
+) -> None:
+    """回答之后：保存这一轮对话，需要时压缩。出错只记日志，不影响已经返回的回答。"""
+    try:
+        at = now()
+        intent = None if reply.intent is None else reply.intent.value
+        deps.memory.add_message(user_id, reply.request_id, "user", text, intent, at)
+        said = [s.text for s in reply.sections] + [p.text for p in reply.answer]
+        deps.memory.add_message(
+            user_id, reply.request_id, "assistant", "\n".join(said) or "（无）", None, at
+        )
+        compress(
+            deps.memory,
+            user_id,
+            rulebook=deps.rulebook,
+            gateway=deps.gateway,
+            request_id=reply.request_id,
+            now=now,
+        )
+    except Exception as e:
+        _log.exception("chat.after_reply_failed", e, request_id=reply.request_id)

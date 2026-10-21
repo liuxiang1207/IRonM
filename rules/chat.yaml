@@ -15,3 +15,12 @@ rules:
       clarify_below: 0.5  # 合并后低于此值、又归不进任何领域：追问
       clarify_min_chars: 3  # 消息至少这么多个字才追问（“好”“嗯”不追问）
     note: 词表与模型都给出结果时取置信度高者，相同时取词表；身体不适、特殊人群两类关注点取两者之并，只升不降。
+
+  - id: R-QA-MEMORY
+    title: 对话压缩
+    status: approved
+    source: {kind: design}
+    params:
+      compress_at: 15  # 还没压缩的消息达到这么多条时压缩
+      keep_recent: 6  # 压缩时保留原文的最近消息条数
+    note: 摘要由模型生成，模型不可用时按话题汇总；摘要不展示给用户，只作为后续回答的上下文。

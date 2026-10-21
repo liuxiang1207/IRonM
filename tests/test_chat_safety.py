@@ -17,27 +17,37 @@ from ironm.core.clock import FixedClock
 from ironm.core.config import load_settings
 from ironm.core.ids import SeededIdGenerator
 from ironm.knowledge.qa_cards import default_cards
+from ironm.memory.profile import ProfileService
+from ironm.memory.profile import load_terms as load_profile_terms
 from ironm.orchestrator.chat import ChatDeps, load_answer_texts, respond
 from ironm.orchestrator.intent import load_intent_book
 from ironm.rules.loader import RULES_DIR, load_rules
 from ironm.safety.decision import default_kit
 from ironm.store.db import connect
+from ironm.store.memory import MemoryStore
 from ironm.store.safety import SafetyFlagStore
+from tests.memory_helpers import memory_db
 
 NOW = datetime(2026, 10, 21, 9, tzinfo=UTC)
 
 
-def _deps(flags: list[tuple[str, str, SafetyFlag]]) -> ChatDeps:
+def _deps(flags: list[tuple[str, str, SafetyFlag]], memory: MemoryStore | None = None) -> ChatDeps:
+    memory = memory or memory_db()
+    ids = SeededIdGenerator(7)
     return ChatDeps(
         kit=default_kit(),
         clock=FixedClock(NOW),
-        ids=SeededIdGenerator(7),
+        ids=ids,
         record_flag=lambda user, req, flag: flags.append((user, req, flag)),
         record_run=lambda user, record: None,
         intents=load_intent_book(),
         cards=default_cards(),
         rulebook=load_rules(RULES_DIR),
         texts=load_answer_texts(),
+        memory=memory,
+        profiles=ProfileService(
+            memory, terms=load_profile_terms(), ids=ids, now=FixedClock(NOW).now
+        ),
     )
 
 

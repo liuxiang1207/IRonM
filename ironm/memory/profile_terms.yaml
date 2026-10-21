@@ -1,0 +1,30 @@
+# 从对话中发现画像变化的说法（spec [2026-10-21] §8）。只认用户说自己的情况；前面紧挨着否定词时不算。
+# 健康状况（conditions）一律立即生效：新增状况只会让分层更严；同时请用户确认，用户否认时撤回。
+# 其余（训练环境、可练天数）作为候选，用户确认后才写入画像。
+# 2026-10-21 由 Claude 撰写，属设计；健康状况的归层见 rules/safety.yaml R-SF-TIER。
+version: "1.0"
+
+conditions:
+  pregnant: [怀孕, 孕期, 孕周, 怀宝宝]
+  breastfeeding: [哺乳期, 在喂奶, 母乳喂养]
+  postpartum_within_year: [产后, 刚生完孩子, 生完宝宝, 刚生完]
+  heart_disease: [心脏病, 冠心病, 心衰, 心肌病, 心脏支架, 放了支架]
+  kidney_disease: [肾病, 肾功能不全, 肾衰]
+  hypertension: [高血压]
+  diabetes_on_medication: [二甲双胍, 打胰岛素, 降糖药, 吃降糖]
+  diabetes_no_medication: [糖尿病]
+  cerebrovascular_disease: [中风过, 脑梗过, 脑卒中, 中风史, 得过脑梗]
+  injury_rehab: [术后康复, 康复期, 伤后康复]
+  eating_disorder_history: [暴食症, 厌食症, 进食障碍]
+  weight_loss_drug_unsupervised: [减重针, 司美格鲁肽, 替尔泊肽]
+# 同一句话命中多个时只保留更严的（例如用降糖药的糖尿病，不再记“未用药”）
+stricter_than:
+  diabetes_on_medication: [diabetes_no_medication]
+
+environment:
+  home: [在家练, 家里练, 在家里练, 家里只有, 在家锻炼]
+  gym: [去健身房练, 在健身房练, 办了健身卡, 健身房的会员]
+  hotel: [出差, 住酒店]
+
+# 否定：说法前紧挨着这些词时不算
+negation: [没有, 没, 不是, 不, 无, 并没有, 没得过, 没有得过]

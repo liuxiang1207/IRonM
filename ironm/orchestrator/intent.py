@@ -38,7 +38,7 @@ __all__ = [
 INTENT_RULE = "R-QA-INTENT"
 INTENT_TERMS_PATH = Path(__file__).with_name("intent_terms.yaml")
 PROMPT_PATH = Path(__file__).parent / "prompts" / "intent_l3.md"
-PROMPT_TEMPLATE = "intent_l3@1.0.0"
+PROMPT_TEMPLATE = "intent_l3@1.1.0"
 
 
 class Intent(StrEnum):
@@ -187,12 +187,13 @@ def recognize(
     rulebook: RuleBook,
     gateway: Gateway | None,
     request_id: str,
+    history: tuple[str, ...] = (),
 ) -> IntentResult:
     p = rulebook.get(INTENT_RULE).params_as(IntentParams)
     rule = rule_intent(text, book, p)
     model: _ModelIntent | None = None
     if gateway is not None:
-        user = json.dumps({"message": text}, ensure_ascii=False)
+        user = json.dumps({"message": text, "recent": list(history)}, ensure_ascii=False)
         model = gateway.complete(
             ModelStage.INTENT,
             request_id=request_id,
