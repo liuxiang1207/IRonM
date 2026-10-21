@@ -1,0 +1,47 @@
+# 各环节使用的模型（spec [2026-10-21] §2）。只写连接与模型设置，不写密钥：
+# api_key_env 指明从哪个环境变量读取密钥（本地放在 .env，不进版本库）。
+# 选型依据：docs 中的模型选型评测（2026-10-20 决定）——主模型 deepseek-flash（不思考），
+# 审查模型 kimi-k2.6（思考，和主模型不同厂商，用于语义审查）。
+version: 2026.10.1
+
+routes:
+  intent_l3:  # 模型级意图识别
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    timeout_s: 8
+    max_tokens: 400
+    extra_body: {thinking: {type: disabled}}
+  capture:  # “说一句”记录抽取
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    timeout_s: 10
+    max_tokens: 800
+    extra_body: {thinking: {type: disabled}}
+  answer:  # 问答起草（L1）
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    timeout_s: 20
+    max_tokens: 1500
+    extra_body: {thinking: {type: disabled}}
+  review_semantic:  # 语义审查（不在用户等待的关键路径上）
+    provider: moonshot
+    base_url: https://api.moonshot.cn/v1
+    model: kimi-k2.6
+    api_key_env: MOONSHOT_API_KEY
+    timeout_s: 60
+    max_tokens: 4000
+    extra_body: {thinking: {type: enabled}}
+  reflect:  # 对话摘要、画像候选提取
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    timeout_s: 20
+    max_tokens: 1000
+    extra_body: {thinking: {type: disabled}}
