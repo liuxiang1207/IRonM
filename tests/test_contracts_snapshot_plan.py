@@ -41,6 +41,7 @@ def _snapshot(**overrides: Any) -> dict[str, Any]:
         "snapshot_id": "s1",
         "user_id": "u1",
         "as_of": "2026-10-20T00:00:00+00:00",
+        "timezone": "Asia/Shanghai",
         "tier": "a",
         "precision_by_domain": {"training": "P1", "body": "P2", "diet": "P1", "recovery": "P1"},
         "profile": {"age": 34, "sex": "male", "equipment": ["dumbbell"]},

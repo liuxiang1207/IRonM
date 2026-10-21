@@ -18,11 +18,10 @@ rules:
       reps_high: 12
       rpe_low: 6
       rpe_high: 7
-      cardio_start_add: 30  # 当前每周运动分钟 + 30
       cardio_start_min: 90
       cardio_start_min_conservative: 60  # B 与协作层
       review_days: 14
-    note: RPE 上限、每周有氧上限另受安全官约束（R-SF-TIER-LIMITS），取更严者。
+    note: 有氧起点 = 当前每周运动分钟 + 安全官规则中按分层的每周增量（R-SF-TIER-LIMITS：A 30、B 20）；RPE 上限、每周有氧上限另受安全官约束，取更严者。
 
   - id: R-EX-MINIMUM
     title: 最低任务

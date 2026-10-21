@@ -494,6 +494,12 @@
       "title": "Tier Matched",
       "type": "array"
     },
+    "timezone": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Timezone",
+      "type": "string"
+    },
     "user_id": {
       "minLength": 1,
       "title": "User Id",
@@ -504,6 +510,7 @@
     "snapshot_id",
     "user_id",
     "as_of",
+    "timezone",
     "tier",
     "precision_by_domain",
     "profile",

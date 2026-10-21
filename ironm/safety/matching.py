@@ -6,7 +6,6 @@ App 离线版（app/src/safety/emergency.ts）逐步对应实现，结果必须�
 
 import json
 import re
-import unicodedata
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated, Literal, Self
@@ -18,7 +17,8 @@ from ironm.contracts.common import ContractModel
 from ironm.core.yamlfile import load_yaml
 
 # 统一后（全角已转半角）的分句符号与空白。前端离线版使用同一组字符。
-CLAUSE_SEPARATORS = ",。!?;、\n\r~"
+# 不含顿号：“胸口、左胳膊都疼”是同一分句，拆开会让组合说法匹配不上（冲刺 2 末审查 H1）
+CLAUSE_SEPARATORS = ",。!?;\n\r~"
 _SPACES = [0x20, 0x09, 0x0C, 0x0B, 0xA0, 0x1680, *range(0x2000, 0x200C), 0x2028, 0x2029]
 WHITESPACE = "".join(map(chr, [*_SPACES, 0x202F, 0x205F, 0x3000, 0xFEFF]))
 _CLAUSE_RE = re.compile(f"[{re.escape(CLAUSE_SEPARATORS)}]+")
@@ -29,10 +29,28 @@ _BP_HIGH_RE = re.compile(r"高压([0-9]+)")
 _BP_LOW_RE = re.compile(r"低压([0-9]+)")
 
 
+def unify(text: str) -> str:
+    """全角 ASCII（U+FF01–FF5E）转半角、全角空格转空格、英文字母转小写，其余字符不变。
+
+    不用 Unicode 规范化：不同运行环境的 Unicode 版本不同，结果会不一致（冲刺 2 末审查 L1）。
+    App 离线版按同样的码点规则实现。
+    """
+    out: list[str] = []
+    for ch in text:
+        code = ord(ch)
+        if 0xFF01 <= code <= 0xFF5E:
+            code -= 0xFEE0
+        elif code == 0x3000:
+            code = 0x20
+        if 0x41 <= code <= 0x5A:
+            code += 0x20
+        out.append(chr(code))
+    return "".join(out)
+
+
 def clauses(text: str) -> list[str]:
-    """统一文字（全角转半角、英文转小写）后按分句符号切开，再去掉空白；空分句丢弃。"""
-    unified = unicodedata.normalize("NFKC", text).lower()
-    parts = (_SPACE_RE.sub("", p) for p in _CLAUSE_RE.split(unified))
+    """统一文字后按分句符号切开，再去掉空白；空分句丢弃。"""
+    parts = (_SPACE_RE.sub("", p) for p in _CLAUSE_RE.split(unify(text)))
     return [p for p in parts if p]
 
 

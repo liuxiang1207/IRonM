@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel
 
+from ironm.contracts.rules import RuleParamError
 from ironm.engine.calories import (
     DEFICIT,
     FLOOR,
@@ -65,6 +66,26 @@ RULE_PARAMS: dict[str, type[BaseModel]] = {
 
 
 def validate_rule_params(rulebook: RuleBook) -> None:
-    """规则缺失或参数不符时直接报错（错误信息含规则编号）。"""
+    """规则缺失或参数不符时直接报错（错误信息含规则编号）；再检查跨规则的一致性（spec §32）。"""
     for rule_id, model in RULE_PARAMS.items():
         rulebook.get(rule_id).params_as(model)
+    _check_cross_rules(rulebook)
+
+
+def _check_cross_rules(rulebook: RuleBook) -> None:
+    def params[M: BaseModel](rule_id: str, model: type[M]) -> M:
+        return rulebook.get(rule_id).params_as(model)
+
+    ages = {
+        TIER_RULE: params(TIER_RULE, TierParams).senior_age,
+        DEFICIT: params(DEFICIT, DeficitParams).senior_age,
+        PROTEIN: params(PROTEIN, ProteinParams).senior_age,
+    }
+    if len(set(ages.values())) != 1:
+        raise RuleParamError(f"各规则中的老年年龄界值不一致：{ages}")
+    window = params(JUDGEMENT_WINDOW, WindowParams).min_window_days
+    span = params(WEIGHT_TREND, TrendParams).min_span_days
+    if window < span:
+        raise RuleParamError(
+            f"{JUDGEMENT_WINDOW} 的最短窗口 {window} 天短于 {WEIGHT_TREND} 的最少覆盖 {span} 天"
+        )

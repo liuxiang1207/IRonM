@@ -85,8 +85,22 @@ export interface Assessment {
 const RANK: Record<Level, number> = { none: 0, red_flag: 1, emergency: 2 };
 
 // 统一文字（全角转半角、英文转小写）后按分句符号切开，再去掉空白；空分句丢弃。
+// 全角 ASCII（U+FF01–FF5E）转半角、全角空格转空格、英文字母转小写，其余字符不变。
+// 不用 normalize("NFKC")：各运行环境的 Unicode 版本不同，结果会与服务端不一致。
+export function unify(text: string): string {
+  let out = "";
+  for (const ch of text) {
+    let code = ch.codePointAt(0) ?? 0;
+    if (code >= 0xff01 && code <= 0xff5e) code -= 0xfee0;
+    else if (code === 0x3000) code = 0x20;
+    if (code >= 0x41 && code <= 0x5a) code += 0x20;
+    out += String.fromCodePoint(code);
+  }
+  return out;
+}
+
 export function clauses(book: TermBook, text: string): string[] {
-  const unified = text.normalize("NFKC").toLowerCase();
+  const unified = unify(text);
   const parts: string[] = [];
   let current = "";
   for (const ch of unified) {

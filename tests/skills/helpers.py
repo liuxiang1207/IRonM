@@ -52,6 +52,7 @@ def snapshot(
         "snapshot_id": "s1",
         "user_id": "u1",
         "as_of": "2026-10-21T00:00:00+00:00",
+        "timezone": "Asia/Shanghai",
         "tier": tier.value if tier else {"unknown": "insufficient_data"},
         "tier_matched": [t.value for t in matched],
         "precision_by_domain": {

@@ -26,7 +26,7 @@ TZ = ZoneInfo("Asia/Shanghai")
 GYM, OLDER, PREGNANT, NEW = PERSONAS.values()
 
 
-def _run(profile: dict[str, Any], **kw: bool) -> FirstPlan:
+def _run(profile: dict[str, Any], **kw: Any) -> FirstPlan:
     return first_plan(profile, as_of=AS_OF, tz=TZ, rulebook=BOOK, skills=SKILLS, **kw)
 
 

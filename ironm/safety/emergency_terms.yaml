@@ -9,7 +9,7 @@
 #       中暑、低血糖、横纹肌溶解、马尾综合征、深静脉血栓、孕期危险信号（ACOG 804）的通行就医标准；
 #       严重过敏、哮喘（GINA）、脑震荡（CRT6）、自伤与轻生的危机处理。
 # 每个症状可写 not_followed_by：说法后紧跟这些字时这一处不算（如“吃完就吐”后接“槽”）。
-version: "1.0"
+version: "1.1"
 review: approved
 
 # 否定与“以前发生过”：只取消紧挨着的一处说法；拿不准时按出现处理。血压数值不受影响。
@@ -20,10 +20,10 @@ negation:
   exceptions: [差点没, 差一点没, 险些没, 差点儿没]
   # 说法后紧跟“过”表示以前发生过（“上周胸口疼过”“以前晕倒过”），这一处不算……
   past_after: 过
-  # ……“晕倒过去”不是以前发生过
-  past_not_followed_by: [去]
-  # 句中有再次发生的字样时，以前发生过的也照常算（“以前胸口疼过，今天又疼了”）
-  recurrence: [又, 再次, 还是, 刚才, 刚刚, 这次, 还在, 再一次, 又开始]
+  # ……“晕倒过去”“过敏”“过多”“过后”“过来”等不是以前发生过（冲刺 2 末审查 H2）
+  past_not_followed_by: [去, 敏, 多, 后, 度, 来, 量, 速, 快, 头, 劳, 分, 于, 程]
+  # 句中有再次发生或近期的字样时，以前发生过的也照常算（“以前胸口疼过，今天又疼了”“今天晕倒过一次”）
+  recurrence: [又, 再次, 还是, 刚才, 刚刚, 这次, 还在, 再一次, 又开始, 今天, 昨天, 这几天, 最近, 这周]
 
 symptoms:
   - id: chest_pain
@@ -34,23 +34,24 @@ symptoms:
       - [[胸口, 胸前, 前胸, 心口, 胸骨], [痛, 疼, 闷, 压, 紧, 憋, 堵, 难受, 绞, 揪]]
   - id: radiating
     name: 疼痛或麻木放射到左臂、下巴、后背
-    terms: [左胳膊, 左臂, 左手臂, 左肩, 下巴, 下颌, 后背, 牙也疼]
+    terms: [左胳膊, 左臂, 左手臂, 左边胳膊, 左边手臂, 左手也, 左肩, 下巴, 下颌, 后背, 牙也疼]
   - id: cold_sweat
     name: 出冷汗
     terms: [冷汗, 虚汗, 大汗淋漓]
   - id: ongoing
     name: 正在持续、休息不缓解或加重
     # 不单用“还在”：“我还在坚持跑步”“现在还在喘”不是症状持续
-    terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 一直疼, 一直痛, 一直闷, 持续, 到现在, 不缓解, 没缓解, 不见好, 没好转, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
+    terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 还是疼, 还是痛, 一直疼, 一直痛, 一直闷, 持续, 到现在, 不缓解, 没有缓解, 不见缓解, 休息了也, 也不行, 没缓解, 不见好, 没好转, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
   - id: sudden
     name: 突然发生
     terms: [突然, 一下子, 猛地, 突发]
   - id: collapse
     name: 晕倒或意识丧失
-    terms: [晕倒, 昏倒, 晕过去, 昏过去, 倒下, 倒地, 晕厥, 昏厥, 失去意识, 没了意识, 不省人事, 叫不醒]
+    terms: [晕倒, 昏倒, 晕过去, 昏过去, 倒下, 倒地, 晕厥, 昏厥, 失去意识, 没了意识, 不省人事, 叫不醒, 叫不应]
     combos:
       # “没反应”须说的是人（“手机没有反应了”不算）
-      - [[人, 他, 她, 叫, 喊], [没反应, 没有反应]]
+      - [[人, 他, 她, 叫, 喊], [没反应, 没有反应, 不应, 不答应, 没回应]]
+      - [[人, 他, 她, 突然], [倒了, 栽倒]]
   - id: seizure
     name: 抽搐
     terms: [抽搐, 抽风, 口吐白沫]
@@ -65,6 +66,9 @@ symptoms:
   - id: dyspnea
     name: 呼吸困难
     terms: [喘不上气, 喘不过气, 上不来气, 呼吸困难, 透不过气, 吸不上气, 喘得厉害, 气短, 憋得慌]
+  - id: dyspnea_severe
+    name: 严重的呼吸困难
+    terms: [憋死, 窒息, 呼吸不上来, 喘不过来要死, 喘不上气要死]
   - id: change_worse
     name: 比以前明显变差
     terms: [以前不会, 以前不这样, 以前没有, 比以前, 越来越, 最近总, 最近老, 最近经常]
@@ -84,14 +88,17 @@ symptoms:
     terms: [头痛, 头疼, 脑袋疼, 脑袋痛, 头要炸, 头像要炸]
   - id: severe
     name: 程度剧烈
-    terms: [剧烈, 炸开, 要炸, 从来没有这么, 从没这么, 受不了, 很厉害, 特别厉害, 非常厉害, 剧痛]
+    terms: [剧烈, 炸开, 要炸, 从来没有这么, 从来没这么, 从没这么, 受不了, 很厉害, 特别厉害, 非常厉害, 得厉害, 剧痛]
   - id: speech
     name: 说话不清
     terms: [说话不清, 说话说不清, 说话也说不清, 说不出话, 口齿不清, 吐字不清, 说话含糊, 讲话含糊, 舌头发硬, 舌头不听使唤]
+    combos:
+      - [[说话, 讲话, 吐字], [不太清, 不清楚, 含糊]]
   - id: one_side_weak
     name: 一侧脸或肢体麻木无力
     terms: [嘴歪, 口角歪, 口眼歪斜, 半身不遂, 偏瘫]
     combos:
+      - [[嘴, 嘴角, 脸], [歪]]
       - [[一边, 半边, 一侧, 单侧, 左边, 右边, 左半边, 右半边, 左手, 右手], [脸, 手, 胳膊, 腿, 身子, 身体], [麻, 没力, 无力, 没劲, 不听使唤, 动不了, 抬不起, 拿不住]]
   - id: vision_loss
     name: 视力突然丧失或重影
@@ -205,10 +212,12 @@ symptoms:
     terms: [割腕, 吃了很多安眠药, 吞药, 吃了一整瓶, 遗书, 准备自杀, 正在自杀, 跳楼]
   - id: self_harm_idea
     name: 轻生想法
-    terms: [想死, 不想活, 活着没意思, 活不下去, 自杀, 轻生, 结束生命, 想消失, 伤害自己, 自残]
+    terms: [想死, 想去死, 不如死了, 不想活, 活着没意思, 活不下去, 自杀, 轻生, 结束生命, 想消失, 伤害自己, 自残]
   - id: hives
     name: 全身风团或面部肿胀
     terms: [风团, 荨麻疹, 全身起疹子, 全身起疙瘩, 全身痒, 嘴唇肿, 眼睛肿]
+    combos:
+      - [[嘴唇, 眼睛, 眼皮, 脸], [肿]]
   - id: throat_swelling
     name: 喉咙发紧或肿
     terms: [喉咙发紧, 嗓子发紧, 喉咙肿, 嗓子肿, 舌头肿, 咽不下去]
@@ -272,6 +281,7 @@ rules:
   # ---- 呼吸 ----
   - {id: EM-CYANOSIS, level: emergency, category: respiratory, title: 嘴唇或脸色发紫, all: [cyanosis]}
   - {id: EM-DYSPNEA-ONGOING, level: emergency, category: respiratory, title: 呼吸困难休息不缓解, all: [dyspnea, ongoing]}
+  - {id: EM-DYSPNEA-SEVERE, level: emergency, category: respiratory, title: 严重的呼吸困难（快憋死、窒息感）, all: [dyspnea_severe]}
   - {id: RF-DYSPNEA-WORSE, level: red_flag, category: respiratory, title: 气短比以前明显加重, all: [dyspnea, change_worse]}
   - {id: EM-ASTHMA-NORELIEF, level: emergency, category: respiratory, title: 哮喘用了急救药仍不缓解, all: [asthma, reliever_fail]}
   - {id: RF-ASTHMA, level: red_flag, category: respiratory, title: 运动中哮喘发作, all: [asthma]}

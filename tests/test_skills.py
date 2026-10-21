@@ -228,7 +228,9 @@ def test_skill_cannot_read_other_skills_data(tmp_path: Path) -> None:
     _write(tmp_path, _manifest("first", requires_data=["tier"]), read=("metric.weight_trend",))
     _write(tmp_path, _manifest("second", requires_data=["metric.weight_trend"]))
     with pytest.raises(UndeclaredDataError):
-        Agent(NUTRI).execute(_snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK)
+        Agent(NUTRI, strict=True).execute(
+            _snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK
+        )
 
 
 @pytest.mark.parametrize(
@@ -240,7 +242,9 @@ def test_output_must_match_running_skill(
 ) -> None:
     _write(tmp_path, _manifest("first"), agent=agent, name=name)
     with pytest.raises(AgentContractError, match=message):
-        Agent(NUTRI).execute(_snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK)
+        Agent(NUTRI, strict=True).execute(
+            _snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK
+        )
 
 
 def test_selection_for_other_agent_rejected(library: tuple[LoadedSkill, ...]) -> None:
@@ -347,3 +351,19 @@ def test_bundled_skills_reviewed_and_tested() -> None:
     for s in skills:
         assert s.manifest.review == "approved", s.manifest.id
         assert (root / s.manifest.tests).is_file(), s.manifest.tests
+
+
+def test_skill_error_isolated_to_no_opinion(tmp_path: Path) -> None:
+    """非严格模式：出错的 Skill 降级为本次无意见，其他 Skill 照常（spec §32）。"""
+    _write(tmp_path, _manifest("broken", requires_data=["tier"]), read=("metric.weight_trend",))
+    _write(tmp_path, _manifest("fine", requires_data=["tier"]), read=("tier",))
+    outputs = Agent(NUTRI).execute(_snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK)
+    by_skill = {o.skill: getattr(o, "reason_code", None) for o in outputs}
+    assert by_skill["broken@0.1.0"] == "skill_error:UndeclaredDataError"
+    assert by_skill["fine@0.1.0"] == "test"
+
+
+def test_non_prescriptive_with_produces_rejected(tmp_path: Path) -> None:
+    _write(tmp_path, _manifest("x", prescriptive=False, produces=["diet_mode"]))
+    with pytest.raises(SkillLoadError, match="必须是处方类"):
+        load_skills(tmp_path)

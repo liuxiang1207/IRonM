@@ -30,13 +30,9 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
         }
 
     max_rpe = p.b_max_rpe if conservative else p.a_max_rpe
-    step = p.b_cardio_step_min if conservative else p.a_cardio_step_min
-    items = [
-        item("intensity_target", "max", {"rpe": max_rpe}, f"tier_{tier}_max_rpe"),
-        item(
-            "progression_rule", "max", {"cardio_minutes_per_week": step}, f"tier_{tier}_cardio_step"
-        ),
-    ]
+    # 有氧每周增量由训练规划师直接按本规则取用（冲刺 2 末审查 M4）：
+    # 不再对没有任何 Skill 产出的字段下约束
+    items = [item("intensity_target", "max", {"rpe": max_rpe}, f"tier_{tier}_max_rpe")]
     if conservative:
         cap = p.b_cardio_cap_min
         items.append(item("weekly_cardio_minutes", "max", cap, f"tier_{tier}_cardio_cap"))

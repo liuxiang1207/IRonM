@@ -1,6 +1,7 @@
 """快照：一次运行中所有 Agent 读取的同一份只读数据。Agent 之间不通信，只读快照。"""
 
 from typing import Annotated, Self
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, JsonValue, model_validator
 
@@ -16,6 +17,8 @@ class Snapshot(ContractModel):
     snapshot_id: Annotated[str, Field(min_length=1)]
     user_id: Annotated[str, Field(min_length=1)]
     as_of: UtcDatetime
+    # 用户时区（标准名称），年龄与日期以此为准
+    timezone: Annotated[str, Field(min_length=1, max_length=64)]
     tier: Tier | Unknown  # 还没建档时为“未知”
     tier_matched: tuple[Tier, ...] = ()  # 同时满足的所有分层（热量等计算取更保守的约束）
     precision_by_domain: FrozenMap[Domain, Precision]
@@ -27,6 +30,10 @@ class Snapshot(ContractModel):
 
     @model_validator(mode="after")
     def _check(self) -> Self:
+        try:
+            ZoneInfo(self.timezone)
+        except (ZoneInfoNotFoundError, ValueError) as e:
+            raise ValueError("时区无效，应为标准名称（如 Asia/Shanghai）") from e
         missing = set(Domain) - set(self.precision_by_domain)
         if missing:
             raise ValueError(f"精度表缺少领域：{', '.join(sorted(missing))}")

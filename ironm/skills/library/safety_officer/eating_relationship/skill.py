@@ -11,8 +11,11 @@ SIGNALS = frozenset({Condition.EATING_DISORDER_HISTORY, Condition.EATING_DISORDE
 
 
 def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
-    conditions = view.get("profile.conditions")
-    present = set(conditions) if isinstance(conditions, list | tuple) else set()
+    present: set[object] = set()
+    for key in ("profile.conditions", "profile.derived_conditions"):  # 问卷答案与聊天推出的
+        value = view.get(key)
+        if isinstance(value, list | tuple):
+            present |= set(value)
     if not present & SIGNALS:
         return no_opinion(context, "no_signal")
     items = [

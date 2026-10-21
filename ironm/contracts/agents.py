@@ -1,5 +1,6 @@
 """Agent 输出：约束、提案、判定、追问、无意见。越权与输出类型在契约层校验。"""
 
+from collections.abc import Mapping
 from datetime import date
 from typing import Annotated, Literal, Self
 
@@ -25,7 +26,22 @@ class Constraint(ContractModel):
     def _check_value(self) -> Self:
         if self.value is None:
             raise ValueError("约束必须给出取值")
+        if self.op in ("max", "min") and not _is_limit(self.value):
+            raise ValueError("上限与下限的取值只能是数值，或“键 → 数值”")
         return self
+
+
+def _is_number(value: object) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
+
+
+def _is_limit(value: object) -> bool:
+    """数值，或非空的“键 → 数值”。"""
+    if _is_number(value):
+        return True
+    if isinstance(value, Mapping):
+        return bool(value) and all(_is_number(v) for v in value.values())
+    return False
 
 
 class Proposal(ContractModel):

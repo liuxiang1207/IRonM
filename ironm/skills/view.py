@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from pydantic import JsonValue
 
@@ -34,6 +35,11 @@ class SnapshotView:
     def as_of(self) -> datetime:
         """快照的计算时间（复核日期等以此为准）。"""
         return self._snapshot.as_of
+
+    @property
+    def tz(self) -> ZoneInfo:
+        """用户时区（快照校验过的标准名称）；年龄、当地日期一律以此为准，不自行回退。"""
+        return ZoneInfo(self._snapshot.timezone)
 
     def get(self, key: str) -> object | Unknown:
         if key not in self._declared:

@@ -1,14 +1,14 @@
 ---
 id: energy_target
 owner_agent: nutritionist
-version: 1.0.0
+version: 1.0.1
 description: 能量目标：用热量计算给出每日热量与蛋白质目标，缺口按同时满足的所有分层取最小
 triggers:
   intents: [goal.create, plan.adjust]
 applies_to:
   scene_packs: [fat_loss]
   population_tiers: [a, a_prime, b, collaborative]
-requires_data: [tier, tier_matched, current_plan, profile.birth_date, profile.sex, profile.height_cm, profile.weight_kg, profile.activity, profile.timezone, profile.high_protein]
+requires_data: [tier, tier_matched, current_plan, profile.birth_date, profile.sex, profile.height_cm, profile.weight_kg, profile.activity, profile.high_protein]
 produces: [daily_kcal_target, daily_protein_g_target]
 priority: 10
 prescriptive: true

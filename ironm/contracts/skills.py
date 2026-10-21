@@ -63,6 +63,8 @@ class SkillManifest(ContractModel):
     def _check(self) -> Self:
         if self.prescriptive and self.applies_to.unknown_tier:
             raise ValueError(f"{self.id}：处方类 Skill 不能在分层未知时加载")
+        if self.produces and not self.prescriptive:
+            raise ValueError(f"{self.id}：产出计划字段的 Skill 必须是处方类")
         stolen = [f for f in self.produces if FIELD_OWNERS[f] != self.owner_agent]
         if stolen:
             raise ValueError(f"越权：{self.id} 产出的字段 {stolen} 不归 {self.owner_agent} 负责")

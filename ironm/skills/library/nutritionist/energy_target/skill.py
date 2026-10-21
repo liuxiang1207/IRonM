@@ -3,7 +3,6 @@
 import json
 from datetime import timedelta
 from typing import Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ironm.contracts.agents import AgentOutput
 from ironm.contracts.calories import Activity, CalorieTarget
@@ -25,14 +24,6 @@ def _screening(view: SnapshotView) -> Screening:
         if not isinstance(value, Unknown):
             data[name] = value
     return Screening.model_validate_json(json.dumps(data))
-
-
-def _zone(view: SnapshotView) -> ZoneInfo:
-    name = view.get("profile.timezone")
-    try:
-        return ZoneInfo(name) if isinstance(name, str) else ZoneInfo("UTC")
-    except (ZoneInfoNotFoundError, ValueError):
-        return ZoneInfo("UTC")  # 只影响生日当天的周岁，误差不超过一天
 
 
 def _tier(view: SnapshotView) -> TierResult:
@@ -76,7 +67,7 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
         else not_recorded(),
         _tier(view),
         as_of=view.as_of,
-        tz=_zone(view),
+        tz=view.tz,  # 时区由快照统一给出，不自行回退（冲刺 2 末审查 M3）
         rulebook=context.rulebook,
         high_protein=high_protein is True,
     )

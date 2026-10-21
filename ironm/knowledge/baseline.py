@@ -12,6 +12,7 @@ from ironm.contracts.common import ContractModel
 from ironm.contracts.screening import Tier
 from ironm.contracts.unknown import Unknown
 from ironm.core.yamlfile import load_yaml
+from ironm.safety.decision import plan_allowed
 
 __all__ = [
     "BASELINE_PATH",
@@ -69,6 +70,10 @@ class BaselineBook(ContractModel):
             raise ValueError(f"测试项编号重复：{dup}")
         if not any(t.kind == "vital" for t in self.tests):
             raise ValueError("至少要有一项任何人都能测的生命体征")
+        for t in self.tests:
+            blocked = [tier for tier in t.tiers if not plan_allowed(tier)]
+            if t.kind == "fitness" and blocked:
+                raise ValueError(f"体能项目 {t.id} 不能适用于不可给计划的分层：{blocked}")
         return self
 
     def get(self, test_id: str) -> BaselineTest:

@@ -1,4 +1,4 @@
-"""每周结构（spec §30）：第一版力量训练次数、全身槽位、用力程度与每周有氧分钟数。"""
+"""每周结构（spec §30、§32）：第一版力量训练次数、全身槽位、用力程度与每周有氧分钟数。"""
 
 from collections.abc import Iterable, Mapping
 from datetime import timedelta
@@ -9,11 +9,13 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from ironm.contracts.agents import AgentOutput, Constraint
 from ironm.contracts.exercises import Pattern
 from ironm.contracts.screening import Tier
+from ironm.safety.tiers import TIER_LIMITS_RULE, TierLimitsParams
 from ironm.skills.loader import SkillContext
 from ironm.skills.outputs import Change, proposals
 from ironm.skills.view import SnapshotView
 
 RULE = "R-TR-START"
+MAX_WEEK_MINUTES = 7 * 24 * 60  # 当前每周运动分钟超出 0–10080 视为未知
 CONSERVATIVE = frozenset({Tier.B, Tier.COLLABORATIVE})
 
 
@@ -29,7 +31,6 @@ class StartParams(BaseModel):
     reps_high: int
     rpe_low: int
     rpe_high: int
-    cardio_start_add: int
     cardio_start_min: int
     cardio_start_min_conservative: int
     review_days: int
@@ -46,7 +47,7 @@ class StartParams(BaseModel):
         return self
 
 
-RULE_PARAMS = {RULE: StartParams}
+RULE_PARAMS = {RULE: StartParams, TIER_LIMITS_RULE: TierLimitsParams}
 
 
 def _max_limit(
@@ -79,9 +80,16 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
     rpe_high = p.rpe_high if rpe_cap is None else min(p.rpe_high, int(rpe_cap))
     rpe_low = min(p.rpe_low, rpe_high)
 
-    floor = p.cardio_start_min_conservative if tier in CONSERVATIVE else p.cardio_start_min
-    base = current if isinstance(current, int) and current >= 0 else 0
-    cardio = max(base + p.cardio_start_add, floor)
+    conservative = tier in CONSERVATIVE
+    limits = context.rulebook.get(TIER_LIMITS_RULE).params_as(TierLimitsParams)
+    # 起点增量与安全官规则中按分层的每周增量一致（A、A′ 30，B、协作 20）
+    step = limits.b_cardio_step_min if conservative else limits.a_cardio_step_min
+    floor = p.cardio_start_min_conservative if conservative else p.cardio_start_min
+    valid = isinstance(current, int) and not isinstance(current, bool)
+    if not (valid and 0 <= current <= MAX_WEEK_MINUTES):  # type: ignore[operator]
+        current = None
+    base = current if isinstance(current, int) else 0
+    cardio = max(base + step, floor)
     cardio_cap = _max_limit(rules, "weekly_cardio_minutes")
     if cardio_cap is not None:
         cardio = min(cardio, int(cardio_cap))

@@ -47,7 +47,14 @@ def test_slots_and_intensity() -> None:
 
 @pytest.mark.parametrize(
     ("tier", "current", "minutes"),
-    [(Tier.A, 120, 150), (Tier.A, 30, 90), (Tier.A, None, 90), (Tier.B, 0, 60), (Tier.B, 50, 80)],
+    [
+        (Tier.A, 120, 150),
+        (Tier.A, 30, 90),
+        (Tier.A, None, 90),
+        (Tier.B, 0, 60),
+        (Tier.B, 50, 70),
+        (Tier.A, 10**6, 90),
+    ],
 )
 def test_cardio_start(tier: Tier, current: int | None, minutes: int) -> None:
     profile = {"current_cardio_minutes": current} if current is not None else {}

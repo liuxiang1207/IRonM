@@ -17,16 +17,12 @@ def _limits(tier: Tier | None) -> dict[str, Any]:
 
 
 def test_a_tier() -> None:
-    assert _limits(Tier.A) == {
-        "intensity_target": ("max", {"rpe": 8}),
-        "progression_rule": ("max", {"cardio_minutes_per_week": 30}),
-    }
+    assert _limits(Tier.A) == {"intensity_target": ("max", {"rpe": 8})}
 
 
 def test_b_and_collaborative_are_stricter() -> None:
     expected = {
         "intensity_target": ("max", {"rpe": 7}),
-        "progression_rule": ("max", {"cardio_minutes_per_week": 20}),
         "weekly_cardio_minutes": ("max", 150),
     }
     assert _limits(Tier.B) == expected
