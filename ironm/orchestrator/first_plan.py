@@ -41,7 +41,7 @@ from ironm.safety.decision import decide, plan_allowed
 from ironm.safety.tiers import classify
 from ironm.skills.loader import LoadedSkill, select
 
-__all__ = ["FirstPlan", "first_plan"]
+__all__ = ["FirstPlan", "build_snapshot", "current_tier", "first_plan"]
 
 SCREENING_FIELDS = ("birth_date", "sex", "height_cm", "weight_kg", "waist_cm", "conditions")
 BLOCKING = "no_plan_until_answered"  # 没回答就不能给计划的追问
@@ -76,6 +76,21 @@ def _clean(profile: Mapping[str, Any]) -> dict[str, Any]:
     return data
 
 
+def current_tier(
+    profile: Mapping[str, Any],
+    *,
+    as_of: datetime,
+    tz: ZoneInfo,
+    rulebook: RuleBook,
+    flags: Iterable[SafetyFlag] = (),
+    clearances: Iterable[datetime] = (),
+) -> TierResult:
+    """按当前画像与红旗记录重新分层（复盘时用，与第一版计划同一套判断）。"""
+    return classify(
+        _screening(_clean(profile), flags, clearances), as_of=as_of, tz=tz, rulebook=rulebook
+    )
+
+
 def _screening(
     profile: Mapping[str, Any], flags: Iterable[SafetyFlag], clearances: Iterable[datetime]
 ) -> Screening:
@@ -85,14 +100,16 @@ def _screening(
     return Screening.model_validate_json(json.dumps(data))
 
 
-def _snapshot(
+def build_snapshot(
     profile: Mapping[str, Any],
     tier: TierResult,
     as_of: datetime,
     tz: ZoneInfo,
     constraints: Iterable[Constraint] = (),
     plan: PlanVersion | None = None,
+    review: Mapping[str, Any] | None = None,
 ) -> Snapshot:
+    """第一版计划与复盘共用的快照（复盘时带上 review 事实，spec [2026-10-21] §17）。"""
     data = {
         "snapshot_id": f"first-plan-{as_of.isoformat()}",
         "user_id": str(profile.get("user_id", "demo")),
@@ -106,6 +123,7 @@ def _snapshot(
         "current_plan": None if plan is None else plan.model_dump(mode="json"),
         "constraints": [c.model_dump(mode="json") for c in constraints],
         "prior_verdicts": [],
+        "review": dict(review or {}),
     }
     return Snapshot.model_validate_json(json.dumps(data, ensure_ascii=False))
 
@@ -168,7 +186,7 @@ def first_plan(
         outputs.extend(result)
         return result
 
-    base = _snapshot(profile, tier, as_of, tz)
+    base = build_snapshot(profile, tier, as_of, tz)
     questions = tuple(
         q for o in run(AgentId.ASSESSOR, base) if isinstance(o, QuestionsOutput) for q in o.items
     )
@@ -198,7 +216,7 @@ def first_plan(
                 if verdict.result == "pass":
                     accepted.append(p)
 
-    with_rules = _snapshot(profile, tier, as_of, tz, constraints)
+    with_rules = build_snapshot(profile, tier, as_of, tz, constraints)
     review(run(AgentId.TRAINING_PLANNER, with_rules))
     review(run(AgentId.NUTRITIONIST, with_rules))
     review(run(AgentId.BEHAVIOR_COACH, with_rules))  # 称重日、签到日与提醒时间
@@ -209,7 +227,7 @@ def first_plan(
     }
     if accepted:  # 动作教练把草稿中的槽位落成具体动作
         draft = _plan(accepted, as_of, rulebook, used)
-        coach = _snapshot(profile, tier, as_of, tz, constraints, draft)
+        coach = build_snapshot(profile, tier, as_of, tz, constraints, draft)
         review(run(AgentId.EXERCISE_COACH, coach))
     used = {
         o.skill.split("@")[0]: o.skill.split("@")[1]

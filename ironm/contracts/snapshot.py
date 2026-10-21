@@ -27,6 +27,8 @@ class Snapshot(ContractModel):
     current_plan: PlanVersion | None  # 首版计划之前为空
     constraints: tuple[Constraint, ...]
     prior_verdicts: tuple[Verdict, ...]  # 上一轮被拒的理由写进下一轮快照
+    # 复盘用的事实（完成率、平均 RPE、疲劳与睡眠等，spec [2026-10-21] §17）；不是复盘时为空
+    review: FrozenMap[str, JsonValue] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _check(self) -> Self:

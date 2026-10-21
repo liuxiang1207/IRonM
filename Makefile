@@ -4,7 +4,7 @@ ifeq ($(strip $(UV)),)
 $(error 找不到 uv，请先安装：https://docs.astral.sh/uv/getting-started/installation/)
 endif
 
-.PHONY: setup check lock-check lint deps fmt type test run schemas offline migrate eval-models sim demo add-user device-code users
+.PHONY: setup check lock-check lint deps fmt type test run schemas offline migrate eval-models sim sim-review demo add-user device-code users
 
 setup:
 	$(UV) sync --locked
@@ -65,6 +65,10 @@ users:
 # 快进模拟：5 类模拟用户各 8 周，写入 data/sim/sim.sqlite 并输出汇总
 sim:
 	$(UV) run python -m sim
+
+# 冲刺 4 演示（D40）：5 类模拟用户各 8 周的每周复盘与计划调整，逐次核对是否符合决策表
+sim-review:
+	$(UV) run python -m sim.reviews
 
 # 冲刺 2 演示：几类模拟用户从建档到第一版计划（含依据卡与基线测试）
 demo:

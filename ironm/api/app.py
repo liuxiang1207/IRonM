@@ -9,14 +9,14 @@ import threading
 import time
 from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import asynccontextmanager, closing
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import IO, Annotated, Any
+from typing import IO, Annotated, Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from ironm import __version__
 from ironm.contracts.events import EVENT_ADAPTER, EnergyCheckEvent, Event, WeightEvent
@@ -29,6 +29,7 @@ from ironm.core.ids import IdGenerator, RandomIdGenerator
 from ironm.core.log import configure_logging, get_logger
 from ironm.engine.energy import EnergyAdjustment, energy_today
 from ironm.engine.metrics_view import build_metrics, lookback_days
+from ironm.engine.review_facts import RETURN_RULE, ReturnParams, return_state, training_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.knowledge.baseline import BASELINE_PATH, load_baseline
 from ironm.knowledge.exercises import LIBRARY_PATH, load_library
@@ -49,6 +50,7 @@ from ironm.orchestrator.chat import (
 )
 from ironm.orchestrator.domains import DOMAIN_RULE, DomainParams
 from ironm.orchestrator.intent import INTENT_RULE, IntentParams, load_intent_book
+from ironm.orchestrator.jobs import JobContext, plan_jobs, run_job
 from ironm.orchestrator.onboarding import Intake, history_view, onboard, plan_view, today_tasks
 from ironm.orchestrator.pages import PAGE_INTENTS, PageContext
 from ironm.orchestrator.qa import RunRecord
@@ -57,13 +59,16 @@ from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
 from ironm.safety.refusals import REFUSALS_PATH
 from ironm.safety.replies import REPLIES_PATH
+from ironm.scheduler.runner import Scheduler, TickResult
 from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
 from ironm.store.auth import AuthStore
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
+from ironm.store.jobs import JobStore
 from ironm.store.memory import MemoryStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
 from ironm.store.plans import PlanStore, VersionConflict
+from ironm.store.reviews import DecisionStore
 from ironm.store.safety import ModelCallStore, RunStore, SafetyFlagStore
 
 log = get_logger("ironm.api")
@@ -113,6 +118,25 @@ class _LoginGuard:
             self._fails = [t for t in self._fails if now - t < self.WINDOW] + [now]
             if len(self._fails) >= self.LIMIT:
                 self._until, self._fails = now + self.WINDOW, []
+
+
+class ModeRequest(BaseModel):
+    """出差 / 节假日 / 恢复正常；出差与节假日要给结束日期（最多 60 天）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: Literal["travel", "holiday", "normal"]
+    until: date | None = None
+
+    @model_validator(mode="after")
+    def _check(self) -> "ModeRequest":
+        if self.mode != "normal" and self.until is None:
+            raise ValueError("出差与节假日要给结束日期")
+        return self
+
+
+def _midnight_utc(day: date, tz: ZoneInfo) -> datetime:
+    return datetime.combine(day, datetime.min.time(), tzinfo=tz)
 
 
 class ChatRequest(BaseModel):
@@ -241,6 +265,7 @@ def create_app(
     rulebook.get(MEMORY_RULE).params_as(MemoryParams)
     env = os.environ if environ is None else environ
     library = load_library(library_path)  # 动作库：启动时校验（spec §27）
+    rulebook.get(RETURN_RULE).params_as(ReturnParams)  # 中断回归参数：启动时校验（spec §17）
     # 知识库与检索（spec [2026-10-21] §12）：问答卡 + 动作库 + 资料目录的段落，启动时建索引
     # 向量一路（spec §13）：配置了向量服务的密钥才启用；段落向量第一次检索时计算，调用只记日志
     vectors = bool(env.get(models.routes[ModelStage.EMBEDDING].api_key_env))
@@ -259,12 +284,39 @@ def create_app(
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         with closing(connect(settings.db_path)) as conn:
             migrate(conn, migrations_dir, clock)
+            JobStore(conn).reset_running(clock.now())  # 上次没执行完的任务重新排队
         if vectors:
             # 启动后在后台预先计算知识段落的向量：不拖慢启动，第一个提问也不用等（spec §13）
             threading.Thread(target=retriever.warm, name="kb-warm", daemon=True).start()
+        stop = threading.Event()
+        if settings.scheduler:
+            threading.Thread(target=_loop, args=(stop,), name="scheduler", daemon=True).start()
         yield
+        stop.set()
+
+    jobs_ctx = JobContext(rulebook=rulebook, skills=skills, ids=id_gen)
+
+    def tick() -> TickResult:
+        """执行一轮定时任务（spec [2026-10-21] §16）：登记到期任务，按到期时间先后执行。"""
+        with closing(connect(settings.db_path)) as conn:
+            scheduler = Scheduler(
+                repo=JobStore(conn),
+                plan=lambda now: plan_jobs(conn, now, jobs_ctx),
+                run=lambda job, now: run_job(conn, job, now, jobs_ctx),
+                clock=clock,
+            )
+            return scheduler.tick()
+
+    def _loop(stop: threading.Event) -> None:
+        while not stop.is_set():
+            try:
+                tick()
+            except Exception as e:  # 一轮出错不停止后台循环
+                log.error("scheduler.tick_failed", status="error", error_type=type(e).__name__)
+            stop.wait(settings.scheduler_interval_s)
 
     app = FastAPI(title="IronM", version=__version__, lifespan=lifespan)
+    app.state.tick = tick  # 管理员命令与测试可直接执行一轮定时任务
 
     def event_store() -> Iterator[EventStore]:
         # 每个请求一个连接
@@ -621,9 +673,70 @@ def create_app(
         zone = _zone(tz)
         if zone is None:
             return _invalid([_TZ_INVALID])
+        today = clock.now().astimezone(zone).date()
+        since = _midnight_utc(today - timedelta(days=90), zone)
         with closing(connect(settings.db_path)) as conn:
             stored = PlanStore(conn).latest(user)
-        return JSONResponse(content=today_tasks(stored, clock.now().astimezone(zone).date()))
+            profile = MemoryStore(conn).profile(user)[1]
+            events = EventStore(conn, clock).list_for_user(
+                user, types={"workout_check", "set_log", "checkin"}, since=since
+            )
+        p = rulebook.get(RETURN_RULE).params_as(ReturnParams)
+        back = return_state(
+            training_days(events, zone),
+            today,
+            gap_days=p.gap_days,
+            rebaseline_after_days=p.rebaseline_after_days,
+            halve_for_days=p.halve_for_days,
+        )
+        content = today_tasks(
+            stored, today, library=library, back=back, mode=profile.get("plan_mode")
+        )
+        return JSONResponse(content=content)
+
+    @app.get("/plan/decisions")
+    def get_plan_decisions(
+        user: Annotated[str, Depends(current_user)], limit: int = 20
+    ) -> JSONResponse:
+        """复盘与复核的决策日志（给用户看的版本：改了什么、为什么、什么时候再看，spec §17）。"""
+        with closing(connect(settings.db_path)) as conn:
+            logs = DecisionStore(conn).recent(user, limit=max(1, min(limit, 100)))
+        return JSONResponse(
+            content=[
+                {
+                    "kind": d.kind,
+                    "period": d.period,
+                    "at": d.at.isoformat(),
+                    "decision": d.record.get("decision"),
+                    "summary": d.record.get("summary"),
+                    "suggestion": d.record.get("suggestion"),
+                    "changes": d.record.get("changes", []),
+                }
+                for d in logs
+            ]
+        )
+
+    @app.post("/plan/mode")
+    def set_plan_mode(
+        body: Annotated[bytes, Depends(raw_body)], user: Annotated[str, Depends(current_user)]
+    ) -> JSONResponse:
+        """出差 / 节假日（spec §17）：到结束日后自动恢复；选“正常”立即恢复。"""
+        try:
+            req = ModeRequest.model_validate_json(body)
+        except ValidationError as e:
+            return _invalid(_errors(e))
+        with closing(connect(settings.db_path)) as conn:
+            memory = MemoryStore(conn)
+            version, profile = memory.profile(user)
+            mode = (
+                {"mode": req.mode, "until": req.until.isoformat()}
+                if req.mode != "normal" and req.until is not None
+                else None
+            )
+            updated = {**profile, "plan_mode": mode}
+            memory.save_profile(user, version, updated, "plan_mode", clock.now())
+        log.info("plan.mode", status=req.mode)
+        return JSONResponse(content={"mode": mode})
 
     @app.get("/energy/today")
     def energy_today_view(

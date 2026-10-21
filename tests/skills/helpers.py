@@ -35,6 +35,7 @@ def snapshot(
     plan_fields: dict[str, Any] | None = None,
     constraints: tuple[dict[str, Any], ...] = (),
     diet_precision: str = "P1",
+    review: dict[str, Any] | None = None,
     **profile: Any,
 ) -> Snapshot:
     plan: dict[str, Any] | None = None
@@ -66,6 +67,7 @@ def snapshot(
         "current_plan": plan,
         "constraints": list(constraints),
         "prior_verdicts": [],
+        "review": review or {},
     }
     return Snapshot.model_validate_json(json.dumps(data))
 

@@ -27,6 +27,7 @@ from ironm.engine.precision import (
     recovery_precision,
     training_precision,
 )
+from ironm.engine.review_facts import training_days, week_facts
 from ironm.engine.trend import weight_trend
 from ironm.engine.window import judgement_window
 from ironm.rules.loader import RULES_DIR, load_rules
@@ -52,6 +53,8 @@ REGISTERED = {
     "recovery_precision",
     "judgement_window",
     "build_metrics",
+    "week_facts",  # 复盘用的每周事实（spec [2026-10-21] §17）
+    "training_days",  # 中断回归用的练过的日子（spec [2026-10-21] §17）
 }
 
 
@@ -290,3 +293,33 @@ def test_build_metrics_order_independent(seed: int) -> None:
     assert build_metrics(ws, as_of=as_of, tz=SH, rulebook=BOOK) == build_metrics(
         shuffled, as_of=as_of, tz=SH, rulebook=BOOK
     )
+
+
+# ---- 复盘（spec [2026-10-21] §17）：更正、截止时间、时区 ----
+
+
+def test_week_facts_uses_correction_and_cutoff() -> None:
+    monday = date(2026, 10, 19)
+    skipped = _ev("workout_check", "2026-10-19T20:00:00+08:00", {"status": "skipped"})
+    fixed = _fix(skipped, {"status": "done"})
+    late = _ev(
+        "workout_check",
+        "2026-10-21T20:00:00+08:00",
+        {"status": "skipped"},
+        recorded_at="2026-10-27T09:00:00+08:00",
+    )
+    cutoff = datetime(2026, 10, 26, tzinfo=SH)
+    facts = week_facts(
+        [skipped, fixed, late], schedule=[0, 2], start=monday, tz=SH, as_of=cutoff, rulebook=BOOK
+    )
+    assert facts.recorded_days == 1  # 更正后周一是“练了”；周三那条是截止后才记的，不算
+    assert facts.completion is None or facts.completion == 1.0
+
+
+def test_training_days_uses_correction_and_timezone() -> None:
+    done = _ev("workout_check", "2026-10-19T23:30:00+08:00", {"status": "done"})
+    undone = _fix(done, {"status": "skipped"})
+    assert training_days([done, undone], SH) == []  # 更正为“没练”
+    late_night = _ev("set_log", "2026-10-19T16:30:00+00:00", {"exercise_id": "sq_goblet",
+                     "set_index": 1, "reps": 10, "load_kg": 10})  # fmt: skip
+    assert training_days([late_night], SH) == [date(2026, 10, 20)]  # 北京时间已是 20 日

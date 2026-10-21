@@ -19,13 +19,15 @@ from ironm.contracts.exercises import Restriction
 from ironm.contracts.plan import PlanVersion
 from ironm.contracts.screening import Condition, SafetyFlag, Sex
 from ironm.contracts.skills import ScenePack
+from ironm.engine.review_facts import ReturnState
+from ironm.knowledge.exercises import Library
 from ironm.memory.repo import MemoryRepo
 from ironm.orchestrator.first_plan import BLOCKING, FirstPlan, first_plan
 from ironm.rules.loader import RuleBook
 from ironm.skills.loader import LoadedSkill
 from ironm.store.plans import PlanStore, StoredPlan
 
-__all__ = ["Intake", "history_view", "onboard", "plan_view", "today_tasks"]
+__all__ = ["Intake", "active_mode", "history_view", "onboard", "plan_view", "today_tasks"]
 
 GOAL_SCENES: dict[str, ScenePack] = {
     "fitness": ScenePack.FITNESS,
@@ -249,8 +251,40 @@ def history_view(stored: list[StoredPlan]) -> list[dict[str, Any]]:
 DEFAULT_SCHEDULES = {1: [2], 2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 4], 5: [0, 1, 2, 3, 4]}
 
 
-def today_tasks(stored: StoredPlan | None, today: date) -> dict[str, Any]:
-    """今日任务：今天要不要练、练什么、最低任务、是不是称重日或签到日。"""
+def _named(lib: Library | None, exercise_id: str) -> dict[str, Any]:
+    if lib is None:
+        return {"exercise_id": exercise_id, "exercise": exercise_id, "key_points": []}
+    try:
+        e = lib.get(exercise_id)
+    except KeyError:
+        return {"exercise_id": exercise_id, "exercise": exercise_id, "key_points": []}
+    return {"exercise_id": exercise_id, "exercise": e.name, "key_points": list(e.key_points)}
+
+
+def active_mode(mode: Mapping[str, Any] | None, today: date) -> dict[str, Any] | None:
+    """出差 / 节假日：到期（结束日之后）自动恢复。"""
+    if not mode or mode.get("mode") not in ("travel", "holiday"):
+        return None
+    try:
+        until = date.fromisoformat(str(mode.get("until")))
+    except ValueError:
+        return None
+    return {"mode": mode["mode"], "until": until.isoformat()} if today <= until else None
+
+
+def today_tasks(
+    stored: StoredPlan | None,
+    today: date,
+    *,
+    library: Library | None = None,
+    back: ReturnState | None = None,
+    mode: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """今日任务：今天要不要练、练什么、最低任务、是不是称重日或签到日（spec §15）。
+
+    叠加（spec §17）：出差用酒店 / 徒手版本、组数减半；节假日只留最低任务、饮食按维持；
+    中断回归第一句说“欢迎回来”、训练量减半，中断超过 4 周先重做基线测试与安全筛查。
+    """
     if stored is None:
         return {"status": "none"}
     fields: Mapping[str, Any] = stored.record["plan"]["fields"]
@@ -261,30 +295,57 @@ def today_tasks(stored: StoredPlan | None, today: date) -> dict[str, Any]:
     )
     scheduled = weekday in schedule
     slots = {s["pattern"]: s for s in fields.get("session_slots") or []}
+    current = active_mode(mode, today)
+    picks = fields.get("exercise_selection") or []
+    if current and current["mode"] == "travel":
+        hotel = (fields.get("alternative_version") or {}).get("hotel") or []
+        picks = [{**h, **_named(library, h["exercise_id"])} for h in hotel] or picks
+    halve = (back is not None and back.status in ("welcome", "halved")) or bool(
+        current and current["mode"] == "travel"
+    )
     items = [
         {
             "slot": e["slot"],
             "exercise_id": e["exercise_id"],
-            "exercise": e["name"],
-            "sets": slots[e["slot"]]["sets"],
+            "exercise": e.get("name") or e.get("exercise") or e["exercise_id"],
+            "sets": max(1, -(-slots[e["slot"]]["sets"] // 2))
+            if halve
+            else slots[e["slot"]]["sets"],
             "reps": slots[e["slot"]]["reps"],
             "rpe": slots[e["slot"]]["rpe"],
             "key_points": e.get("key_points", []),
             "cautions": e.get("cautions", []),
             "substitutes": e.get("substitutes", []),
         }
-        for e in fields.get("exercise_selection") or []
+        for e in picks
         if e.get("slot") in slots
     ]
-    return {
+    if current and current["mode"] == "holiday":
+        scheduled = False  # 节假日只留最低任务，不补练
+    out: dict[str, Any] = {
         "status": "ok",
         "date": today.isoformat(),
         "weekday": weekday,
         "plan_version": stored.version,
         "training": {"scheduled": scheduled, "items": items if scheduled else []},
-        "minimum_task": fields.get("minimum_task"),
+        "minimum_task": [
+            {**m, **_named(library, m["exercise_id"])} for m in fields.get("minimum_task") or []
+        ],
         "weekly_cardio_minutes": fields.get("weekly_cardio_minutes"),
         "steps_target": fields.get("daily_steps_target"),
         "weigh_in_today": weekday in (fields.get("weigh_in_days") or []),
         "checkin_today": weekday == fields.get("checkin_day"),
+        "mode": current,
+        "greeting": None,
+        "next_step": None,
     }
+    if current and current["mode"] == "holiday":
+        out["diet_note"] = "节假日按维持吃，不设缺口；结束后自动恢复，不需要补练或节食补偿。"
+    if back is not None and back.status in ("welcome", "rebaseline"):
+        out["greeting"] = "欢迎回来！"
+    if back is not None and back.status == "rebaseline":
+        out["training"] = {"scheduled": False, "items": []}
+        out["next_step"] = "先做一次基线测试和安全筛查，再按结果重新开始训练。"
+    elif back is not None and back.status == "welcome":
+        out["next_step"] = "今天先轻松练，组数减半，接下来一两周再慢慢回到原来的量。"
+    return out

@@ -62,3 +62,51 @@ rules:
       review_days: 28
     note: 安全官给出称重次数上限（如进食障碍史每周最多 1 次）时，只保留排在前面的称重日；一周从周一算起（spec [2026-10-21] §15）。
 
+
+  - id: R-RV-WEEKLY
+    title: 每周训练复盘决策表
+    status: approved
+    source: {kind: design, ref: "IronM 计划生成链路 v1.2 周训练复盘决策表；ACSM 抗阻训练立场（先加组、再加次数、最后加负荷的渐进顺序）"}
+    params:
+      fatigue_rise: 2  # 疲劳比前两次签到的平均高这么多分（1–5 分制）
+      sleep_low: 2  # 睡眠质量不高于此值
+      rpe_high: 9  # 本周平均 RPE 不低于此值
+      low_completion: 0.5  # 完成率低于此值（连续两周才下调）
+      high_completion: 0.9  # 完成率不低于此值才进阶
+      rpe_ok: 7  # 进阶要求平均 RPE 不高于此值；没记 RPE 时改为要求连续两周完成率达标
+      cardio_cut_pct: 20  # 有氧下调的比例
+      max_sets: 3  # 进阶先把每个动作加到 3 组
+      max_reps_high: 15  # 再把次数上限加到 15
+      review_days: 14
+    note: 按表中顺序取第一条命中的；签到说“只记录了一部分”的一周不调整，标了经期的一周不下调（spec [2026-10-21] §17）。有氧每档增量取安全官规则 R-SF-TIER-LIMITS（A、A′ 30 分钟，B、协作 20 分钟），上限取安全官约束与 R-TR-START 的 cardio_target_min 中更严者。
+
+  - id: R-RV-DIET
+    title: 两周饮食复盘决策表（只对减脂）
+    status: approved
+    source: {kind: borrowed, ref: "IronM 减脂模块方案 v0.3 §5、§7；计划生成链路 v1.2 两周饮食复盘：每次调整 150 千卡、不破热量底线、前 4 周不判断减太快"}
+    params:
+      min_meal_days_per_week: 4  # 7 天里至少几天有饮食记录
+      min_weigh_ins_per_week: 1
+      max_ci_half_width: 0.25  # 体重趋势可信范围半宽（千克 / 周）不超过此值才判断
+      low_completion: 0.5  # 训练完成率低于此值时先降计划难度，饮食不变
+      low_adherence_days: 3  # 按计划吃的天数低于此值时饮食不变
+      ok_completion: 0.7
+      ok_adherence_days: 4
+      step_kcal: 150
+      fast_loss_kg_per_week: 1.0
+      fast_loss_after_days: 28
+      target_low_a: 0.5  # A 层每周减重目标下限（千克）
+      target_low_a_prime: 0.25  # A′ 层
+      trend_window_days: 14
+      review_days: 14
+    note: 按顺序取第一条命中的（spec [2026-10-21] §17）；降热量要连续两个周期满足条件；不低于热量底线（安全官约束）。
+
+  - id: R-RV-RETURN
+    title: 中断回归
+    status: approved
+    source: {kind: borrowed, ref: "IronM 计划生成链路 v1.2：≤1 周照常、1–4 周训练量约减半起步并在 1–2 周内回升、超过 4 周重做基线测试与安全筛查；第一句说“欢迎回来”"}
+    params:
+      gap_days: 7  # 超过这么多天没有任何训练记录（且签到没说练了）算中断
+      rebaseline_after_days: 28  # 中断超过这么多天，先重做基线测试与安全筛查
+      halve_for_days: 14  # 回来后这么多天内训练量减半
+    note: 没记录不等于没练：签到说“按计划练了但没记”或“在别处练”的那一周算练了（spec [2026-10-21] §17）。

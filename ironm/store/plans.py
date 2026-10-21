@@ -27,6 +27,13 @@ class PlanStore:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
 
+    def users(self) -> list[str]:
+        """有计划的用户。"""
+        rows = self._conn.execute(
+            "SELECT DISTINCT user_id FROM plan_versions ORDER BY user_id"
+        ).fetchall()
+        return [r["user_id"] for r in rows]
+
     def latest(self, user_id: str) -> StoredPlan | None:
         row = self._conn.execute(
             "SELECT version, record, reason, at FROM plan_versions WHERE user_id = ?"

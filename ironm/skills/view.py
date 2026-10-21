@@ -62,4 +62,8 @@ class SnapshotView:
             return profile[name] if name in profile else not_recorded()
         if group == "metric":
             return next((m for m in s.metrics if m.name == name), not_recorded())
+        if group == "review":
+            facts: dict[str, JsonValue] = dict(s.review)
+            value = facts.get(name)
+            return not_recorded() if value is None else value
         raise UndeclaredDataError(f"未知的数据键：{key}")

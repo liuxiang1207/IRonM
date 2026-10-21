@@ -470,6 +470,9 @@
     "profile": {
       "$ref": "#/$defs/FrozenMap_str_JsonValue_"
     },
+    "review": {
+      "$ref": "#/$defs/FrozenMap_str_JsonValue_"
+    },
     "snapshot_id": {
       "minLength": 1,
       "title": "Snapshot Id",
