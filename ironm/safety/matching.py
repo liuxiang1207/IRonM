@@ -149,14 +149,21 @@ class Negation(ContractModel):
         return any(rest.startswith(w) for w in self.past_not_followed_by)
 
     def found(
-        self, clause: str, term: str, past_counts: bool, not_followed_by: tuple[str, ...] = ()
+        self,
+        clause: str,
+        term: str,
+        past_counts: bool,
+        not_followed_by: tuple[str, ...] = (),
+        not_preceded_by: tuple[str, ...] = (),
     ) -> bool:
-        """term 在分句里是否有一处算出现；后面紧跟 not_followed_by 中的字时这一处不算。"""
+        """term 在分句里是否有一处算出现；前面紧挨着 not_preceded_by、后面紧跟 not_followed_by
+        中的字时这一处不算。"""
         i = clause.find(term)
         while i != -1:
             end = i + len(term)
             followed = any(clause.startswith(w, end) for w in not_followed_by)
-            if not followed and self.counts(clause, i, end, past_counts):
+            preceded = any(clause[:i].endswith(w) for w in not_preceded_by)
+            if not (followed or preceded) and self.counts(clause, i, end, past_counts):
                 return True
             i = clause.find(term, i + 1)
         return False
@@ -172,6 +179,11 @@ class Symptom(ContractModel):
     blood_pressure: BloodPressure | None = None
     # 说法后紧跟这些字时这一处不算（如“吃完就吐”后接“槽”）
     not_followed_by: tuple[Term, ...] = ()
+    not_preceded_by: tuple[Term, ...] = ()  # 说法前紧挨着这些字时这一处不算（如“快晕过去”）
+    # 分句里有这些字样时整个症状在这个分句不算（如放射痛的分句里有“练、酸”：多是肌肉酸痛）
+    not_in_clause_with: tuple[Term, ...] = ()
+    # 背景状况（怀孕、糖尿病、高温等）：判定条目时整句任何位置出现都算，不受条目的范围限制
+    context: bool = False
 
     @model_validator(mode="after")
     def _check(self) -> Self:
@@ -181,7 +193,7 @@ class Symptom(ContractModel):
             if len(combo) < 2 or any(not group for group in combo):
                 raise ValueError(f"症状 {self.id} 的组合至少两组，且每组至少一个说法")
         words = [*self.terms, *(t for combo in self.combos for g in combo for t in g)]
-        words += self.not_followed_by
+        words += [*self.not_followed_by, *self.not_preceded_by, *self.not_in_clause_with]
         if self.blood_pressure is not None:
             words += self.blood_pressure.context
         for word in words:
@@ -189,8 +201,13 @@ class Symptom(ContractModel):
         return self
 
     def matches(self, clause: str, negation: Negation, past_counts: bool) -> bool:
+        if any(w in clause for w in self.not_in_clause_with):
+            return False
+
         def found(term: str) -> bool:
-            return negation.found(clause, term, past_counts, self.not_followed_by)
+            return negation.found(
+                clause, term, past_counts, self.not_followed_by, self.not_preceded_by
+            )
 
         if any(found(t) for t in self.terms):
             return True
@@ -208,14 +225,16 @@ class Phrasebook(ContractModel):
     negation: Negation
     symptoms: tuple[Symptom, ...] = Field(min_length=1)
 
-    def present(self, text: str) -> frozenset[str]:
-        """这句话里出现的症状编号。"""
+    def present_by_clause(self, text: str) -> list[frozenset[str]]:
+        """每个分句里出现的症状编号。"""
         parts = clauses(text)
         neg = self.negation
-        marked = list(zip(parts, neg.past_counts(parts), strict=True))
-        return frozenset(
-            s.id for s in self.symptoms if any(s.matches(c, neg, r) for c, r in marked)
-        )
+        marked = zip(parts, neg.past_counts(parts), strict=True)
+        return [frozenset(s.id for s in self.symptoms if s.matches(c, neg, r)) for c, r in marked]
+
+    def present(self, text: str) -> frozenset[str]:
+        """这句话里出现的症状编号。"""
+        return frozenset().union(*self.present_by_clause(text))
 
     def check_rules(self, rules: Iterable[tuple[str, tuple[str, ...]]]) -> None:
         """条目编号唯一、引用的症状都存在、每个症状至少被一个条目使用。"""

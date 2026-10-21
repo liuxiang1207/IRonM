@@ -11,7 +11,7 @@ from ironm.safety.decision import SafetyKit, load_kit
 from ironm.safety.emergency import CLAUSE_SEPARATORS, WHITESPACE
 
 OFFLINE_PATH = Path(__file__).resolve().parents[2] / "app/src/safety/emergency_terms.json"
-FORMAT = 2
+FORMAT = 3
 
 
 def render(kit: SafetyKit) -> str:

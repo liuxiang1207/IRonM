@@ -1,8 +1,8 @@
 {
- "format": 2,
+ "format": 3,
  "separators": ",。!?;\n\r~",
  "whitespace": " \t\f\u000b             ​    　﻿",
- "version": "1.4",
+ "version": "1.5",
  "review": "approved",
  "negation": {
   "before": [
@@ -63,6 +63,9 @@
    "也疼",
    "也痛",
    "也闷",
+   "也有点疼",
+   "也有点痛",
+   "也有点闷",
    "就在刚才"
   ],
   "body_parts": [
@@ -101,6 +104,7 @@
    "这周",
    "这两天",
    "好几次",
+   "好多次",
    "几次了",
    "每次",
    "经常",
@@ -162,7 +166,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "radiating",
@@ -182,7 +189,23 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "练",
+    "推",
+    "拉完",
+    "举",
+    "酸",
+    "训练",
+    "健身",
+    "卧推",
+    "划船",
+    "硬拉",
+    "引体",
+    "撸铁"
+   ],
+   "context": false
   },
   {
    "id": "cold_sweat",
@@ -192,9 +215,32 @@
     "虚汗",
     "大汗淋漓"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "出了一身",
+      "一身"
+     ],
+     [
+      "汗"
+     ]
+    ]
+   ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "跑",
+    "练",
+    "运动",
+    "热",
+    "健身",
+    "骑",
+    "跳",
+    "动作",
+    "训练"
+   ],
+   "context": false
   },
   {
    "id": "ongoing",
@@ -212,7 +258,6 @@
     "一直疼",
     "一直痛",
     "一直闷",
-    "持续",
     "到现在",
     "不缓解",
     "没有缓解",
@@ -222,6 +267,7 @@
     "没缓解",
     "不见好",
     "没好转",
+    "还没好",
     "越来越厉害",
     "越来越重",
     "越来越疼",
@@ -232,9 +278,24 @@
     "坐下也",
     "躺下也"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "持续"
+     ],
+     [
+      "分钟",
+      "小时",
+      "不断",
+      "不停"
+     ]
+    ]
+   ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "sudden",
@@ -247,7 +308,15 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "想起",
+    "想到",
+    "发现",
+    "突然想"
+   ],
+   "context": false
   },
   {
    "id": "collapse",
@@ -295,7 +364,44 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [
+    "就睡",
+    "睡"
+   ],
+   "not_preceded_by": [
+    "快",
+    "快要",
+    "差点",
+    "差一点",
+    "险些"
+   ],
+   "not_in_clause_with": [],
+   "context": false
+  },
+  {
+   "id": "unconscious",
+   "name": "叫不醒",
+   "terms": [
+    "叫不醒",
+    "喊不醒",
+    "叫不应",
+    "喊不应",
+    "拍不醒"
+   ],
+   "combos": [],
+   "blood_pressure": null,
+   "not_followed_by": [
+    "我"
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "闹钟",
+    "起床",
+    "睡懒觉",
+    "每天",
+    "赖床"
+   ],
+   "context": false
   },
   {
    "id": "collapse_fell",
@@ -312,7 +418,9 @@
       "头一晕"
      ],
      [
-      "倒"
+      "倒",
+      "晕了",
+      "晕过去"
      ]
     ],
     [
@@ -342,17 +450,116 @@
     "些",
     "进",
     "出"
-   ]
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
+  },
+  {
+   "id": "stroke_named",
+   "name": "直接说中风",
+   "terms": [
+    "中风",
+    "卒中",
+    "脑梗",
+    "脑溢血",
+    "脑出血"
+   ],
+   "combos": [],
+   "blood_pressure": null,
+   "not_followed_by": [
+    "后",
+    "过",
+    "康复",
+    "病人",
+    "患者",
+    "病史",
+    "的风险",
+    "风险",
+    "的人",
+    "史"
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "预防",
+    "风险",
+    "康复",
+    "后遗症",
+    "病史",
+    "得过",
+    "患过",
+    "有过",
+    "家族",
+    "遗传",
+    "以前",
+    "之前",
+    "去年",
+    "前年",
+    "曾经",
+    "几年前",
+    "年前"
+   ],
+   "context": false
+  },
+  {
+   "id": "cardiac_named",
+   "name": "直接说心梗、没呼吸、没心跳",
+   "terms": [
+    "心梗",
+    "心肌梗",
+    "心脏病发作",
+    "心脏骤停",
+    "心跳骤停",
+    "没有呼吸",
+    "没呼吸了",
+    "没了呼吸",
+    "没有心跳",
+    "没心跳",
+    "心跳停了",
+    "呼吸停了"
+   ],
+   "combos": [],
+   "blood_pressure": null,
+   "not_followed_by": [
+    "后",
+    "过",
+    "康复",
+    "病人",
+    "患者",
+    "病史",
+    "的风险",
+    "风险",
+    "的人",
+    "史",
+    "支架"
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "预防",
+    "风险",
+    "康复",
+    "后遗症",
+    "病史",
+    "得过",
+    "患过",
+    "有过",
+    "家族",
+    "遗传",
+    "以前",
+    "之前",
+    "去年",
+    "前年",
+    "曾经",
+    "几年前",
+    "年前",
+    "憋气"
+   ],
+   "context": false
   },
   {
    "id": "unresponsive",
    "name": "叫人没反应",
-   "terms": [
-    "叫不醒",
-    "叫不应",
-    "喊不醒",
-    "喊不应"
-   ],
+   "terms": [],
    "combos": [
     [
      [
@@ -365,7 +572,8 @@
       "没有反应",
       "没回应",
       "不答应",
-      "不应",
+      "也不应",
+      "都不应",
       "不醒"
      ]
     ]
@@ -373,8 +581,12 @@
    "blood_pressure": null,
    "not_followed_by": [
     "该",
-    "过来"
-   ]
+    "过来",
+    "我"
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "collapse_context",
@@ -387,15 +599,40 @@
     "昏倒",
     "晕过去",
     "昏过去",
+    "晕了",
     "摔倒",
+    "摔了",
     "栽倒",
+    "栽下来",
+    "一头栽",
     "躺在地上",
+    "躺地上",
     "倒在地上",
-    "抽搐"
+    "抽搐",
+    "不动了"
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [
+    "杯",
+    "一杯",
+    "两杯",
+    "水",
+    "胃口",
+    "半",
+    "油",
+    "汤",
+    "点",
+    "些",
+    "进",
+    "出"
+   ],
+   "not_preceded_by": [
+    "喝",
+    "喝得"
+   ],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "seizure",
@@ -407,19 +644,31 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "presyncope",
-   "name": "眼前发黑",
+   "name": "眼前发黑、快晕倒",
    "terms": [
     "眼前一黑",
     "眼前发黑",
-    "黑朦"
+    "黑朦",
+    "快晕倒",
+    "快晕过去",
+    "快要晕倒",
+    "快要晕过去",
+    "差点晕倒",
+    "差点晕过去"
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "cyanosis",
@@ -445,7 +694,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "dyspnea",
@@ -464,9 +716,23 @@
     "气短",
     "憋得慌"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "呼吸"
+     ],
+     [
+      "困难",
+      "费劲",
+      "费力"
+     ]
+    ]
+   ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "dyspnea_severe",
@@ -478,7 +744,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "dyspnea_sudden",
@@ -500,7 +769,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "dyspnea_rest",
@@ -512,7 +784,11 @@
     "坐着也喘",
     "躺着都喘",
     "躺着也喘",
-    "动不动就喘"
+    "动不动就喘",
+    "平躺就喘",
+    "躺平就喘",
+    "躺下就喘",
+    "一躺下就喘"
    ],
    "combos": [
     [
@@ -550,7 +826,10 @@
    "not_followed_by": [
     "口气",
     "口"
-   ]
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "at_rest",
@@ -563,7 +842,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "change_worse",
@@ -580,7 +862,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "fast_heart",
@@ -596,7 +881,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "palpitation",
@@ -612,9 +900,24 @@
     "早搏",
     "心脏乱跳"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "心脏",
+      "心跳"
+     ],
+     [
+      "乱跳",
+      "乱了",
+      "不齐"
+     ]
+    ]
+   ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "dizziness",
@@ -645,7 +948,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "headache",
@@ -658,9 +964,36 @@
     "头要炸",
     "头像要炸"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "头",
+      "脑袋"
+     ],
+     [
+      "一样疼",
+      "一样痛",
+      "突然疼",
+      "突然痛",
+      "剧痛",
+      "炸裂",
+      "要裂开"
+     ]
+    ]
+   ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "头肌",
+    "二头",
+    "三头",
+    "骨头",
+    "回头",
+    "拳头",
+    "指头"
+   ],
+   "context": false
   },
   {
    "id": "severe",
@@ -669,6 +1002,8 @@
     "剧烈",
     "炸开",
     "要炸",
+    "炸裂",
+    "裂开",
     "从来没有这么",
     "从来没这么",
     "从没这么",
@@ -681,7 +1016,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "speech",
@@ -711,12 +1049,35 @@
     "舌头不灵",
     "舌头僵"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "说话",
+      "讲话",
+      "吐字",
+      "口齿"
+     ],
+     [
+      "含糊",
+      "含含糊糊",
+      "大舌头",
+      "不利索"
+     ]
+    ]
+   ],
    "blood_pressure": null,
    "not_followed_by": [
     "其辞",
     "不楚"
-   ]
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "听不",
+    "视频",
+    "其辞",
+    "不清不楚"
+   ],
+   "context": false
   },
   {
    "id": "one_side_weak",
@@ -726,6 +1087,8 @@
     "嘴巴歪",
     "嘴角歪",
     "嘴有点歪",
+    "嘴都歪",
+    "嘴也歪",
     "口角歪",
     "口眼歪斜",
     "半身不遂",
@@ -794,6 +1157,28 @@
       "歪向一边",
       "歪到一边"
      ]
+    ],
+    [
+     [
+      "突然",
+      "一下子"
+     ],
+     [
+      "左腿",
+      "右腿",
+      "左手",
+      "右手",
+      "左胳膊",
+      "右胳膊",
+      "半边身子"
+     ],
+     [
+      "没力",
+      "无力",
+      "没劲",
+      "抬不起",
+      "动不了"
+     ]
     ]
    ],
    "blood_pressure": null,
@@ -802,7 +1187,10 @@
     "着笑",
     "歪歪",
     "歪的"
-   ]
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "vision_loss",
@@ -817,7 +1205,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "dark_urine",
@@ -848,7 +1239,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "confusion",
@@ -890,7 +1284,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "heat_exposure",
@@ -911,7 +1308,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": true
   },
   {
    "id": "no_sweat_hot",
@@ -929,7 +1329,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "heat_illness",
@@ -946,7 +1349,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "diabetes",
@@ -968,7 +1374,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": true
   },
   {
    "id": "hypo_signs",
@@ -986,7 +1395,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "back_pain",
@@ -1009,7 +1421,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "bladder_loss",
@@ -1038,7 +1453,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "saddle_numb",
@@ -1065,7 +1483,12 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "练"
+   ],
+   "context": false
   },
   {
    "id": "leg_numb",
@@ -1088,7 +1511,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "pregnancy",
@@ -1116,7 +1542,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": true
   },
   {
    "id": "pregnancy_warning",
@@ -1142,7 +1571,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "pregnancy_caution",
@@ -1161,7 +1593,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "bp_crisis",
@@ -1178,7 +1613,10 @@
     "systolic_at_least": 180,
     "diastolic_at_least": 110
    },
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": true
   },
   {
    "id": "calf_swelling",
@@ -1197,7 +1635,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "unilateral",
@@ -1213,7 +1654,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "red_hot",
@@ -1229,7 +1673,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "joint_swelling",
@@ -1251,7 +1698,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "fever",
@@ -1266,7 +1716,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "cant_bear",
@@ -1286,7 +1739,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "injury",
@@ -1307,7 +1763,14 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "差点",
+    "差一点",
+    "险些"
+   ],
+   "context": true
   },
   {
    "id": "fracture_signs",
@@ -1321,7 +1784,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "night_pain",
@@ -1338,7 +1804,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "purge",
@@ -1378,7 +1847,10 @@
    "blood_pressure": null,
    "not_followed_by": [
     "槽"
-   ]
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": true
   },
   {
    "id": "self_harm_act",
@@ -1395,7 +1867,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "self_harm_idea",
@@ -1412,11 +1887,31 @@
     "结束生命",
     "想消失",
     "伤害自己",
-    "自残"
+    "自残",
+    "想不开"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "楼",
+      "天台",
+      "桥",
+      "窗户"
+     ],
+     [
+      "跳下去",
+      "跳下来",
+      "往下跳"
+     ]
+    ]
+   ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [
+    "动"
+   ],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "hives",
@@ -1442,7 +1937,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "face_swelling",
@@ -1461,7 +1959,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "itch",
@@ -1473,7 +1974,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "allergen",
@@ -1496,7 +2000,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": true
   },
   {
    "id": "face_allergy",
@@ -1531,7 +2038,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "throat_swelling",
@@ -1544,9 +2054,38 @@
     "舌头肿",
     "咽不下去"
    ],
-   "combos": [],
+   "combos": [
+    [
+     [
+      "喉咙"
+     ],
+     [
+      "紧紧",
+      "发紧",
+      "收紧",
+      "肿"
+     ]
+    ],
+    [
+     [
+      "舌头"
+     ],
+     [
+      "肿"
+     ]
+    ]
+   ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "感冒",
+    "发炎",
+    "上火",
+    "咽炎",
+    "扁桃体"
+   ],
+   "context": false
   },
   {
    "id": "asthma",
@@ -1558,7 +2097,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": true
   },
   {
    "id": "reliever_fail",
@@ -1572,7 +2114,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "head_injury",
@@ -1588,7 +2133,14 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [
+    "差点",
+    "差一点",
+    "险些"
+   ],
+   "context": true
   },
   {
    "id": "head_red",
@@ -1607,7 +2159,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "hematemesis",
@@ -1618,7 +2173,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "gi_bleed",
@@ -1630,7 +2188,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "abdominal_severe",
@@ -1653,7 +2214,10 @@
     ]
    ],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   },
   {
    "id": "purge_complication",
@@ -1670,7 +2234,10 @@
    ],
    "combos": [],
    "blood_pressure": null,
-   "not_followed_by": []
+   "not_followed_by": [],
+   "not_preceded_by": [],
+   "not_in_clause_with": [],
+   "context": false
   }
  ],
  "rules": [
@@ -1681,7 +2248,8 @@
    "title": "正在或已经自伤",
    "all": [
     "self_harm_act"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-SELF-HARM",
@@ -1690,7 +2258,8 @@
    "title": "轻生想法",
    "all": [
     "self_harm_idea"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-ANAPHYLAXIS-AIRWAY",
@@ -1699,7 +2268,8 @@
    "title": "喉咙发紧或肿（严重过敏）",
    "all": [
     "throat_swelling"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-ANAPHYLAXIS-BREATH",
@@ -1709,7 +2279,8 @@
    "all": [
     "hives",
     "dyspnea"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-ANAPHYLAXIS-FAINT",
@@ -1719,7 +2290,8 @@
    "all": [
     "hives",
     "dizziness"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-ANAPHYLAXIS-FACE",
@@ -1730,7 +2302,8 @@
     "face_swelling",
     "allergen",
     "dyspnea"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-ALLERGY-FACE",
@@ -1739,7 +2312,8 @@
    "title": "接触过敏原后脸或眼睛肿",
    "all": [
     "face_allergy"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-ALLERGY-ITCH",
@@ -1749,7 +2323,8 @@
    "all": [
     "face_swelling",
     "itch"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-HIVES",
@@ -1758,7 +2333,18 @@
    "title": "全身风团或嘴唇肿",
    "all": [
     "hives"
-   ]
+   ],
+   "within": "nearby"
+  },
+  {
+   "id": "EM-CARDIAC-NAMED",
+   "level": "emergency",
+   "category": "cardiovascular",
+   "title": "直接说心梗、没呼吸、没心跳",
+   "all": [
+    "cardiac_named"
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CHEST-ONGOING",
@@ -1768,7 +2354,8 @@
    "all": [
     "chest_pain",
     "ongoing"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CHEST-SUDDEN",
@@ -1778,7 +2365,8 @@
    "all": [
     "chest_pain",
     "sudden"
-   ]
+   ],
+   "within": "clause"
   },
   {
    "id": "EM-CHEST-RADIATE",
@@ -1788,7 +2376,8 @@
    "all": [
     "chest_pain",
     "radiating"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CHEST-SWEAT",
@@ -1798,7 +2387,8 @@
    "all": [
     "chest_pain",
     "cold_sweat"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CHEST-DYSPNEA",
@@ -1808,7 +2398,8 @@
    "all": [
     "chest_pain",
     "dyspnea"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-CHEST",
@@ -1817,7 +2408,8 @@
    "title": "胸痛或胸闷",
    "all": [
     "chest_pain"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-TACHY-ONGOING",
@@ -1827,7 +2419,8 @@
    "all": [
     "fast_heart",
     "ongoing"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-TACHY-DIZZY",
@@ -1837,7 +2430,8 @@
    "all": [
     "fast_heart",
     "dizziness"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-PALPITATION",
@@ -1846,7 +2440,8 @@
    "title": "心慌或心律不齐",
    "all": [
     "palpitation"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-BP-HEADACHE",
@@ -1856,7 +2451,8 @@
    "all": [
     "bp_crisis",
     "headache"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-BP-CHEST",
@@ -1866,7 +2462,8 @@
    "all": [
     "bp_crisis",
     "chest_pain"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-BP-DIZZY",
@@ -1876,7 +2473,8 @@
    "all": [
     "bp_crisis",
     "dizziness"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-BP-DYSPNEA",
@@ -1886,7 +2484,8 @@
    "all": [
     "bp_crisis",
     "dyspnea"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-BP-VISION",
@@ -1896,7 +2495,8 @@
    "all": [
     "bp_crisis",
     "vision_loss"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-BP",
@@ -1905,7 +2505,8 @@
    "title": "血压极高",
    "all": [
     "bp_crisis"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-DVT-UNILATERAL",
@@ -1915,7 +2516,8 @@
    "all": [
     "calf_swelling",
     "unilateral"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-DVT-HOT",
@@ -1925,7 +2527,8 @@
    "all": [
     "calf_swelling",
     "red_hot"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-COLLAPSE",
@@ -1934,7 +2537,18 @@
    "title": "晕倒或意识丧失",
    "all": [
     "collapse"
-   ]
+   ],
+   "within": "nearby"
+  },
+  {
+   "id": "EM-UNCONSCIOUS",
+   "level": "emergency",
+   "category": "syncope",
+   "title": "叫不醒",
+   "all": [
+    "unconscious"
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-COLLAPSE-FELL",
@@ -1943,7 +2557,8 @@
    "title": "突然倒下",
    "all": [
     "collapse_fell"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-UNRESPONSIVE",
@@ -1953,7 +2568,8 @@
    "all": [
     "unresponsive",
     "collapse_context"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-PRESYNCOPE",
@@ -1962,7 +2578,8 @@
    "title": "眼前发黑",
    "all": [
     "presyncope"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-DIZZY",
@@ -1971,7 +2588,8 @@
    "title": "头晕",
    "all": [
     "dizziness"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CYANOSIS",
@@ -1980,7 +2598,8 @@
    "title": "嘴唇或脸色发紫",
    "all": [
     "cyanosis"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-DYSPNEA-ONGOING",
@@ -1990,7 +2609,8 @@
    "all": [
     "dyspnea",
     "ongoing"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-DYSPNEA-SEVERE",
@@ -2000,7 +2620,8 @@
    "all": [
     "dyspnea",
     "dyspnea_severe"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-DYSPNEA-SUDDEN",
@@ -2009,7 +2630,8 @@
    "title": "突然喘不上气",
    "all": [
     "dyspnea_sudden"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-DYSPNEA-REST",
@@ -2018,7 +2640,8 @@
    "title": "休息或轻微活动时也喘不上气、夜里憋醒",
    "all": [
     "dyspnea_rest"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-DYSPNEA-IDLE",
@@ -2028,7 +2651,8 @@
    "all": [
     "dyspnea",
     "at_rest"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-DYSPNEA-WORSE",
@@ -2038,7 +2662,8 @@
    "all": [
     "dyspnea",
     "change_worse"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-ASTHMA-NORELIEF",
@@ -2048,7 +2673,8 @@
    "all": [
     "asthma",
     "reliever_fail"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-ASTHMA",
@@ -2057,7 +2683,8 @@
    "title": "运动中哮喘发作",
    "all": [
     "asthma"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-SEIZURE",
@@ -2066,7 +2693,8 @@
    "title": "抽搐",
    "all": [
     "seizure"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-THUNDERCLAP",
@@ -2077,7 +2705,8 @@
     "headache",
     "sudden",
     "severe"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-HEADACHE-SEVERE",
@@ -2087,7 +2716,18 @@
    "all": [
     "headache",
     "severe"
-   ]
+   ],
+   "within": "nearby"
+  },
+  {
+   "id": "EM-STROKE-NAMED",
+   "level": "emergency",
+   "category": "neuro",
+   "title": "直接说中风",
+   "all": [
+    "stroke_named"
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-STROKE-SPEECH",
@@ -2096,7 +2736,8 @@
    "title": "说话不清（卒中征象）",
    "all": [
     "speech"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-STROKE-WEAK",
@@ -2105,7 +2746,8 @@
    "title": "一侧脸或肢体麻木无力（卒中征象）",
    "all": [
     "one_side_weak"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-STROKE-VISION",
@@ -2115,7 +2757,8 @@
    "all": [
     "vision_loss",
     "sudden"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-HEAD-INJURY",
@@ -2125,7 +2768,8 @@
    "all": [
     "head_injury",
     "head_red"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-HEAD-INJURY",
@@ -2134,7 +2778,8 @@
    "title": "头部受伤",
    "all": [
     "head_injury"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CONFUSION",
@@ -2143,7 +2788,8 @@
    "title": "意识不清",
    "all": [
     "confusion"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CAUDA-BLADDER",
@@ -2153,7 +2799,8 @@
    "all": [
     "back_pain",
     "bladder_loss"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-CAUDA-SADDLE",
@@ -2163,7 +2810,8 @@
    "all": [
     "back_pain",
     "saddle_numb"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-DARK-URINE",
@@ -2172,7 +2820,8 @@
    "title": "尿色像酱油（疑似横纹肌溶解）",
    "all": [
     "dark_urine"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-JOINT-FEVER",
@@ -2182,7 +2831,8 @@
    "all": [
     "joint_swelling",
     "fever"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-JOINT-HOT",
@@ -2192,7 +2842,8 @@
    "all": [
     "joint_swelling",
     "red_hot"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-JOINT-CANT-BEAR",
@@ -2202,7 +2853,19 @@
    "all": [
     "joint_swelling",
     "cant_bear"
-   ]
+   ],
+   "within": "nearby"
+  },
+  {
+   "id": "RF-SUDDEN-CANT-BEAR",
+   "level": "red_flag",
+   "category": "musculoskeletal",
+   "title": "突然疼得不能负重",
+   "all": [
+    "sudden",
+    "cant_bear"
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-INJURY-CANT-BEAR",
@@ -2212,7 +2875,8 @@
    "all": [
     "injury",
     "cant_bear"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-FRACTURE",
@@ -2221,7 +2885,8 @@
    "title": "疑似骨折或脱位",
    "all": [
     "fracture_signs"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-NIGHT-PAIN",
@@ -2230,7 +2895,8 @@
    "title": "夜间疼醒",
    "all": [
     "night_pain"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-SCIATICA",
@@ -2240,7 +2906,8 @@
    "all": [
     "back_pain",
     "leg_numb"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-HEAT-NOSWEAT",
@@ -2250,7 +2917,8 @@
    "all": [
     "heat_exposure",
     "no_sweat_hot"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-HEAT-CONFUSION",
@@ -2260,7 +2928,8 @@
    "all": [
     "heat_exposure",
     "confusion"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-HEAT-COLLAPSE",
@@ -2270,7 +2939,8 @@
    "all": [
     "heat_exposure",
     "collapse"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-HEAT-ILLNESS",
@@ -2280,7 +2950,8 @@
    "all": [
     "heat_exposure",
     "heat_illness"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-HEAT-DIZZY",
@@ -2290,7 +2961,8 @@
    "all": [
     "heat_exposure",
     "dizziness"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-HYPOGLYCEMIA",
@@ -2300,7 +2972,8 @@
    "all": [
     "diabetes",
     "hypo_signs"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-PREGNANCY",
@@ -2310,7 +2983,8 @@
    "all": [
     "pregnancy",
     "pregnancy_warning"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-PREGNANCY",
@@ -2320,7 +2994,8 @@
    "all": [
     "pregnancy",
     "pregnancy_caution"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-HEMATEMESIS",
@@ -2329,7 +3004,8 @@
    "title": "吐血",
    "all": [
     "hematemesis"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-GI-BLEED",
@@ -2338,7 +3014,8 @@
    "title": "便血或黑便（补铁也会黑便）",
    "all": [
     "gi_bleed"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-ABDOMEN",
@@ -2347,7 +3024,8 @@
    "title": "腹部剧痛（减重针用户注意胰腺炎）",
    "all": [
     "abdominal_severe"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "EM-PURGE-COMPLICATION",
@@ -2357,7 +3035,8 @@
    "all": [
     "purge",
     "purge_complication"
-   ]
+   ],
+   "within": "nearby"
   },
   {
    "id": "RF-PURGE",
@@ -2366,7 +3045,8 @@
    "title": "催吐或用泻药",
    "all": [
     "purge"
-   ]
+   ],
+   "within": "nearby"
   }
  ],
  "replies": {

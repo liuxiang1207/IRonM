@@ -3,13 +3,17 @@
 # 两层：
 #   symptoms 症状：terms 任一说法出现即命中；combos 每项是几组词，同一分句里每组都出现才命中；
 #            blood_pressure 按数值判断（同一分句里要有 context 中的字样）。
-#   rules 判定条目：all 中的症状在同一句话里都出现时给出 level。多条命中取最高一级。
+#   rules 判定条目：all 中的症状都出现时给出 level，多条命中取最高一级。within 是范围：
+#            nearby（默认）同一分句或相邻两个分句，clause 同一分句，sentence 整句；
+#            标了 context 的背景状况（怀孕、糖尿病、高温等）整句任何位置出现都算。
 # 说法要写成统一后的形式：半角、小写、不含空白与分句符号。
 # 依据：ACSM 运动前健康筛查（第 10 版）的症状清单；AHA 心脏病发作与卒中（BE FAST）警示信号；
 #       中暑、低血糖、横纹肌溶解、马尾综合征、深静脉血栓、孕期危险信号（ACOG 804）的通行就医标准；
 #       严重过敏、哮喘（GINA）、脑震荡（CRT6）、自伤与轻生的危机处理。
-# 每个症状可写 not_followed_by：说法后紧跟这些字时这一处不算（如“吃完就吐”后接“槽”）。
-version: "1.4"
+# 每个症状可写 not_followed_by / not_preceded_by：说法后紧跟、前面紧挨着这些字时这一处不算
+# （如“吃完就吐”后接“槽”、“快晕过去”）；not_in_clause_with：分句里有这些字样时这个症状在该分句不算
+# （如放射痛的分句里有“练、酸”）。
+version: "1.5"
 review: approved
 
 # 否定与“以前发生过”：只取消紧挨着的一处说法；拿不准时按出现处理。血压数值不受影响。
@@ -27,13 +31,13 @@ negation:
   # 1. 同一分句或后面的分句有复发说法（“以前胸口疼过，今天又疼了”“今天跑步时也疼”），
   #    但后面那个分句说的是别的部位时不算（“以前晕倒过，最近腿也疼”）；
   #    不单用“又、再次、又犯”：“去年晕倒过一次，现在又胖回来了”“想再次挑战马拉松”“又犯懒”不是复发
-  recurrence: [又疼, 又痛, 又闷, 又晕, 又犯病, 又发作, 又开始疼, 又开始痛, 又开始闷, 又开始晕, 又出现, 又抽, 又喘, 又心慌, 再次发作, 再次出现, 也疼, 也痛, 也闷, 就在刚才]
+  recurrence: [又疼, 又痛, 又闷, 又晕, 又犯病, 又发作, 又开始疼, 又开始痛, 又开始闷, 又开始晕, 又出现, 又抽, 又喘, 又心慌, 再次发作, 再次出现, 也疼, 也痛, 也闷, 也有点疼, 也有点痛, 也有点闷, 就在刚才]
   body_parts: [腿, 膝, 腰, 背, 肩, 脚, 手, 头, 脖子, 肚子, 胳膊, 臂, 踝, 肘, 屁股, 臀, 牙, 眼, 嗓子, 喉咙, 胃, 肌肉]
   # 2. 同一分句或前一个分句有近期或反复的字样（“今天跑步的时候，晕倒过一次”“跑步时胸口疼过好几次”），
   #    但所在分句有久远的时间、又没有近期字样时不算（“去年晕倒过一次，最近想开始减肥”）；
   #    后面分句的近期字样不算（“晕倒过一次，最近想开始减肥”）。拿不准时按出现处理：
   #    “今天跑步之前胸口疼过”照常算，“我今天想问以前胸口疼过能不能练”也会算（已知取舍）
-  recent: [刚才, 刚刚, 这次, 今天, 昨天, 前天, 这几天, 最近, 这周, 这两天, 好几次, 几次了, 每次, 经常, 老是, 总是]
+  recent: [刚才, 刚刚, 这次, 今天, 昨天, 前天, 这几天, 最近, 这周, 这两天, 好几次, 好多次, 几次了, 每次, 经常, 老是, 总是]
   remote: [以前, 之前, 去年, 前年, 上个月, 上周, 小时候, 曾经, 年轻时, 几年前, 那时候, 早年, 上次, 前几年]
 
 symptoms:
@@ -46,16 +50,25 @@ symptoms:
   - id: radiating
     name: 疼痛或麻木放射到左臂、下巴、后背
     terms: [左胳膊, 左臂, 左手臂, 左边胳膊, 左边手臂, 左手也, 左肩, 下巴, 下颌, 后背, 牙也疼]
+    # 分句里说的是训练后酸痛时不算（“后背练完很酸”“左肩推完有点疼”，冲刺 2 第四轮复核）
+    not_in_clause_with: [练, 推, 拉完, 举, 酸, 训练, 健身, 卧推, 划船, 硬拉, 引体, 撸铁]
   - id: cold_sweat
     name: 出冷汗
     terms: [冷汗, 虚汗, 大汗淋漓]
+    combos:
+      - [[出了一身, 一身], [汗]]
+    not_in_clause_with: [跑, 练, 运动, 热, 健身, 骑, 跳, 动作, 训练]  # 运动出汗不算
   - id: ongoing
     name: 正在持续、休息不缓解或加重
     # 不单用“还在”：“我还在坚持跑步”“现在还在喘”不是症状持续
-    terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 还闷, 还是疼, 还是痛, 一直疼, 一直痛, 一直闷, 持续, 到现在, 不缓解, 没有缓解, 不见缓解, 休息了也, 也不行, 没缓解, 不见好, 没好转, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
+    # 不单用“持续”：“健身持续了三个月”（第四轮复核）
+    terms: [还在疼, 还在痛, 还在闷, 还在憋, 还疼, 还痛, 还闷, 还是疼, 还是痛, 一直疼, 一直痛, 一直闷, 到现在, 不缓解, 没有缓解, 不见缓解, 休息了也, 也不行, 没缓解, 不见好, 没好转, 还没好, 越来越厉害, 越来越重, 越来越疼, 停不下来, 止不住, 休息也, 歇了也, 坐下也, 躺下也]
+    combos:
+      - [[持续], [分钟, 小时, 不断, 不停]]
   - id: sudden
     name: 突然发生
     terms: [突然, 一下子, 猛地, 突发]
+    not_in_clause_with: [想起, 想到, 发现, 突然想]  # “突然想起来没吃药”说的不是症状
   - id: collapse
     name: 晕倒或意识丧失
     # 不用“倒在地上”“栽倒”：“练完腿直接倒在地上”“滑了一跤栽倒了”多是累了或摔了（冲刺 2 第二轮复核）
@@ -63,32 +76,51 @@ symptoms:
     combos:
       - [[地上], [一动不动, 不动了, 没反应, 没有反应]]
       - [[他, 她, 人], [失去知觉]]  # “手指失去知觉”是麻木
+    not_preceded_by: [快, 快要, 差点, 差一点, 险些]  # “快晕过去了”见眼前发黑（红旗）
+    not_followed_by: [就睡, 睡]  # “到家直接倒下就睡”
+  - id: unconscious
+    name: 叫不醒
+    terms: [叫不醒, 喊不醒, 叫不应, 喊不应, 拍不醒]
+    not_followed_by: [我]  # “闹钟喊不醒我”
+    not_in_clause_with: [闹钟, 起床, 睡懒觉, 每天, 赖床]
   - id: collapse_fell
     name: 突然倒了
     terms: [突然倒了, 一下子倒了]
     combos:
-      - [[眼前一黑, 眼前发黑, 头一晕], [倒]]
+      - [[眼前一黑, 眼前发黑, 头一晕], [倒, 晕了, 晕过去]]
       - [[跑着跑着, 练着练着, 骑着骑着, 走着走着], [倒, 栽]]
     # 只对“倒了”这类说法排除（“突然倒了胃口”“一下子倒了半瓶油”“突然倒了杯水”），不影响“晕倒半小时”
     not_followed_by: [杯, 一杯, 两杯, 水, 胃口, 半, 油, 汤, 点, 些, 进, 出]
+  - id: stroke_named
+    name: 直接说中风
+    terms: [中风, 卒中, 脑梗, 脑溢血, 脑出血]
+    not_followed_by: [后, 过, 康复, 病人, 患者, 病史, 的风险, 风险, 的人, 史]
+    # 说的是病史、预防或风险时不算（“我爸去年中风，现在能做什么运动”“怎么预防中风”）
+    not_in_clause_with: [预防, 风险, 康复, 后遗症, 病史, 得过, 患过, 有过, 家族, 遗传, 以前, 之前, 去年, 前年, 曾经, 几年前, 年前]
+  - id: cardiac_named
+    name: 直接说心梗、没呼吸、没心跳
+    terms: [心梗, 心肌梗, 心脏病发作, 心脏骤停, 心跳骤停, 没有呼吸, 没呼吸了, 没了呼吸, 没有心跳, 没心跳, 心跳停了, 呼吸停了]
+    not_followed_by: [后, 过, 康复, 病人, 患者, 病史, 的风险, 风险, 的人, 史, 支架]
+    not_in_clause_with: [预防, 风险, 康复, 后遗症, 病史, 得过, 患过, 有过, 家族, 遗传, 以前, 之前, 去年, 前年, 曾经, 几年前, 年前, 憋气]
   - id: unresponsive
     name: 叫人没反应
-    # 单独出现不算（“我叫了外卖半天没反应”“我妈每天早上都喊不醒我”）；须与倒下、晕倒等同时出现
-    terms: [叫不醒, 叫不应, 喊不醒, 喊不应]
+    # 单独出现不算（“我叫了外卖半天没反应”）；须与倒下、晕倒等同时出现。不用“不应”：“叫他起来跑步不应”
     combos:
-      - [[叫, 喊, 拍], [没反应, 没有反应, 没回应, 不答应, 不应, 不醒]]
-    # “不应该”“没反应过来”不算（冲刺 2 复核 N1）
-    not_followed_by: [该, 过来]
+      - [[叫, 喊, 拍], [没反应, 没有反应, 没回应, 不答应, 也不应, 都不应, 不醒]]
+    # “不应该”“没反应过来”“闹钟叫不醒我”不算（冲刺 2 复核 N1）
+    not_followed_by: [该, 过来, 我]
   - id: collapse_context
     name: 倒下或晕倒
     # 只用成词的说法（不用“倒、晕、摔、突然”单字：“倒是、倒霉、倒立、喝晕、突然想起”很常见，冲刺 2 第三轮复核）
-    terms: [倒了, 倒下, 倒地, 晕倒, 昏倒, 晕过去, 昏过去, 摔倒, 栽倒, 躺在地上, 倒在地上, 抽搐]
+    terms: [倒了, 倒下, 倒地, 晕倒, 昏倒, 晕过去, 昏过去, 晕了, 摔倒, 摔了, 栽倒, 栽下来, 一头栽, 躺在地上, 躺地上, 倒在地上, 抽搐, 不动了]
+    not_followed_by: [杯, 一杯, 两杯, 水, 胃口, 半, 油, 汤, 点, 些, 进, 出]  # “倒了杯水”
+    not_preceded_by: [喝, 喝得]  # “最后喝晕了”
   - id: seizure
     name: 抽搐
     terms: [抽搐, 抽风, 口吐白沫]
   - id: presyncope
-    name: 眼前发黑
-    terms: [眼前一黑, 眼前发黑, 黑朦]
+    name: 眼前发黑、快晕倒
+    terms: [眼前一黑, 眼前发黑, 黑朦, 快晕倒, 快晕过去, 快要晕倒, 快要晕过去, 差点晕倒, 差点晕过去]
   - id: cyanosis
     name: 嘴唇或脸色发紫
     terms: [发绀]
@@ -97,6 +129,8 @@ symptoms:
   - id: dyspnea
     name: 呼吸困难
     terms: [喘不上气, 喘不过气, 喘不过来, 喘不上来, 上不来气, 呼吸困难, 呼吸不上来, 透不过气, 吸不上气, 喘得厉害, 气短, 憋得慌]
+    combos:
+      - [[呼吸], [困难, 费劲, 费力]]
   - id: dyspnea_severe
     name: 快憋死、窒息感
     # 单独出现不算（“健身房太闷了快憋死了”“这个动作有窒息感”）；须与呼吸困难一起（冲刺 2 复核 N2）
@@ -110,7 +144,7 @@ symptoms:
     name: 休息或轻微活动时气短、夜里憋醒
     # 运动中喘不上气很常见；休息字样须与气短在同一分句（“不动也胖，一动就喘不上气”不算）。
     # 不用“坐着、躺着、休息的时候”单独与“喘”搭配：“跑完坐着喘了半天”“组间休息的时候喘得厉害”是运动后（第三轮复核）
-    terms: [憋醒, 喘醒, 坐着都喘, 坐着也喘, 躺着都喘, 躺着也喘, 动不动就喘]
+    terms: [憋醒, 喘醒, 坐着都喘, 坐着也喘, 躺着都喘, 躺着也喘, 动不动就喘, 平躺就喘, 躺平就喘, 躺下就喘, 一躺下就喘]
     combos:
       - [[坐着也, 坐着都, 躺着也, 躺着都, 平躺, 躺下就, 一躺下, 不动也, 不动都, 沙发上, 休息的时候也, 休息时也, 走几步, 走两步就, 一走路就], [喘不上气, 喘不过气, 喘不过来, 喘不上来, 上不来气, 呼吸困难, 透不过气, 吸不上气, 气短]]
     not_followed_by: [口气, 口]  # “坐着都喘口气”
@@ -126,6 +160,8 @@ symptoms:
   - id: palpitation
     name: 心慌、心律不齐
     terms: [心慌, 心悸, 心跳乱, 心跳不齐, 心律不齐, 一下快一下慢, 漏跳, 早搏, 心脏乱跳]
+    combos:
+      - [[心脏, 心跳], [乱跳, 乱了, 不齐]]
   - id: dizziness
     name: 头晕
     terms: [头晕, 眩晕, 头昏, 发晕, 晕乎乎, 天旋地转, 站不稳, 头重脚轻, 眼花]
@@ -134,24 +170,33 @@ symptoms:
   - id: headache
     name: 头痛
     terms: [头痛, 头疼, 脑袋疼, 脑袋痛, 头要炸, 头像要炸]
+    combos:
+      # 中间插字的说法（“头突然炸裂一样疼”）
+      - [[头, 脑袋], [一样疼, 一样痛, 突然疼, 突然痛, 剧痛, 炸裂, 要裂开]]
+    not_in_clause_with: [头肌, 二头, 三头, 骨头, 回头, 拳头, 指头]
   - id: severe
     name: 程度剧烈
-    terms: [剧烈, 炸开, 要炸, 从来没有这么, 从来没这么, 从没这么, 受不了, 很厉害, 特别厉害, 非常厉害, 得厉害, 剧痛]
+    terms: [剧烈, 炸开, 要炸, 炸裂, 裂开, 从来没有这么, 从来没这么, 从没这么, 受不了, 很厉害, 特别厉害, 非常厉害, 得厉害, 剧痛]
   - id: speech
     name: 说话不清
     # 只用紧挨着的说法（“教练说话我听不清楚”不算），“含糊其辞”“不清不楚”不算（冲刺 2 复核 N2）
     terms: [说话不清, 说话不太清, 说话说不清, 说话也说不清, 说话也不清, 说话突然不清, 讲话不清, 讲话不太清, 讲话突然不清, 话都说不清, 说不出话, 口齿不清, 吐字不清, 说话含糊, 讲话含糊, 吐字含糊, 说话有点含糊, 讲话有点含糊, 说话变得含糊, 舌头发硬, 舌头不听使唤, 舌头不灵, 舌头僵]
+    combos:
+      # 中间插字的说法（“说话说着说着就含含糊糊的”）
+      - [[说话, 讲话, 吐字, 口齿], [含糊, 含含糊糊, 大舌头, 不利索]]
     not_followed_by: [其辞, 不楚]
+    not_in_clause_with: [听不, 视频, 其辞, 不清不楚]  # 说的是别人讲得不清楚
   - id: one_side_weak
     name: 一侧脸或肢体麻木无力
     # 不单用“脸歪”（“脸歪了吗这个自拍”“突然发现照片里脸歪了”），不用“左脸、右脸”（“自拍左脸歪了”“右脸下垂要做提拉”）；
     # 侧别组合里不含“歪”（“深蹲时身体往右边歪”是动作问题，第二、三轮复核）
     # 后接“笑、着笑、歪歪、歪的”不算（“嘴歪笑”“嘴角歪着笑”“嘴歪歪的”）；前面带“天生”不算
-    terms: [嘴歪, 嘴巴歪, 嘴角歪, 嘴有点歪, 口角歪, 口眼歪斜, 半身不遂, 偏瘫, 突然脸歪, 脸突然歪, 一下子脸歪]
+    terms: [嘴歪, 嘴巴歪, 嘴角歪, 嘴有点歪, 嘴都歪, 嘴也歪, 口角歪, 口眼歪斜, 半身不遂, 偏瘫, 突然脸歪, 脸突然歪, 一下子脸歪]
     combos:
       - [[一边, 半边, 一侧, 单侧, 左边, 右边, 左半边, 右半边, 左手, 右手], [脸, 手, 胳膊, 腿, 身子, 身体], [麻, 没力, 无力, 没劲, 不听使唤, 动不了, 抬不起, 拿不住]]
       - [[左边脸, 右边脸, 半边脸, 一边脸, 一侧脸], [歪, 下垂, 耷拉]]
       - [[嘴, 嘴角, 嘴巴], [往一边歪, 往左歪, 往右歪, 歪向一边, 歪到一边]]
+      - [[突然, 一下子], [左腿, 右腿, 左手, 右手, 左胳膊, 右胳膊, 半边身子], [没力, 无力, 没劲, 抬不起, 动不了]]
     not_followed_by: [笑, 着笑, 歪歪, 歪的]
   - id: vision_loss
     name: 视力突然丧失或重影
@@ -171,6 +216,7 @@ symptoms:
       - [[人, 脑子, 整个人], [迷迷糊糊, 糊里糊涂]]
   - id: heat_exposure
     name: 高温或暴晒环境
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [大太阳, 太阳下, 烈日, 高温, 暴晒, 中暑, 天很热, 天太热, 天气热, 闷热, 桑拿天, 三伏天]
   - id: no_sweat_hot
     name: 不再出汗或体温很高
@@ -180,6 +226,7 @@ symptoms:
     terms: [恶心, 想吐, 呕吐, 头痛, 头疼, 抽筋, 乏力, 浑身无力]
   - id: diabetes
     name: 糖尿病或用降糖药
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     # 不单用“胰岛素”：“胰岛素抵抗”不是用胰岛素；磺脲类（格列××）同样会引起低血糖
     terms: [糖尿病, 降糖药, 打胰岛素, 用胰岛素, 注射胰岛素, 胰岛素针, 胰岛素泵, 低血糖, 血糖低, 血糖很低, 二甲双胍, 格列, 磺脲]
   - id: hypo_signs
@@ -200,6 +247,7 @@ symptoms:
     terms: [会阴麻, 鞍区麻]
     combos:
       - [[屁股, 臀部, 会阴, 肛门, 大腿内侧, 裆], [麻, 没知觉, 没感觉]]
+    not_in_clause_with: [练]  # “屁股都练麻了”
   - id: leg_numb
     name: 腿脚发麻或放射痛
     terms: [坐骨神经]
@@ -207,6 +255,7 @@ symptoms:
       - [[腿, 脚], [麻, 窜, 放射, 过电]]
   - id: pregnancy
     name: 怀孕
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [怀孕, 孕期, 孕妇, 怀着孕, 孕周, 孕早期, 孕中期, 孕晚期, 怀了宝宝, 怀二胎]
     combos:
       - [[孕], [周]]
@@ -218,6 +267,7 @@ symptoms:
     terms: [头晕, 眩晕, 胸痛, 胸闷, 喘不上气, 小腿肿, 小腿疼, 腿肚子疼, 站不稳, 没力气]
   - id: bp_crisis
     name: 血压极高
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     blood_pressure:
       context: [血压, 高压, 低压, mmhg]
       systolic_at_least: 180
@@ -245,7 +295,9 @@ symptoms:
     terms: [没法走路, 走不了路, 不能走路, 走不了, 站不起来, 不能着地, 不敢着地, 没法着地, 不能负重, 一瘸一拐, 瘸了]
   - id: injury
     name: 扭伤、拉伤、摔伤
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [扭了, 扭伤, 崴了, 崴脚, 拉伤, 撕裂, 摔了, 摔倒, 撞了, 咔的一声, 啪的一声, 听到响声]
+    not_in_clause_with: [差点, 差一点, 险些]
   - id: fracture_signs
     name: 疑似骨折或脱位
     # 不含“变形”：健身语境里多指动作变形
@@ -255,6 +307,7 @@ symptoms:
     terms: [疼醒, 痛醒, 疼得睡不着, 痛得睡不着, 半夜疼, 夜间痛, 夜里疼, 夜里痛]
   - id: purge
     name: 催吐或用泻药
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     # 不单用“去吐”“吐出来”“吐掉”：“去吐槽”“发力时把气吐出来”不是催吐
     terms: [催吐, 抠喉, 抠嗓子, 故意吐, 吃完就吐, 吃了就吐, 吃完就去吐, 吃了就去吐, 吃完去吐, 吃完饭就吐, 吃泻药, 用泻药, 吃了泻药, 用了泻药, 喝泻药, 番泻叶]
     combos:
@@ -265,7 +318,11 @@ symptoms:
     terms: [割腕, 吃了很多安眠药, 吞药, 吃了一整瓶, 遗书, 准备自杀, 正在自杀, 跳楼]
   - id: self_harm_idea
     name: 轻生想法
-    terms: [想死, 想去死, 不如死了, 不想活, 活着没意思, 活不下去, 自杀, 轻生, 结束生命, 想消失, 伤害自己, 自残]
+    # “不想活得这么累”仍算：宁可多关心一次（已知取舍）
+    terms: [想死, 想去死, 不如死了, 不想活, 活着没意思, 活不下去, 自杀, 轻生, 结束生命, 想消失, 伤害自己, 自残, 想不开]
+    combos:
+      - [[楼, 天台, 桥, 窗户], [跳下去, 跳下来, 往下跳]]
+    not_followed_by: [动]  # “不想活动”
   - id: hives
     name: 全身风团或嘴唇肿
     # 脸肿、眼皮肿单独不算（“吃咸了脸肿”“哭了眼皮肿”，冲刺 2 复核 N2）；舌头肿见喉咙发紧
@@ -282,6 +339,7 @@ symptoms:
     terms: [痒, 起疹子, 起风团]
   - id: allergen
     name: 常见过敏原或过敏
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     # 不用“蜂”单字：“喝了蜂蜜水”（第三轮复核）
     terms: [花生, 坚果, 虾, 蟹, 海鲜, 芒果, 蜜蜂, 马蜂, 黄蜂, 蛰, 蜇, 过敏, 吃了药, 打了针]
   - id: face_allergy
@@ -291,15 +349,22 @@ symptoms:
   - id: throat_swelling
     name: 喉咙发紧或肿
     terms: [喉咙发紧, 嗓子发紧, 喉咙肿, 嗓子肿, 舌头肿, 咽不下去]
+    combos:
+      - [[喉咙], [紧紧, 发紧, 收紧, 肿]]
+      - [[舌头], [肿]]
+    not_in_clause_with: [感冒, 发炎, 上火, 咽炎, 扁桃体]  # 感冒嗓子肿不是严重过敏
   - id: asthma
     name: 哮喘
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [哮喘, 喘鸣, 嗓子里有哨音]
   - id: reliever_fail
     name: 用了急救药不缓解
     terms: [喷了药也, 喷了也, 喷了没用, 吸了药也, 药不管用]
   - id: head_injury
     name: 头部受伤
+    context: true  # 背景状况：判定条目时整句任何位置出现都算
     terms: [脑震荡, 撞到头, 砸到头, 磕到头, 摔到头, 头撞, 头被砸]
+    not_in_clause_with: [差点, 差一点, 险些]  # “杠铃差点砸到头”
   - id: head_red
     name: 头部受伤后的危险信号（CRT6）
     terms: [吐了, 呕吐, 越来越疼, 犯困, 嗜睡, 想睡, 记不清, 断片, 重影, 脖子疼]
@@ -330,8 +395,9 @@ rules:
   - {id: RF-ALLERGY-ITCH, level: red_flag, category: allergy, title: 脸或眼睛肿伴痒、起疹子, all: [face_swelling, itch]}
   - {id: RF-HIVES, level: red_flag, category: allergy, title: 全身风团或嘴唇肿, all: [hives]}
   # ---- 心血管 ----
+  - {id: EM-CARDIAC-NAMED, level: emergency, category: cardiovascular, title: 直接说心梗、没呼吸、没心跳, all: [cardiac_named]}
   - {id: EM-CHEST-ONGOING, level: emergency, category: cardiovascular, title: 胸痛正在持续或休息不缓解, all: [chest_pain, ongoing]}
-  - {id: EM-CHEST-SUDDEN, level: emergency, category: cardiovascular, title: 突发胸痛, all: [chest_pain, sudden]}
+  - {id: EM-CHEST-SUDDEN, level: emergency, category: cardiovascular, title: 突发胸痛, all: [chest_pain, sudden], within: clause}  # “胸口有点闷，突然想起来没吃药”不算
   - {id: EM-CHEST-RADIATE, level: emergency, category: cardiovascular, title: 胸痛放射到左臂、下巴或后背, all: [chest_pain, radiating]}
   - {id: EM-CHEST-SWEAT, level: emergency, category: cardiovascular, title: 胸痛伴出冷汗, all: [chest_pain, cold_sweat]}
   - {id: EM-CHEST-DYSPNEA, level: emergency, category: cardiovascular, title: 胸痛伴呼吸困难, all: [chest_pain, dyspnea]}
@@ -349,6 +415,7 @@ rules:
   - {id: EM-DVT-HOT, level: emergency, category: cardiovascular, title: 小腿红肿发烫（疑似深静脉血栓）, all: [calf_swelling, red_hot]}
   # ---- 晕厥 ----
   - {id: EM-COLLAPSE, level: emergency, category: syncope, title: 晕倒或意识丧失, all: [collapse]}
+  - {id: EM-UNCONSCIOUS, level: emergency, category: syncope, title: 叫不醒, all: [unconscious]}
   - {id: EM-COLLAPSE-FELL, level: emergency, category: syncope, title: 突然倒下, all: [collapse_fell]}
   - {id: EM-UNRESPONSIVE, level: emergency, category: syncope, title: 倒下或晕后叫不醒、没反应, all: [unresponsive, collapse_context]}
   - {id: RF-PRESYNCOPE, level: red_flag, category: syncope, title: 眼前发黑, all: [presyncope]}
@@ -367,6 +434,7 @@ rules:
   - {id: EM-SEIZURE, level: emergency, category: neuro, title: 抽搐, all: [seizure]}
   - {id: EM-THUNDERCLAP, level: emergency, category: neuro, title: 突发剧烈头痛, all: [headache, sudden, severe]}
   - {id: RF-HEADACHE-SEVERE, level: red_flag, category: neuro, title: 剧烈头痛, all: [headache, severe]}
+  - {id: EM-STROKE-NAMED, level: emergency, category: neuro, title: 直接说中风, all: [stroke_named]}
   - {id: EM-STROKE-SPEECH, level: emergency, category: neuro, title: 说话不清（卒中征象）, all: [speech]}
   - {id: EM-STROKE-WEAK, level: emergency, category: neuro, title: 一侧脸或肢体麻木无力（卒中征象）, all: [one_side_weak]}
   - {id: EM-STROKE-VISION, level: emergency, category: neuro, title: 突然看不见或重影（卒中征象）, all: [vision_loss, sudden]}
@@ -381,6 +449,7 @@ rules:
   - {id: EM-JOINT-FEVER, level: emergency, category: musculoskeletal, title: 关节肿伴发烧（疑似关节感染）, all: [joint_swelling, fever]}
   - {id: RF-JOINT-HOT, level: red_flag, category: musculoskeletal, title: 关节红肿发烫, all: [joint_swelling, red_hot]}
   - {id: RF-JOINT-CANT-BEAR, level: red_flag, category: musculoskeletal, title: 关节肿且不能负重, all: [joint_swelling, cant_bear]}
+  - {id: RF-SUDDEN-CANT-BEAR, level: red_flag, category: musculoskeletal, title: 突然疼得不能负重, all: [sudden, cant_bear]}
   - {id: RF-INJURY-CANT-BEAR, level: red_flag, category: musculoskeletal, title: 受伤后不能负重, all: [injury, cant_bear]}
   - {id: RF-FRACTURE, level: red_flag, category: musculoskeletal, title: 疑似骨折或脱位, all: [fracture_signs]}
   - {id: RF-NIGHT-PAIN, level: red_flag, category: musculoskeletal, title: 夜间疼醒, all: [night_pain]}

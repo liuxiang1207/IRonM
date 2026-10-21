@@ -17,6 +17,9 @@ export interface Symptom {
   combos: string[][][];
   blood_pressure: BloodPressure | null;
   not_followed_by: string[];
+  not_preceded_by: string[];
+  not_in_clause_with: string[];
+  context: boolean;
 }
 
 export interface EmergencyRule {
@@ -25,6 +28,7 @@ export interface EmergencyRule {
   category: string;
   title: string;
   all: string[];
+  within: "clause" | "nearby" | "sentence";
 }
 
 export interface Negation {
@@ -160,26 +164,30 @@ function counts(neg: Negation, clause: string, start: number, end: number, pastC
   return neg.past_not_followed_by.some((w) => rest.startsWith(w));
 }
 
-// 后面紧跟 notFollowedBy 中的字时这一处不算
+// 前面紧挨着 notPrecededBy、后面紧跟 notFollowedBy 中的字时这一处不算
 function found(
   neg: Negation,
   clause: string,
   term: string,
   pastCounts: boolean,
   notFollowedBy: string[],
+  notPrecededBy: string[],
 ): boolean {
   let i = clause.indexOf(term);
   while (i !== -1) {
     const end = i + term.length;
     const followed = notFollowedBy.some((w) => clause.startsWith(w, end));
-    if (!followed && counts(neg, clause, i, end, pastCounts)) return true;
+    const head = clause.slice(0, i);
+    const preceded = notPrecededBy.some((w) => head.endsWith(w));
+    if (!followed && !preceded && counts(neg, clause, i, end, pastCounts)) return true;
     i = clause.indexOf(term, i + 1);
   }
   return false;
 }
 
 function symptomMatches(symptom: Symptom, clause: string, neg: Negation, pastCounts: boolean): boolean {
-  const f = (t: string) => found(neg, clause, t, pastCounts, symptom.not_followed_by);
+  if (symptom.not_in_clause_with.some((w) => clause.includes(w))) return false;
+  const f = (t: string) => found(neg, clause, t, pastCounts, symptom.not_followed_by, symptom.not_preceded_by);
   if (symptom.terms.some(f)) return true;
   if (symptom.combos.some((combo) => combo.every((group) => group.some(f)))) return true;
   // 血压按数值判断，不受否定影响
@@ -198,14 +206,31 @@ function pastCountsAt(neg: Negation, parts: string[], i: number): boolean {
   return again || (near && (here || !has(clause, neg.remote)));
 }
 
+// 条目是否成立：背景状况整句任何位置出现即可，其余症状须在条目范围内同时出现（与 TermBook.fires 对应）
+function fires(book: TermBook, rule: EmergencyRule, perClause: Set<string>[]): boolean {
+  const union = (sets: Set<string>[]) => new Set(sets.flatMap((x) => [...x]));
+  const anywhere = union(perClause);
+  const context = new Set(book.symptoms.filter((s) => s.context).map((s) => s.id));
+  if (!rule.all.filter((s) => context.has(s)).every((s) => anywhere.has(s))) return false;
+  const acute = rule.all.filter((s) => !context.has(s));
+  let windows: Set<string>[];
+  if (rule.within === "sentence") windows = [anywhere];
+  else {
+    const size = rule.within === "clause" ? 1 : 2;
+    windows = perClause.map((_, i) => union(perClause.slice(i, i + size)));
+  }
+  return windows.some((w) => acute.every((s) => w.has(s)));
+}
+
 export function assess(book: TermBook, text: string): Assessment {
   const parts = clauses(book, text);
   const neg = book.negation;
-  const marked = parts.map((c, i): [string, boolean] => [c, pastCountsAt(neg, parts, i)]);
-  const present = new Set(
-    book.symptoms.filter((s) => marked.some(([c, r]) => symptomMatches(s, c, neg, r))).map((s) => s.id),
+  // 每个分句里出现的症状
+  const perClause = parts.map(
+    (c, i) =>
+      new Set(book.symptoms.filter((s) => symptomMatches(s, c, neg, pastCountsAt(neg, parts, i))).map((s) => s.id)),
   );
-  const fired = book.rules.filter((r) => r.all.every((s) => present.has(s)));
+  const fired = book.rules.filter((r) => fires(book, r, perClause));
   let level: Level = "none";
   for (const r of fired) if (RANK[r.level] > RANK[level]) level = r.level;
   return {
