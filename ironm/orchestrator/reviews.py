@@ -42,6 +42,8 @@ from ironm.orchestrator.onboarding import DEFAULT_SCHEDULES, GOAL_SCENES
 from ironm.rules.loader import RuleBook
 from ironm.skills.library.nutritionist.diet_adjust.skill import RULE as DIET_RULE
 from ironm.skills.library.nutritionist.diet_adjust.skill import DietParams, slow_loss
+from ironm.skills.library.training_planner.weekly_adjust.skill import RULE as WEEKLY_RULE
+from ironm.skills.library.training_planner.weekly_adjust.skill import WeeklyParams, needs_recovery
 from ironm.skills.loader import LoadedSkill, select
 from ironm.store.plans import PlanStore, StoredPlan
 from ironm.store.reviews import Adjustment, DecisionStore
@@ -251,6 +253,21 @@ def _publish(
     }
 
 
+def _recovery_streak(user_id: str, week: date, deps: ReviewDeps) -> int:
+    """这一周之前，连续几周命中了“疲劳高或睡眠差”（按各周决策日志里记下的事实判断）。"""
+    p = deps.rulebook.get(WEEKLY_RULE).params_as(WeeklyParams)
+    earlier = {
+        d.period: d.record
+        for d in deps.decisions.recent(user_id, kind="weekly", limit=p.recovery_max_weeks + 4)
+    }
+    streak = 0
+    while (
+        record := earlier.get((week - timedelta(days=7 * (streak + 1))).isoformat())
+    ) is not None and needs_recovery(record.get("facts", {}).get("this_week", {}), p):
+        streak += 1
+    return streak
+
+
 def _summary(changes: Sequence[Mapping[str, Any]], reasons: Sequence[str]) -> str:
     names = {
         "weekly_cardio_minutes": "每周有氧分钟数",
@@ -265,6 +282,8 @@ def _summary(changes: Sequence[Mapping[str, Any]], reasons: Sequence[str]) -> st
         "weekly_insufficient": "这周记录太少，先不调整。",
         "weekly_partial_week": "这周只记录了一部分，先不调整。",
         "weekly_keep": "这周按计划进行，不需要调整。",
+        "weekly_recovery_streak": "已经连续 3 周疲劳高或睡得差：先不再减量，这几天以休息为主；"
+        "持续不缓解请就医。",
         "diet_insufficient": "饮食或称重记录还不够判断，饮食先不变，下次再看。",
         "diet_simplify_first": "先把训练完成好，饮食暂时不变。",
         "diet_keep": "体重变化在目标范围内，饮食不变。",
@@ -326,6 +345,7 @@ def run_review(
         "sleep_quality": this.sleep_quality,
         "partial_week": this.partial_week,
         "menstruation": this.menstruation,
+        "recovery_weeks_before": _recovery_streak(user_id, week, deps),
     }
     first = deps.plans.history(user_id)[0]
     started = first.at.astimezone(tz).date()

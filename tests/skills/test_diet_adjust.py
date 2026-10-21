@@ -33,6 +33,12 @@ def test_slow_loss_two_periods_cuts_150() -> None:
     assert _kcal() == 1850
 
 
+def test_trend_ci_up_to_point_four_is_enough() -> None:
+    """可信范围半宽 0.35 千克 / 周：按修正后的门槛（0.4）可以判断，减重偏慢即下调。"""
+    assert _kcal(ci_half_width=0.35) == 1850
+    assert _kcal(ci_half_width=0.41) is None
+
+
 def test_slow_loss_first_period_waits() -> None:
     assert _kcal(prev_slow=False) is None
 
@@ -55,7 +61,7 @@ def test_fast_loss_after_four_weeks_adds_150() -> None:
         {"red_flag": True},
         {"meal_days_min": 3},
         {"weigh_ins_min": 0},
-        {"ci_half_width": 0.3},
+        {"ci_half_width": 0.45},  # 可信范围宽于每周 0.4 千克：数据不足
         {"completion": 0.4},
         {"adherence_days": 2},
         {"partial_week": True},

@@ -1,5 +1,6 @@
 """训练规划师 · 每周训练复盘（spec [2026-10-21] §17）：按决策表 R-RV-WEEKLY 调整有氧与组数次数。"""
 
+from collections.abc import Mapping
 from datetime import timedelta
 from typing import Any
 
@@ -37,6 +38,8 @@ class WeeklyParams(BaseModel):
     max_sets: int
     max_reps_high: int
     review_days: int
+    recovery_floor_pct: int  # 恢复性下调时有氧不低于起点的这个百分比
+    recovery_max_weeks: int  # 连续这么多周命中恢复行时，不再减量，改为提示休息与就医
 
 
 RULE_PARAMS = {RULE: WeeklyParams, START_RULE: StartParams, TIER_LIMITS_RULE: TierLimitsParams}
@@ -45,6 +48,27 @@ RULE_PARAMS = {RULE: WeeklyParams, START_RULE: StartParams, TIER_LIMITS_RULE: Ti
 def _num(view: SnapshotView, key: str) -> float | None:
     value = view.get(key)
     return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else None
+
+
+def needs_recovery(facts: Mapping[str, Any], p: WeeklyParams) -> bool:
+    """决策表第一行：疲劳比前两次签到的平均高、或睡眠差。记录不全、数据不足、经期都不算。
+    facts 为一周的复盘事实（键同 WeekFacts）；复盘时也用它数连续命中了几周。"""
+
+    def num(key: str) -> float | None:
+        v = facts.get(key)
+        return float(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
+
+    if facts.get("partial_week") is True or facts.get("menstruation") is True:
+        return False
+    if num("completion") is None:
+        return False
+    fatigue, baseline, sleep = num("fatigue"), num("fatigue_baseline"), num("sleep_quality")
+    tired = fatigue is not None and baseline is not None and fatigue - baseline >= p.fatigue_rise
+    return tired or (sleep is not None and sleep <= p.sleep_low)
+
+
+_FACT_KEYS = ("partial_week", "menstruation", "completion", "fatigue", "fatigue_baseline",
+              "sleep_quality")  # fmt: skip
 
 
 def _row(view: SnapshotView, p: WeeklyParams) -> str:
@@ -56,11 +80,8 @@ def _row(view: SnapshotView, p: WeeklyParams) -> str:
         return "insufficient"
     previous = _num(view, "review.prev_completion")
     rpe = _num(view, "review.avg_rpe")
-    fatigue, baseline = _num(view, "review.fatigue"), _num(view, "review.fatigue_baseline")
-    sleep = _num(view, "review.sleep_quality")
     down = view.get("review.menstruation") is not True  # 经期这一周不下调
-    tired = fatigue is not None and baseline is not None and fatigue - baseline >= p.fatigue_rise
-    if down and (tired or (sleep is not None and sleep <= p.sleep_low)):
+    if needs_recovery({k: view.get(f"review.{k}") for k in _FACT_KEYS}, p):
         return "recovery"
     if down and rpe is not None and rpe >= p.rpe_high:
         return "rpe_high"
@@ -111,7 +132,10 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
     facts = _facts(view)
     cardio, strength = cardio_now, "same"
     if row == "recovery":
-        cardio, strength = cut, "down"
+        if (_num(view, "review.recovery_weeks_before") or 0) >= p.recovery_max_weeks - 1:
+            return no_opinion(context, "weekly_recovery_streak")  # 连续多周：先休息，不再减量
+        lowest = round(floor * p.recovery_floor_pct / 100 / 5) * 5
+        cardio, strength = max(cut, min(lowest, cardio_now)), "down"
     elif row == "rpe_high":
         strength = "down"
     elif row == "low_completion":

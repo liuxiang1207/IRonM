@@ -232,6 +232,23 @@ def test_checkin_submitted_minutes_later_still_counts(env: tuple[_Env, TestClien
     assert after["fields"]["weekly_cardio_minutes"] < before["fields"]["weekly_cardio_minutes"]
 
 
+def test_three_tired_weeks_in_a_row_stop_cutting_and_suggest_rest(
+    env: tuple[_Env, TestClient],
+) -> None:
+    """连续 3 周睡得差：前两周恢复性下调，第 3 周不再减量，提示先休息、持续不缓解请就医。"""
+    e, client = env
+    cardio = []
+    for k in range(3):
+        monday = W1 + timedelta(days=7 * k)
+        _train_week(e, client, monday, checkin={"fatigue": 4, "sleep_quality": 1})
+        e.tick(e.at(monday + timedelta(days=6), 21, 30))
+        cardio.append(client.get("/plan").json()["plan"]["fields"]["weekly_cardio_minutes"])
+    assert cardio[0] > cardio[1] and cardio[2] == cardio[1]  # 第 3 周不再减
+    latest = next(d for d in client.get("/plan/decisions").json() if d["kind"] == "weekly")
+    assert latest["period"] == (W1 + timedelta(days=14)).isoformat()
+    assert latest["changes"] == [] and "就医" in latest["summary"]
+
+
 def test_tired_week_cuts_load(env: tuple[_Env, TestClient]) -> None:
     e, client = env
     for k, fatigue in enumerate((2, 2)):  # 前两次签到的疲劳都是 2

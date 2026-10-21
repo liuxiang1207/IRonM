@@ -37,3 +37,17 @@ def test_diet_reviews_only_for_fat_loss(reports: dict[str, PersonaReport]) -> No
             assert len(r.diet_rows) >= 3
         else:
             assert r.diet_rows == ()
+
+
+def test_long_recovery_stops_cutting_after_two_weeks(reports: dict[str, PersonaReport]) -> None:
+    """完成度低的用户连续 6 周睡得差：只在前两周下调，之后不再减量（spec §17 修正）。"""
+    r = reports["low_completion"]
+    assert r.rows[:6] == ("recovery",) * 6
+    assert r.adjusted == 2
+
+
+def test_diet_review_decides_in_second_month(reports: dict[str, PersonaReport]) -> None:
+    """28 天体重趋势、门槛 0.4：每周称两次、记饮食的减脂用户第二个月起得到饮食判断。"""
+    for name in ("adherent", "fatigue"):
+        assert [row for row in reports[name].diet_rows[1:] if row != "insufficient"]
+    assert set(reports["weekly_weigher"].diet_rows) == {"insufficient"}  # 每周只称一次、不记饮食

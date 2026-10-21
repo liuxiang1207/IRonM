@@ -104,3 +104,20 @@ def test_no_change_rows(review: dict[str, Any]) -> None:
 def test_not_loaded_for_first_plan_or_c_tier() -> None:
     assert "weekly_adjust" not in run_agent(AgentId.TRAINING_PLANNER, "goal.create", Tier.A)
     assert "weekly_adjust" not in run_agent(AgentId.TRAINING_PLANNER, "review.weekly", Tier.C)
+
+
+def test_recovery_cardio_not_below_half_of_start() -> None:
+    """恢复性下调的下限：起点（A 层 90 分钟）的一半；已在下限的只减组数。"""
+    low = {**PLAN, "weekly_cardio_minutes": 50}
+    assert _changes(_adjust(plan=low, sleep_quality=2))["weekly_cardio_minutes"] == 45  # 40 → 45
+    at_floor = _changes(_adjust(plan={**PLAN, "weekly_cardio_minutes": 45}, sleep_quality=2))
+    assert "weekly_cardio_minutes" not in at_floor and _sets(at_floor) == [1] * 5
+    b_low = _changes(_adjust(Tier.B, plan=low, sleep_quality=2))
+    assert b_low["weekly_cardio_minutes"] == 40  # B 层起点 60 的一半是 30
+
+
+def test_third_recovery_week_in_a_row_stops_cutting() -> None:
+    """已连续两周恢复性下调，第 3 周仍疲劳或睡得差：不再减量，提示休息与就医。"""
+    out = _adjust(sleep_quality=2, recovery_weeks_before=2)
+    assert out.kind == "no_opinion" and out.reason_code == "weekly_recovery_streak"
+    assert _changes(_adjust(sleep_quality=2, recovery_weeks_before=1))  # 第 2 周照常下调

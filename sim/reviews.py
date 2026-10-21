@@ -159,11 +159,15 @@ def run_persona(persona: Persona, workdir: Path) -> PersonaReport:
     first = history[0].record
     tier = (first.get("tier") or {}).get("tier")
     start_cardio = first["plan"]["fields"].get("weekly_cardio_minutes")
-    rows, diet_rows, changes, violations = [], [], [], []
+    rows: list[str] = []
+    diet_rows, changes, violations = [], [], []
     for d in decisions:
+        streak = 0
+        while streak < len(rows) and rows[-1 - streak] == "recovery":
+            streak += 1
         row, diet_seen, problems = check_review(
             d.record, weekly=SPEC_WEEKLY, diet=SPEC_DIET, goal=GOALS[persona.id], tier=tier,
-            start_cardio=start_cardio,
+            start_cardio=start_cardio, recovery_before=streak,
         )  # fmt: skip
         rows.append(row)
         if diet_seen is not None:

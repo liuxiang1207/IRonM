@@ -8,7 +8,7 @@ triggers:
 applies_to:
   scene_packs: [fat_loss, strength, fitness, habits, maintenance]
   population_tiers: [a, a_prime, b, collaborative]
-requires_data: [tier, constraints, current_plan, review.completion, review.prev_completion, review.avg_rpe, review.fatigue, review.fatigue_baseline, review.sleep_quality, review.partial_week, review.menstruation]
+requires_data: [tier, constraints, current_plan, review.completion, review.prev_completion, review.avg_rpe, review.fatigue, review.fatigue_baseline, review.sleep_quality, review.partial_week, review.menstruation, review.recovery_weeks_before]
 produces: [weekly_cardio_minutes, session_slots]
 priority: 10
 prescriptive: true

@@ -14,6 +14,9 @@ CARDIO, SLOTS, KCAL = "weekly_cardio_minutes", "session_slots", "daily_kcal_targ
 # 有氧每次最多加一档（A、A′ 30 分钟，B、协作 20 分钟），总量不超过每周 300 分钟（R-SF-TIER-LIMITS、
 # R-TR-START）；这里按最宽的一档核对
 STEP_MAX, CAP = 30, 300
+# 恢复性下调（spec §17 修正）：有氧不低于起点（A 层 90、B 与协作层 60 分钟）的一半；
+# 连续 3 周不再减量
+RECOVERY_FLOOR_A, RECOVERY_FLOOR_B, RECOVERY_MAX_WEEKS = 45, 30, 3
 # spec §17 两张决策表里写明的数值
 SPEC_WEEKLY: dict[str, float] = {
     "fatigue_rise": 2,
@@ -27,7 +30,7 @@ SPEC_WEEKLY: dict[str, float] = {
     "max_reps_high": 15,
 }
 SPEC_DIET: dict[str, float] = {
-    "min_meal_days_per_week": 4, "min_weigh_ins_per_week": 1, "max_ci_half_width": 0.25,
+    "min_meal_days_per_week": 4, "min_weigh_ins_per_week": 1, "max_ci_half_width": 0.4,
     "low_completion": 0.5, "low_adherence_days": 3, "ok_completion": 0.7, "ok_adherence_days": 4,
     "step_kcal": 150, "fast_loss_kg_per_week": 1.0, "fast_loss_after_days": 28,
     "target_low_a": 0.5, "target_low_a_prime": 0.25,
@@ -150,14 +153,18 @@ def check_review(
     goal: str,
     tier: str | None,
     start_cardio: float | None,
+    recovery_before: int = 0,
 ) -> tuple[str, str | None, list[str]]:
-    """返回（训练行, 饮食行, 不符合决策表之处）。record 是一条每周复盘的完整决策日志。"""
+    """返回（训练行, 饮食行, 不符合决策表之处）。record 是一条每周复盘的完整决策日志；
+    recovery_before 是这一周之前连续命中恢复行的周数。"""
     facts = record.get("facts", {})
     this, last = facts.get("this_week", {}), facts.get("last_week", {})
     row = training_row(this, last, weekly)
     allowed = {k: set(v) for k, v in ALLOWED.get(row, {}).items()}
     if this.get("menstruation"):
         allowed = {k: v - {"down"} for k, v in allowed.items()}  # 经期不下调
+    if row == "recovery" and recovery_before >= RECOVERY_MAX_WEEKS - 1:
+        allowed = {}  # 连续 3 周：不再减量，只提示休息与就医
     problems: list[str] = []
     changes = {c["field"]: c for c in record.get("changes", [])}
     for name, c in changes.items():
@@ -173,13 +180,19 @@ def check_review(
         if name == CARDIO and move == "down":
             # 减 20%，时长按 5 分钟取整：与准确值相差不超过 2.5 分钟；完成率低时不低于起点
             exact = c["from"] * (1 - weekly["cardio_cut_pct"] / 100)
-            at_start = row == "low_completion" and c["to"] == start_cardio
+            floor_a = RECOVERY_FLOOR_A if tier in ("a", "a_prime") else RECOVERY_FLOOR_B
+            at_start = (row == "low_completion" and c["to"] == start_cardio) or (
+                row == "recovery" and c["to"] == floor_a
+            )
             if abs(c["to"] - exact) > 2.5 and not at_start:
                 problems.append(
                     f"有氧没有按 {weekly['cardio_cut_pct']}% 下调：{c['from']}→{c['to']}"
                 )
             if row == "low_completion" and start_cardio is not None and c["to"] < start_cardio:
                 problems.append("有氧减到了起点以下")
+            lowest = RECOVERY_FLOOR_A if tier in ("a", "a_prime") else RECOVERY_FLOOR_B
+            if row == "recovery" and c["to"] < lowest:
+                problems.append(f"恢复性下调低于下限 {lowest} 分钟：{c['from']}→{c['to']}")
         if name == CARDIO and move == "up" and (c["to"] - c["from"] > STEP_MAX or c["to"] > CAP):
             problems.append(f"有氧加得太多：{c['from']}→{c['to']}")
     diet_seen = None

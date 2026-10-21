@@ -78,6 +78,8 @@ rules:
       max_sets: 3  # 进阶先把每个动作加到 3 组
       max_reps_high: 15  # 再把次数上限加到 15
       review_days: 14
+      recovery_floor_pct: 50  # 恢复性下调时有氧不低于起点的一半（项目负责人确认，快进模拟后）
+      recovery_max_weeks: 3  # 连续 3 周命中恢复行：不再减量，提示先休息、持续不缓解请就医
     note: 按表中顺序取第一条命中的；签到说“只记录了一部分”的一周不调整，标了经期的一周不下调（spec [2026-10-21] §17）。有氧每档增量取安全官规则 R-SF-TIER-LIMITS（A、A′ 30 分钟，B、协作 20 分钟），上限取安全官约束与 R-TR-START 的 cardio_target_min 中更严者。
 
   - id: R-RV-DIET
@@ -87,7 +89,7 @@ rules:
     params:
       min_meal_days_per_week: 4  # 7 天里至少几天有饮食记录
       min_weigh_ins_per_week: 1
-      max_ci_half_width: 0.25  # 体重趋势可信范围半宽（千克 / 周）不超过此值才判断
+      max_ci_half_width: 0.4  # 体重趋势可信范围半宽（千克 / 周）不超过此值才判断（快进模拟后由 0.25 放宽）
       low_completion: 0.5  # 训练完成率低于此值时先降计划难度，饮食不变
       low_adherence_days: 3  # 按计划吃的天数低于此值时饮食不变
       ok_completion: 0.7
@@ -97,7 +99,7 @@ rules:
       fast_loss_after_days: 28
       target_low_a: 0.5  # A 层每周减重目标下限（千克）
       target_low_a_prime: 0.25  # A′ 层
-      trend_window_days: 14
+      trend_window_days: 28  # 体重趋势按最近 28 天（快进模拟后由 14 天改）
       review_days: 14
     note: 按顺序取第一条命中的（spec [2026-10-21] §17）；降热量要连续两个周期满足条件；不低于热量底线（安全官约束）。
 
