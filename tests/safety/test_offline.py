@@ -27,6 +27,10 @@ from tests.safety.test_emergency import (
     UNIFIED,
 )
 
+# 2026-10-21 项目负责人决定：离线版先暂停，优先在线部分（spec §34）。恢复时去掉这一行，
+# 运行 make offline，并把 app/src/safety/emergency.ts 补齐到与服务端一致。
+pytestmark = pytest.mark.skip(reason="App 离线版暂停维护（spec §34）")
+
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER = Path(__file__).with_name("run_offline.mjs")
 

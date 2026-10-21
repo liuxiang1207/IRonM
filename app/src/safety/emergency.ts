@@ -1,4 +1,5 @@
 // 急症词表离线版（spec §21–22）。不依赖任何第三方库，断网时照常拦截。
+// 2026-10-21 起暂停维护（spec §34）：与服务端的一致性停留在提交 31ea3fe，恢复前不要在 App 中使用。
 // 数据由服务端同一份词表生成（emergency_terms.json，运行 make offline 更新）；
 // 逻辑与 ironm/safety/emergency.py 逐步对应，两边结果必须完全一致（tests/safety/test_offline.py）。
 
