@@ -246,8 +246,8 @@ def answer_as(
     visible = {k: profile[k] for k in spec.data if k in profile}  # 只给声明能读的字段
     # 多查询、两路召回、大模型重排（spec §13）；问答卡优先级最低。安全官的保证：
     # 触发词命中的安全类卡一定进入它的依据，不会因为召回或重排漏掉
-    asked = " ".join([text, *queries])
-    matched = [f"card:{c.id}" for c, _ in cards.matches(asked) if c.agent == agent]
+    # 问答卡只按用户原话匹配：改写出的说法拼在一起可能凑出别的卡的触发词
+    matched = [f"card:{c.id}" for c, _ in cards.matches(text) if c.agent == agent]
     must = matched if agent is _A.SAFETY_OFFICER else []
     reranker = (
         ModelReranker(gateway, request_id=request_id, question=text, role=spec.role)
@@ -286,12 +286,14 @@ def answer_as(
     reason = "no_model"
     if gateway is not None:
         opinion = _generate(spec, text, visible, passages, tools, gateway, request_id)
-        if opinion is not None and opinion.conclusion.startswith(NO_BASIS):
+        no_basis = opinion is not None and opinion.conclusion.startswith(NO_BASIS)
+        if no_basis and not must:
             # 模型判断给它的依据答不了这个问题：这个领域不发言
             return AgentAnswer(agent, "missing", None, ids, names, "no_basis", retrieval)
-        if opinion is not None:
+        if opinion is not None and not no_basis:
             return AgentAnswer(agent, "model", opinion, ids, names, None, retrieval)
-        reason = "model_failed_or_invalid"
+        # 安全官的模型说“没有依据”，但这句话命中了安全类卡：照样按卡提醒，不能丢
+        reason = "model_no_basis" if no_basis else "model_failed_or_invalid"
     tool_opinion = _from_tool(tools)
     if tool_opinion is not None:
         return AgentAnswer(agent, "tool", tool_opinion, ids, names, reason, retrieval)

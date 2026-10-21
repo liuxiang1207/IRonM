@@ -69,7 +69,7 @@ routes:
     timeout_s: 8
     max_tokens: 800
     extra_body: {thinking: {type: disabled}}
-  embedding:  # 向量模型（§13）：只发送查询文字与知识段落，不发画像与对话记录
+  embedding:  # 向量模型（§13）：发送改写后的查询（可能带上从最近几轮补全的指代）与知识段落；不发画像
     # 按通用的 embeddings 接口调用，可换成其他服务；没有密钥时只用关键词召回。
     # max_tokens 对向量接口不起作用，按配置格式填写。
     provider: siliconflow

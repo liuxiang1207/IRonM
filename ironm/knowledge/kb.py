@@ -10,6 +10,7 @@
 import json
 import math
 import re
+import statistics
 import threading
 import time
 from collections import Counter
@@ -33,6 +34,7 @@ __all__ = [
     "Embedder",
     "KnowledgeBase",
     "KnowledgeLoadError",
+    "OncePerRequestEmbedder",
     "Passage",
     "Reranker",
     "Retrieval",
@@ -88,7 +90,8 @@ class Reranker(Protocol):
     def score(self, query: str, passages: Sequence[Passage]) -> list[float] | None: ...
 
 
-# 问句里的虚词与口头语：不表示问的是什么，算覆盖比例前去掉（只用于没有大模型重排时的打分）
+# 问句里的虚词与口头语：不表示问的是什么，算覆盖比例前去掉（只用于没有大模型重排时的打分）。
+# 只去掉多字的问句词与句末语气词；“有”“能”“要”这类单字常在实词里（有氧、能量、要点），不去
 _QUESTION_TERMS = (
     "怎么样",
     "怎么",
@@ -113,29 +116,11 @@ _QUESTION_TERMS = (
     "吧",
     "啊",
     "呀",
-    "要",
-    "能",
-    "会",
-    "该",
-    "好",
     "的",
-    "了",
     "我",
     "你",
-    "是",
-    "有",
-    "在",
-    "就",
-    "都",
-    "也",
-    "很",
-    "太",
-    "想",
-    "做",
     "这个",
     "那个",
-    "这",
-    "那",
 )
 _QUESTION_WORDS = re.compile("|".join(sorted(_QUESTION_TERMS, key=len, reverse=True)))
 
@@ -151,7 +136,7 @@ class CoverageReranker:
         self._unseen = unseen
 
     def score(self, query: str, passages: Sequence[Passage]) -> list[float]:
-        # 知识库里从没出现过的片段（如“跑鞋”）最稀有：按最高权重计入，没被覆盖就拉低分数，
+        # 知识库里从没出现过的片段（如“跑鞋”）也计入，没被覆盖就拉低分数，
         # 避免只凭“什么”这类常见片段就判为全覆盖
         q = set(_grams(_QUESTION_WORDS.sub("，", query)))
         weight = {g: self._idf.get(g, self._unseen) for g in q}
@@ -173,6 +158,7 @@ class Retrieved:
 
 class KnowledgeBase:
     def __init__(self, passages: Iterable[Passage]) -> None:
+        # 被取代的段落保留（历史回答要能追溯），但不再参与检索
         self.passages = tuple(passages)
         ids = [p.passage_id for p in self.passages]
         dup = sorted({i for i in ids if ids.count(i) > 1})
@@ -186,7 +172,8 @@ class KnowledgeBase:
             df.update(d.keys())
         n = len(self._docs)
         self._idf = {g: math.log(1 + (n - c + 0.5) / (c + 0.5)) for g, c in df.items()}
-        self.unseen_idf = math.log(1 + (n + 0.5) / 0.5)  # 没出现过的片段的权重
+        # 没出现过的片段按中位权重计入：比“什么”这类常见片段重，又不至于压过真正的专业词
+        self.unseen_idf = statistics.median(self._idf.values()) if self._idf else 0.0
 
     @property
     def idf(self) -> dict[str, float]:
@@ -257,6 +244,29 @@ class Retrieval:
     keyword: tuple[str, ...] = ()  # 关键词一路召回的段落编号（各查询合并）
     vector: tuple[str, ...] = ()  # 向量一路召回的段落编号；没有向量模型或不可用时为空
     reranked_by: Literal["model", "coverage", "none"] = "none"
+    vector_status: Literal["ok", "off", "unavailable"] = "off"  # off：没有配置向量服务
+
+
+class OncePerRequestEmbedder:
+    """同一次请求里，几个 Agent 用同一组查询：向量只算一次（失败也只失败一次）。"""
+
+    def __init__(self, inner: Embedder) -> None:
+        self._inner = inner
+        self._lock = threading.Lock()
+        self._done: dict[tuple[str, ...], list[list[float]] | BaseException] = {}
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        key = tuple(texts)
+        with self._lock:  # 同一组查询的并发请求排队，第一个算完后其余直接取结果
+            if key not in self._done:
+                try:
+                    self._done[key] = self._inner.embed(list(texts))
+                except Exception as e:
+                    self._done[key] = e
+            got = self._done[key]
+        if isinstance(got, BaseException):
+            raise got
+        return got
 
 
 class Retriever:
@@ -290,43 +300,63 @@ class Retriever:
         self._retry_after, self._timer = retry_after_s, timer
         self._vectors: list[list[float]] | None = None
         self._failed_at: float | None = None
+        self._computing = False
         self._lock = threading.Lock()
 
+    def _cooling(self) -> bool:
+        return self._failed_at is not None and self._timer() - self._failed_at < self._retry_after
+
+    def _fail(self) -> None:
+        with self._lock:
+            self._failed_at = self._timer()
+
     def _passage_vectors(self) -> list[list[float]] | None:
-        """段落向量：第一次用到时计算并缓存；失败后隔一段时间再试，期间只用关键词一路。"""
+        """段落向量：第一次用到时计算并缓存；正在计算时其他请求不等待，先只用关键词一路；
+        失败后隔一段时间再试。"""
         if self._embedder is None:
             return None
         with self._lock:
+            if self._cooling() or self._computing:
+                return None
             if self._vectors is not None:
                 return self._vectors
-            if self._failed_at is not None and self._timer() - self._failed_at < self._retry_after:
-                return None
-            try:
-                vectors = self._embedder.embed([p.title + p.text for p in self._kb.passages])
-            except Exception:  # 向量服务不可用：这一路跳过，不影响回答
+            self._computing = True
+        vectors: list[list[float]] | None = None
+        try:
+            got = self._embedder.embed([p.title + p.text for p in self._kb.passages])
+            dims = {len(v) for v in got}
+            if len(got) == len(self._kb.passages) and len(dims) == 1 and 0 not in dims:
+                vectors = got
+        except Exception:  # 向量服务不可用：这一路跳过，不影响回答
+            vectors = None
+        with self._lock:
+            self._computing = False
+            if vectors is None:
                 self._failed_at = self._timer()
-                return None
-            if len(vectors) != len(self._kb.passages):
-                self._failed_at = self._timer()
-                return None
-            self._vectors = vectors
-            return vectors
+            else:
+                self._vectors = vectors
+        return vectors
 
     def _vector_lists(
         self, queries: Sequence[str], allowed: frozenset[int], embedder: Embedder | None
-    ) -> list[list[int]]:
+    ) -> tuple[list[list[int]], Literal["ok", "off", "unavailable"]]:
+        if self._embedder is None:
+            return [], "off"
         vectors = self._passage_vectors()
         if vectors is None:
-            return []
+            return [], "unavailable"
         try:
-            qvs = (embedder or self._embedder).embed(list(queries))  # type: ignore[union-attr]
-        except Exception:
-            return []
+            qvs = (embedder or self._embedder).embed(list(queries))
+            if len(qvs) != len(queries) or any(len(qv) != len(vectors[0]) for qv in qvs):
+                raise ValueError("向量维度不一致")
+        except Exception:  # 查询向量失败（含维度对不上）：这一路跳过，并进入冷却
+            self._fail()
+            return [], "unavailable"
         lists = []
         for qv in qvs:
             sims = sorted(((i, _cosine(qv, vectors[i])) for i in allowed), key=lambda x: -x[1])
             lists.append([i for i, _ in sims[: self._recall_k]])
-        return lists
+        return lists, "ok"
 
     def retrieve(
         self,
@@ -347,7 +377,7 @@ class Retriever:
         if not allowed or not queries:
             return Retrieval(())
         keyword = [[i for i, _ in self._kb.bm25(q, allowed)[: self._recall_k]] for q in queries]
-        vector = self._vector_lists(queries, allowed, embedder)
+        vector, vector_status = self._vector_lists(queries, allowed, embedder)
         fused: dict[int, float] = {}
         for ranked in (*keyword, *vector):
             for rank, i in enumerate(ranked):
@@ -375,6 +405,7 @@ class Retriever:
             keyword=ids(keyword),
             vector=ids(vector),
             reranked_by=by if candidates else "none",
+            vector_status=vector_status,
         )
 
     def _rerank(

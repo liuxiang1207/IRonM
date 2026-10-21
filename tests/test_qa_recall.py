@@ -37,8 +37,8 @@ def _rewrite(text: str, reply: Any, history: tuple[str, ...] = (), max_queries: 
     router = Router(rewrite=lambda _: reply) if reply is not None else None
     gw = _gateway(router)[0] if router is not None else None
     return rewrite_queries(
-        text, history=history, context_item=None, book=BOOK, gateway=gw, request_id="r",
-        max_queries=max_queries,
+        text, history=history, context_item=None, book=BOOK, cards=CARDS, gateway=gw,
+        request_id="r", max_queries=max_queries,
     )  # fmt: skip
 
 
@@ -109,7 +109,7 @@ def test_chat_rewrites_before_intent_and_records_trace() -> None:
         }
     )
     reply = respond("u1", "肌酸要怎么吃", deps)
-    assert seen == ["一水肌酸的服用方法"]  # 主查询交给意图识别
+    assert seen == ["肌酸要怎么吃"]  # 原话已经清楚：意图按原话识别，不再看改写
     assert reply.layer == "l1"
     [record] = runs
     assert record.query_count == 3 and record.rewrite == "model"

@@ -96,14 +96,20 @@ def _vectors(resp: Mapping[str, object], expected: int) -> list[list[float]]:
     data = resp.get("data")
     if not isinstance(data, list) or len(data) != expected:
         raise OutputRejected("向量条数不对")
-    rows: list[tuple[int, list[float]]] = []
+    rows: dict[int, list[float]] = {}
     for n, item in enumerate(data):
         vec = item.get("embedding") if isinstance(item, dict) else None
         index = item.get("index", n) if isinstance(item, dict) else n
-        if not isinstance(vec, list) or not vec or not all(isinstance(x, int | float) for x in vec):
+        if type(index) is not int or not 0 <= index < expected or index in rows:
+            raise OutputRejected("向量序号不对")  # 重复、越界、非整数（含布尔）
+        if not isinstance(vec, list) or not vec:
             raise OutputRejected("向量格式不对")
-        rows.append((index if isinstance(index, int) else n, [float(x) for x in vec]))
-    return [v for _, v in sorted(rows, key=lambda r: r[0])]
+        if not all(type(x) in (int, float) for x in vec):
+            raise OutputRejected("向量格式不对")
+        rows[index] = [float(x) for x in vec]
+    if len({len(v) for v in rows.values()}) != 1:
+        raise OutputRejected("向量维度不一致")
+    return [rows[i] for i in range(expected)]
 
 
 class GatewayEmbedder:

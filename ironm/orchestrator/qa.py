@@ -28,7 +28,7 @@ from ironm.contracts.roles import AgentId
 from ironm.core.body import bmi
 from ironm.core.log import get_logger
 from ironm.core.numbers import numbers_in, unregistered
-from ironm.knowledge.kb import Embedder, Retriever
+from ironm.knowledge.kb import Embedder, OncePerRequestEmbedder, Retriever
 from ironm.knowledge.qa_cards import CardBook, PartKind, QACard
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
@@ -228,10 +228,12 @@ def _trace(a: AgentAnswer) -> RetrievalTrace:
 
 
 def _degraded(answers: Sequence[AgentAnswer], has_model: bool) -> list[str]:
-    """模型可用却没用上的步骤：重排退回覆盖比例、Agent 退回工具或问答卡。"""
+    """降级发生的步骤：向量一路不可用、重排退回覆盖比例、Agent 退回工具或问答卡。"""
+    vector_down = any(a.retrieval and a.retrieval.vector_status == "unavailable" for a in answers)
+    out = ["vector:unavailable"] if vector_down else []
     if not has_model:
-        return ["model_unavailable"]
-    out = [
+        return ["model_unavailable", *out]
+    out += [
         f"rerank:{a.agent.value}"
         for a in answers
         if a.retrieval is not None and a.retrieval.reranked_by == "coverage"
@@ -307,7 +309,7 @@ def answer_question(
             as_of=as_of or datetime.now(UTC),
             tz=tz or _DEFAULT_TZ,
             queries=queries,
-            embedder=embedder,
+            embedder=OncePerRequestEmbedder(embedder) if embedder is not None else None,
         )
         tried = tuple((a.agent, a.status) for a in collected.answers)
         traces = tuple(_trace(a) for a in collected.answers if a.retrieval is not None)

@@ -8,6 +8,7 @@
 回答中不含用户原话。
 """
 
+import functools
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -183,6 +184,7 @@ def _rewrite(
         history=history,
         context_item=item,
         book=deps.intents,
+        cards=deps.cards,
         gateway=deps.gateway,
         request_id=request_id,
         max_queries=params.max_queries,
@@ -249,18 +251,34 @@ def respond(
         sections = refusal_part
         ctx = context(deps.memory, user_id)
         history = tuple(m.text for m in ctx.recent if m.role == "user")[-HISTORY_TURNS:]
-        # 检索前的多查询改写（spec §13）：明显是闲聊、问 App 用法或超范围时不改写；
-        # 主查询交给意图识别（改写不能丢原话里的关注点，见 rewrite 的校验）
+        # 检索前的多查询改写（spec §13）：明显是闲聊、问 App 用法或超范围时不改写
         item = page_context.item if page_context else None
         rewritten = _rewrite(text, history, item, deps, request_id)
-        result = recognize(
-            rewritten.queries[0],
+        # 意图按用户原话识别；原话含糊或像闲聊时，再看补全后的主查询，只能升为专业问题，
+        # 不能把专业或安全问题降成闲聊（独立审查：改写不能改变问题的性质）
+        recognize_ = functools.partial(
+            recognize,
             book=deps.intents,
             rulebook=deps.rulebook,
             gateway=deps.gateway,
             request_id=request_id,
             history=history,
         )
+        result = recognize_(text)
+        vague = result.clarify or result.intent in (Intent.UNKNOWN, *_GENERAL, Intent.OUT_OF_SCOPE)
+        if vague and rewritten.status == "model" and rewritten.queries[0] != text:
+            clearer = recognize_(rewritten.queries[0])
+            if clearer.intent in DOMAIN_WEIGHTS and not clearer.clarify:
+                concerns = tuple(dict.fromkeys([*result.concerns, *clearer.concerns]))
+                result = clearer.model_copy(update={"concerns": concerns})
+        safety_hit = next(
+            (c for c, _ in deps.cards.matches(text) if c.agent == AgentId.SAFETY_OFFICER), None
+        )
+        if result.intent in _GENERAL and safety_hit is not None and not result.concerns:
+            # 命中安全类问答卡的话（“两周后婚礼一天只吃一顿”）不当闲聊：按卡的意图走专业流程
+            result = result.model_copy(
+                update={"intent": Intent(safety_hit.intents[0]), "clarify": False}
+            )
         if result.intent in _GENERAL and result.concerns:
             # 这句话里提到身体不适或特殊人群（“你好，我怀孕了还能练吗”）：走专业流程，
             # 不由通用 Agent 回答（spec [2026-10-21] §12）。只看这句话本身，画像带来的关注点

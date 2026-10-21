@@ -188,7 +188,9 @@ def compose(
         # 安全官的意见放在最前，冲突时以它为准；它的结论作为必须写进回答的提醒交给整合
         body = [safety, *others]
         cautions = [*dict.fromkeys([safety.opinion.conclusion, *cautions])]  # type: ignore[union-attr]
-        partial = partial and bool(others)
+        if not others:
+            # 只有安全官作答：其他领域只是没有依据时不提示；出错或作答失败时照样提示
+            partial = any(a.opinion is None and a.reason != "no_basis" for a in core)
     by_model, rewrites = False, 0
     parts: list[AnswerPart] | None = None
     wanted_model = len(body) > 1 and gateway is not None
