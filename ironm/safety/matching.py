@@ -180,10 +180,12 @@ class Symptom(ContractModel):
     # 说法后紧跟这些字时这一处不算（如“吃完就吐”后接“槽”）
     not_followed_by: tuple[Term, ...] = ()
     not_preceded_by: tuple[Term, ...] = ()  # 说法前紧挨着这些字时这一处不算（如“快晕过去”）
-    # 分句里有这些字样时整个症状在这个分句不算（如放射痛的分句里有“练、酸”：多是肌肉酸痛）
+    # 分句里有这些字样时整个症状在这个分句不算（如放射痛的分句里有“练、酸”：多是肌肉酸痛）……
     not_in_clause_with: tuple[Term, ...] = ()
-    # 修饰词（突然、持续、很厉害等）：判定条目时须在核心症状前后 MODIFIER_REACH 个分句以内
-    modifier: bool = False
+    # ……但分句里同时有这些字样时照常算（“几分钟之前我爸突然中风了”）
+    still_if_clause_has: tuple[Term, ...] = ()
+    # 背景状况（怀孕、糖尿病、高温、过敏原等）：判定条目时整句任何位置出现都算
+    context: bool = False
 
     @model_validator(mode="after")
     def _check(self) -> Self:
@@ -194,6 +196,7 @@ class Symptom(ContractModel):
                 raise ValueError(f"症状 {self.id} 的组合至少两组，且每组至少一个说法")
         words = [*self.terms, *(t for combo in self.combos for g in combo for t in g)]
         words += [*self.not_followed_by, *self.not_preceded_by, *self.not_in_clause_with]
+        words += self.still_if_clause_has
         if self.blood_pressure is not None:
             words += self.blood_pressure.context
         for word in words:
@@ -201,7 +204,8 @@ class Symptom(ContractModel):
         return self
 
     def matches(self, clause: str, negation: Negation, past_counts: bool) -> bool:
-        if any(w in clause for w in self.not_in_clause_with):
+        excluded = any(w in clause for w in self.not_in_clause_with)
+        if excluded and not any(w in clause for w in self.still_if_clause_has):
             return False
 
         def found(term: str) -> bool:

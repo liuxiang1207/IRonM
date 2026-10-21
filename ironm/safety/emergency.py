@@ -41,13 +41,13 @@ type Level = Literal["emergency", "red_flag", "none"]
 _RANK: dict[Level, int] = {"none": 0, "red_flag": 1, "emergency": 2}
 
 
-# 修饰词与核心症状之间最多相隔的分句数（“头疼，是突然开始的，疼得从来没这么厉害”）
-MODIFIER_REACH = 2
+# 背景状况以外的症状须在连续这么多个分句以内同时出现（“头疼，是突然开始的，疼得从来没这么厉害”）
+WINDOW = 3
 
 
 class EmergencyRule(ContractModel):
     """all 中的症状都出现时给出 level。范围 within：
-    sentence（默认）整句任何位置，但修饰词须在某个核心症状前后 MODIFIER_REACH 个分句以内；
+    sentence（默认）背景状况在整句任何位置，其余症状在连续 WINDOW 个分句以内；
     clause 全部在同一分句。
     """
 
@@ -87,21 +87,13 @@ class TermBook(Phrasebook):
     def fires(self, rule: EmergencyRule, per_clause: list[frozenset[str]]) -> bool:
         if rule.within == "clause":
             return any(all(s in found for s in rule.all) for found in per_clause)
-        if not all(any(s in found for found in per_clause) for s in rule.all):
+        anywhere = frozenset().union(*per_clause)
+        context = {s.id for s in self.symptoms if s.context}
+        if not all(s in anywhere for s in rule.all if s in context):
             return False
-        modifiers = {s.id for s in self.symptoms if s.modifier}
-        mods = [s for s in rule.all if s in modifiers]
-        core = [s for s in rule.all if s not in modifiers]
-        if not mods:
-            return True
-        # 以任一含核心症状的分句为中心，修饰词都在前后 MODIFIER_REACH 个分句以内
-        anchors = [i for i, f in enumerate(per_clause) if not core or any(s in f for s in core)]
-        for i in anchors:
-            lo, hi = max(0, i - MODIFIER_REACH), i + MODIFIER_REACH + 1
-            near = frozenset().union(*per_clause[lo:hi])
-            if all(s in near for s in mods):
-                return True
-        return False
+        acute = [s for s in rule.all if s not in context]
+        windows = [frozenset().union(*per_clause[i : i + WINDOW]) for i in range(len(per_clause))]
+        return any(all(s in w for s in acute) for w in windows)
 
     def assess(self, text: str) -> Assessment:
         per_clause = self.present_by_clause(text)
