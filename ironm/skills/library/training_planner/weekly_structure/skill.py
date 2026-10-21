@@ -117,7 +117,7 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
         Change(
             field="intensity_target",
             to_value={"rpe": [rpe_low, rpe_high]},
-            reason_facts=(f"安全官给的 RPE 上限：{rpe_cap if rpe_cap is not None else '无'}",),
+            reason_facts=(f"安全官给的 RPE 上限：{int(rpe_cap) if rpe_cap is not None else '无'}",),
             rule_id=RULE,
             expected_effect="每组结束时还能再做 3–4 次",
             rollback_condition=rollback,
@@ -127,7 +127,7 @@ def run(view: SnapshotView, context: SkillContext) -> AgentOutput:
             to_value=cardio,
             reason_facts=(
                 f"当前每周运动：{current if isinstance(current, int) else '未知'} 分钟",
-                f"每周有氧上限：{cardio_cap if cardio_cap is not None else '无'}",
+                f"每周有氧上限：{int(cardio_cap) if cardio_cap is not None else '无'}",
             ),
             rule_id=RULE,
             expected_effect="逐步接近每周 250 分钟的减脂有氧目标",

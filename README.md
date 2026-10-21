@@ -11,6 +11,7 @@ make schemas   # 契约改动后重新导出 JSON Schema（make check 会比对�
 make offline   # 急症词表或回答模板改动后重新生成 App 离线版数据（make check 会比对）
 make migrate   # 执行尚未执行的数据库迁移（migrations/NNNN_说明.sql）
 make sim       # 快进模拟：5 类模拟用户各 8 周，输出汇总与第 8 周末的指标（精度、趋势与可信范围、真实趋势、状态、还差什么）
+make demo      # 冲刺 2 演示：4 类模拟用户从建档到第一版计划（追问、安全官约束、复核、依据卡、基线测试）
 make eval-models  # 模型选型评测（调用真实接口、产生费用；密钥放 .env）
 make run       # 本地启动（启动时自动执行迁移）；/healthz 存活检查
 ```
@@ -56,10 +57,11 @@ ironm/
   core/        时间来源、标识生成、配置、结构化日志（最底层）
   contracts/   数据契约：记录、未知值、指标结果、Agent 输出、字段归属、快照、计划版本、模型调用
   safety/      急症词表、拒答词表、回答模板（*.yaml，只能由人修改）；急症判定、人群安全分层、三档输出与四段式：不依赖其他业务模块，离线可用
-  knowledge/   动作库（exercises.yaml，50 个动作，只能由人修改）：按模式、器材、身体限制筛选、替代与降阶
+  knowledge/   动作库（exercises.yaml，50 个动作）与基线测试方案（baseline_tests.yaml），只能由人修改
+  orchestrator/ 第一版计划链路（演示）：分层 → 追问 → 约束 → 提案 → 复核 → 计划 → 依据卡
   skills/      Skill 加载器与 Skill 库（library/<Agent>/<编号>/：SKILL.md 头信息 + skill.py 实现）；按意图、场景、人群分层选择，每个 Skill 只读自己声明的数据
   agents/      Agent：每个加载的 Skill 各出一份输出；没有匹配的 Skill 时“本次无意见”
-  rules/ engine/ llm/ memory/ orchestrator/ scheduler/ api/
+  rules/ engine/ llm/ memory/ scheduler/ api/
   store/       SQLite 连接、迁移执行器、记录仓储（只追加、去重、全文检索）
 migrations/    按编号的数据库迁移脚本
 rules/         规则表（YAML，每条带编号、审定状态、来源、参数）

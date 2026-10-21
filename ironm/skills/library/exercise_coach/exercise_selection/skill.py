@@ -47,16 +47,19 @@ def _pick(
     found = lib.candidates(
         pattern, equipment=equipment, restrictions=restrictions, max_difficulty=level
     )
-    choice = (
-        found[0]
-        if found
-        else lib.regress(
-            lib.default_for(pattern).id, equipment=equipment, restrictions=restrictions
-        )
-    )
+    if found:
+        # 取不超过用户水平、最接近其水平的动作（同难度按编号）；不是一律取最容易的
+        top = max(c.difficulty for c in found)
+        choice = next(c for c in found if c.difficulty == top)
+    else:
+        default = lib.default_for(pattern).id
+        choice = lib.regress(default, equipment=equipment, restrictions=restrictions)
     exercise = lib.get(choice.exercise_id)
-    subs = lib.substitutes(
-        choice.exercise_id, equipment=equipment, restrictions=restrictions, max_difficulty=level
+    subs = sorted(
+        lib.substitutes(
+            choice.exercise_id, equipment=equipment, restrictions=restrictions, max_difficulty=level
+        ),
+        key=lambda s: (abs(s.difficulty - choice.difficulty), s.exercise_id),  # 难度相近的优先
     )
     return {
         "slot": pattern.value,

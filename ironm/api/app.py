@@ -24,6 +24,7 @@ from ironm.core.log import configure_logging, get_logger
 from ironm.engine.energy import EnergyAdjustment, energy_today
 from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
+from ironm.knowledge.baseline import BASELINE_PATH, load_baseline
 from ironm.knowledge.exercises import LIBRARY_PATH, load_library
 from ironm.rules.loader import load_rules
 from ironm.safety.decision import load_kit
@@ -140,6 +141,7 @@ def create_app(
     refusals_path: Path = REFUSALS_PATH,
     replies_path: Path = REPLIES_PATH,
     library_path: Path = LIBRARY_PATH,
+    baseline_path: Path = BASELINE_PATH,
     skills_dir: Path = SKILLS_DIR,
 ) -> FastAPI:
     """配置、规则表、安全文件、动作库或 Skill 有误时在这里直接失败。
@@ -152,6 +154,7 @@ def create_app(
     # 急症词表、拒答词表与回答模板：启动时校验并互相核对（spec §21–24）
     load_kit(terms_path, refusals_path, replies_path)
     load_library(library_path)  # 动作库：启动时校验（spec §27）
+    load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
     # Skill 头信息与它们用到的规则参数：启动时校验（spec §28、§30）
     validate_skill_rules(load_skills(skills_dir), rulebook)
 

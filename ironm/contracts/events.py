@@ -74,7 +74,7 @@ class SymptomPayload(ContractModel):
 class BaselineTestPayload(ContractModel):
     test_id: str = Field(min_length=1)
     value: float = Field(ge=0, le=100000)
-    unit: Literal["reps", "s", "kg", "cm", "m"]
+    unit: Literal["reps", "s", "kg", "cm", "m", "bpm"]  # bpm：静息心率（次 / 分）
 
 
 class CircumferencePayload(ContractModel):

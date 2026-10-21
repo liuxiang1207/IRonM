@@ -1,0 +1,91 @@
+# 基线测试方案（spec §31）。说明为原创中文，只能由人修改。
+# 2026-10-21 由 Claude 受项目负责人委托，对照 ACSM《运动测试与运动处方指南》与 Rikli & Jones 老年体适能测试（30 秒坐站）的公开资料撰写与审定，
+# 未经认证教练或医学顾问复核；逐项记录见 spec/review_log.md。
+# 结果记为 baseline_test 记录，test_id 为“编号@版本”；只与同一版本的历史结果比较。
+# kind：fitness 为体能项目（测前筛查不通过时跳过）；vital 为生命体征（总是可以测）。
+version: "1.0"
+review: approved
+
+tests:
+  - id: push_up
+    version: 1
+    name: 俯卧撑次数
+    unit: reps
+    kind: fitness
+    tiers: [a, a_prime]
+    instructions:
+      - 双手略宽于肩，身体从头到脚成一条直线
+      - 胸口下降到离地约一拳，再推起到手臂伸直，算 1 次
+      - 以稳定的节奏连续做，直到动作无法保持标准
+    common_errors:
+      - 塌腰或撅臀
+      - 只做一半幅度
+    stop_when:
+      - 动作无法保持标准
+      - 手腕、肩膀疼痛，或出现胸闷、头晕
+
+  - id: knee_push_up
+    version: 1
+    name: 跪姿俯卧撑次数
+    unit: reps
+    kind: fitness
+    tiers: [b, collaborative]
+    instructions:
+      - 双膝着地，双手略宽于肩，从头到膝成一条直线
+      - 胸口下降到离地约一拳，再推起到手臂伸直，算 1 次
+      - 以稳定的节奏连续做，不憋气
+    common_errors:
+      - 撅臀
+      - 憋气
+    stop_when:
+      - 动作无法保持标准
+      - 手腕、肩膀疼痛，或出现胸闷、头晕
+
+  - id: sit_to_stand_30s
+    version: 1
+    name: 30 秒椅子坐站次数
+    unit: reps
+    kind: fitness
+    tiers: [a, a_prime, b, collaborative]
+    instructions:
+      - 椅子靠墙放稳，坐在前半部分，双臂交叉放在胸前
+      - 完全站直再坐下，臀部碰到椅面算 1 次
+      - 30 秒内尽量多做，以能控制的速度
+    common_errors:
+      - 没有完全站直
+      - 用手撑腿借力
+    stop_when:
+      - 膝盖或腰部疼痛
+      - 头晕或站不稳
+
+  - id: plank
+    version: 1
+    name: 平板支撑时长
+    unit: s
+    kind: fitness
+    tiers: [a, a_prime]
+    instructions:
+      - 前臂撑地，肘在肩正下方，身体从头到脚成一条直线
+      - 保持正常呼吸，从身体摆好开始计时
+      - 最长做到 120 秒，记录保持标准姿势的时间
+    common_errors:
+      - 塌腰
+      - 憋气
+    stop_when:
+      - 腰部下塌、无法保持直线
+      - 腰痛，或出现胸闷、头晕
+
+  - id: resting_hr
+    version: 1
+    name: 静息心率
+    unit: bpm
+    kind: vital
+    tiers: [a, a_prime, b, collaborative, c, d, not_applicable, paused]
+    instructions:
+      - 早上起床前或安静坐 5 分钟后测
+      - 用手环读数，或在手腕处数 30 秒脉搏再乘以 2
+      - 连续测 3 天取平均更可靠
+    common_errors:
+      - 刚活动完或喝咖啡后立即测
+    stop_when:
+      - 静息时心率持续高于 100 次 / 分或低于 50 次 / 分且感到不适时，停止训练建议并咨询医生

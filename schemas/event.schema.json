@@ -111,7 +111,8 @@
             "s",
             "kg",
             "cm",
-            "m"
+            "m",
+            "bpm"
           ],
           "title": "Unit",
           "type": "string"
