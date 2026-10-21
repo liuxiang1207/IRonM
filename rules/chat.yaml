@@ -33,3 +33,13 @@ rules:
       related_min_score: 0.45  # 相关领域的最低得分
       related_min_ratio: 0.55  # 相关领域不低于主领域得分的比例
     note: 分数 = 意图的固有分 × 置信度；主领域 1 个、相关领域最多 2 个；安全类的卡不参与打分、每次都查（spec [2026-10-21] §12）。
+
+  - id: R-QA-RETRIEVAL
+    title: 知识库检索
+    status: approved
+    source: {kind: design}
+    params:
+      recall_k: 20  # 每一路召回的段落数
+      keep_k: 4  # 重排后交给 Agent 的段落数
+      min_score: 0.3  # 重排分低于此值的段落不算依据
+    note: 关键词按中文两字片段做 BM25；配置了向量模型时与向量召回按倒数排名融合；默认重排按 IDF 加权的覆盖比例（spec [2026-10-21] §12）。
