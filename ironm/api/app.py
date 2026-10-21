@@ -9,13 +9,13 @@ import threading
 import time
 from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import asynccontextmanager, closing
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import IO, Annotated, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ironm import __version__
@@ -57,6 +57,7 @@ from ironm.safety.emergency import TERMS_PATH
 from ironm.safety.refusals import REFUSALS_PATH
 from ironm.safety.replies import REPLIES_PATH
 from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
+from ironm.store.auth import AuthStore
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.memory import MemoryStore
@@ -77,6 +78,39 @@ MAX_BATCH = 500
 _EARLIER_WEIGHTS = 10  # 回看范围之外再取几次称重：足以找到一次可信读数
 MAX_BODY_BYTES = 2 * 1024 * 1024
 _USER_RE = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
+
+
+class LoginRequest(BaseModel):
+    """登录：设备码与设备名（如“我的 iPhone”）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    code: Annotated[str, Field(min_length=1, max_length=32)]
+    device: Annotated[str, Field(min_length=1, max_length=40)]
+
+
+class _LoginGuard:
+    """10 分钟内错 10 次设备码，接下来 10 分钟拒绝任何登录（spec [2026-10-21] §14）。"""
+
+    WINDOW = timedelta(minutes=10)
+    LIMIT = 10
+
+    def __init__(self, clock: Clock) -> None:
+        self._clock = clock
+        self._fails: list[datetime] = []
+        self._until: datetime | None = None
+        self._lock = threading.Lock()
+
+    def locked(self) -> bool:
+        with self._lock:
+            return self._until is not None and self._clock.now() < self._until
+
+    def fail(self) -> None:
+        with self._lock:
+            now = self._clock.now()
+            self._fails = [t for t in self._fails if now - t < self.WINDOW] + [now]
+            if len(self._fails) >= self.LIMIT:
+                self._until, self._fails = now + self.WINDOW, []
 
 
 class ChatRequest(BaseModel):
@@ -243,11 +277,67 @@ def create_app(
             raise HTTPException(status_code=413, detail="请求过大")
         return body
 
-    def current_user(x_ironm_user: Annotated[str | None, Header()] = None) -> str:
-        """当前用户。登录功能完成前由请求头 X-IronM-User 给出；之后改为由登录身份决定。"""
-        if x_ironm_user is None or not _USER_RE.fullmatch(x_ironm_user):
-            raise HTTPException(status_code=401, detail="缺少当前用户")
-        return x_ironm_user
+    def current_user(
+        authorization: Annotated[str | None, Header()] = None,
+        x_ironm_user: Annotated[str | None, Header()] = None,
+    ) -> str:
+        """当前用户（spec [2026-10-21] §14）：带登录凭证时按凭证认人；正式环境只认凭证，
+        开发与测试环境也可用请求头 X-IronM-User 直接指定。"""
+        if authorization is not None:
+            scheme, _, token = authorization.partition(" ")
+            if scheme.lower() == "bearer" and token.strip():
+                with closing(connect(settings.db_path)) as conn:
+                    found = AuthStore(conn, clock).user_for(token.strip())
+                if found is not None:
+                    return found[0]
+            raise HTTPException(status_code=401, detail="登录已失效，请重新登录")
+        if settings.env != "prod" and x_ironm_user and _USER_RE.fullmatch(x_ironm_user):
+            return x_ironm_user
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    guard = _LoginGuard(clock)
+
+    @app.post("/auth/login")
+    def login(body: Annotated[bytes, Depends(raw_body)]) -> JSONResponse:
+        """设备码换这台设备的登录凭证（spec §14）。"""
+        try:
+            req = LoginRequest.model_validate_json(body)
+        except ValidationError as e:
+            raise HTTPException(status_code=422, detail="请填写设备码与设备名") from e
+        if guard.locked():
+            log.info("auth.login", status="locked")
+            raise HTTPException(status_code=429, detail="错误次数太多，请 10 分钟后再试")
+        with closing(connect(settings.db_path)) as conn:
+            got = AuthStore(conn, clock).login(req.code, req.device)
+        if got is None:
+            guard.fail()
+            log.info("auth.login", status="rejected")
+            raise HTTPException(status_code=401, detail="设备码无效、已用过或已过期")
+        user_id, token = got
+        log.info("auth.login", status="ok", user_id=user_id)
+        return JSONResponse({"user_id": user_id, "token": token})
+
+    @app.get("/auth/devices")
+    def list_devices(user: Annotated[str, Depends(current_user)]) -> JSONResponse:
+        with closing(connect(settings.db_path)) as conn:
+            devices = AuthStore(conn, clock).devices(user)
+        return JSONResponse(
+            [
+                {"device_id": d.device_id, "name": d.name, "created_at": d.created_at.isoformat()}
+                for d in devices
+            ]
+        )
+
+    @app.delete("/auth/devices/{device_id}", status_code=204)
+    def revoke_device(device_id: str, user: Annotated[str, Depends(current_user)]) -> Response:
+        """撤销自己的一台设备；不是自己的设备一律当作不存在。"""
+        ok = False
+        if _USER_RE.fullmatch(device_id):
+            with closing(connect(settings.db_path)) as conn:
+                ok = AuthStore(conn, clock).revoke(user, device_id)
+        if not ok:
+            raise HTTPException(status_code=404, detail="没有这台设备")
+        return Response(status_code=204)
 
     def chat_deps(conn: sqlite3.Connection) -> ChatDeps:
         """一次请求（或回答后的后台任务）用到的依赖；都用同一个连接。"""

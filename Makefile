@@ -4,7 +4,7 @@ ifeq ($(strip $(UV)),)
 $(error 找不到 uv，请先安装：https://docs.astral.sh/uv/getting-started/installation/)
 endif
 
-.PHONY: setup check lock-check lint deps fmt type test run schemas offline migrate eval-models sim demo
+.PHONY: setup check lock-check lint deps fmt type test run schemas offline migrate eval-models sim demo add-user device-code users
 
 setup:
 	$(UV) sync --locked
@@ -50,6 +50,17 @@ migrate:
 # 模型选型评测（会调用真实接口并产生费用）；密钥从 .env 读取，可在 ARGS 里指定配置名
 eval-models:
 	set -a; [ -f .env ] && . ./.env; set +a; $(UV) run python -m evals.model_selection.run $(ARGS)
+
+# 管理员（spec [2026-10-21] §14）：添加用户并输出一次性设备码；给已有用户的新设备发设备码；列出用户
+# 用法：make add-user NAME=我   make device-code ID=u_xxxx   make users
+add-user:
+	$(UV) run python -m ironm.api.cli add-user "$(NAME)"
+
+device-code:
+	$(UV) run python -m ironm.api.cli device-code "$(ID)"
+
+users:
+	$(UV) run python -m ironm.api.cli users
 
 # 快进模拟：5 类模拟用户各 8 周，写入 data/sim/sim.sqlite 并输出汇总
 sim:
