@@ -32,6 +32,7 @@ from ironm.llm.gateway import Gateway
 from ironm.memory.conversation import compress, context
 from ironm.memory.profile import ProfileService
 from ironm.memory.repo import MemoryRepo
+from ironm.orchestrator.domains import DOMAIN_WEIGHTS
 from ironm.orchestrator.general import general_answer
 from ironm.orchestrator.intent import Concern, Intent, IntentBook, recognize
 from ironm.orchestrator.pages import PAGE_AGENTS, PAGE_DEFAULT, Page, PageContext
@@ -127,6 +128,16 @@ class ChatReply(ContractModel):
 _DEFAULT_TZ = ZoneInfo("Asia/Shanghai")
 
 
+_GENERAL = (Intent.CHITCHAT, Intent.APP_HELP)
+# 关注点对应的提醒（answer_texts 里的 caution_<名称>）
+_CONCERN_CAUTION = {"discomfort": "discomfort", "special_population": "special"}
+# 带关注点的闲聊按关注点归到专业领域：身体不适 → 动作（含疼痛时的调整），特殊人群 → 训练知识
+_CONCERN_TOPIC: dict[str, Intent] = {
+    "discomfort": Intent.EXERCISE_TECHNIQUE,
+    "special_population": Intent.TRAINING_KNOWLEDGE,
+}
+
+
 @dataclass(frozen=True)
 class ChatDeps:
     kit: SafetyKit
@@ -214,6 +225,13 @@ def respond(
             request_id=request_id,
             history=history,
         )
+        if result.intent in _GENERAL and result.concerns:
+            # 这句话里提到身体不适或特殊人群（“你好，我怀孕了还能练吗”）：走专业流程，
+            # 不由通用 Agent 回答（spec [2026-10-21] §12）。只看这句话本身，画像带来的关注点
+            # 不改变闲聊的走向，否则有健康状况的用户说“你好”也会进专业流程
+            topic = next((i for i in result.domains if i in DOMAIN_WEIGHTS), None)
+            topic = topic or _CONCERN_TOPIC[result.concerns[0]]
+            result = result.model_copy(update={"intent": topic, "clarify": False})
         if (profile.get("conditions") or noted_conditions(noted)) and (
             "special_population" not in result.concerns
         ):
@@ -238,9 +256,15 @@ def respond(
             # 本功能以外的问题：转入管家对话并带上上下文，不调用其他功能的 Agent
             handoff = page_context or PageContext(page=page)
             layer, answer = "handoff", (AnswerPart(kind="notice", text=deps.texts.page_handoff),)
+            # 转走之前，这句话里提到的身体不适或特殊人群提醒照样给出
+            answer += tuple(
+                AnswerPart(kind="caution", text=getattr(deps.texts, f"caution_{c}"))
+                for c in _CONCERN_CAUTION
+                if c in concerns
+            )
         elif result.clarify or intent is Intent.UNKNOWN:
             layer, answer = "clarify", (AnswerPart(kind="clarify", text=deps.texts.clarify),)
-        elif intent in (Intent.CHITCHAT, Intent.APP_HELP):
+        elif intent in _GENERAL:
             # 基本通用问题：通用 Agent 直接回答，不检索；模型不可用或出现数字时用固定说法
             kind: Literal["chitchat", "app_help"] = (
                 "chitchat" if intent is Intent.CHITCHAT else "app_help"

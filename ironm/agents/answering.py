@@ -28,11 +28,20 @@ from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
 from ironm.rules.loader import RuleBook
 
-__all__ = ["SPECS", "AgentAnswer", "AgentSpec", "answer_as"]
+__all__ = ["NO_BASIS", "SPECS", "AgentAnswer", "AgentSpec", "answer_as", "copies_external"]
 
 _A = AgentId
 PROMPT_PATH = Path(__file__).parent / "prompts" / "agent_answer.md"
 PROMPT_TEMPLATE = "agent_answer@1.0.0"
+NO_BASIS = "没有找到可靠依据"  # 与提示词约定的说法
+# 外部资料（不是问答卡、动作库）不能整段照抄进回答：连续这么多字相同即算照抄
+COPY_CHARS = 40
+_OWN_LEVELS = ("card", "library")
+
+
+def copies_external(text: str, sources: list[str], n: int = COPY_CHARS) -> bool:
+    """回答里是否有连续 n 个字与某段外部资料相同（有版权的原文不整段展示，spec §12 约束）。"""
+    return any(src[i : i + n] in text for src in sources for i in range(len(src) - n + 1))
 
 
 @dataclass(frozen=True)
@@ -167,6 +176,10 @@ def _generate(
     g = result.value
     if g is None:
         return None
+    external = [r.passage.text for r in passages if r.passage.level not in _OWN_LEVELS]
+    said = " ".join(v for v in (g.conclusion, g.reasoning, g.how, g.caution, g.uncertain) if v)
+    if copies_external(said, external):
+        return None  # 照抄外部资料：这条意见作废
     try:
         return Opinion(
             conclusion=g.conclusion,
@@ -231,6 +244,9 @@ def answer_as(
     reason = "no_model"
     if gateway is not None:
         opinion = _generate(spec, text, visible, passages, tools, gateway, request_id)
+        if opinion is not None and opinion.conclusion.startswith(NO_BASIS):
+            # 模型判断给它的依据答不了这个问题：这个领域不发言
+            return AgentAnswer(agent, "missing", None, ids, names, "no_basis")
         if opinion is not None:
             return AgentAnswer(agent, "model", opinion, ids, names)
         reason = "model_failed_or_invalid"

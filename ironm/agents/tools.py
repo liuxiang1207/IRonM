@@ -61,8 +61,19 @@ _WEIGHT_RE = re.compile(r"(\d{2,3}(?:\.\d)?)(公斤|kg|千克|斤)")
 _BMI_RE = re.compile(r"bmi(?:是|为|只有)?(\d{1,2}(?:\.\d)?)")
 
 
+# 问到这些时，画像算出的数字才与问题相关；无关的计算不算依据（独立审查 M1）
+_BODY_WORDS = ("bmi", "胖", "瘦", "超重", "肥胖", "体重", "身材", "身高")
+_ENERGY_WORDS = ("热量", "卡路里", "千卡", "大卡", "吃多少", "摄入", "蛋白", "缺口", "饭量")
+
+
+def _asks(text: str, words: tuple[str, ...]) -> bool:
+    low = text.lower()
+    return any(w in low for w in words)
+
+
 def bmi_tool(inp: ToolInput) -> ToolResult | None:
-    """BMI：优先用这句话里说的身高体重，其次用画像；用户只说了 BMI 时照用。"""
+    """BMI：优先用这句话里说的身高体重，其次用画像；用户只说了 BMI 时照用。
+    只用画像时，问题须与体型有关。"""
     joined = "".join(clauses(inp.text))
     height, weight = _HEIGHT_RE.search(joined), _WEIGHT_RE.search(joined)
     cm: float | None = None
@@ -71,8 +82,10 @@ def bmi_tool(inp: ToolInput) -> ToolResult | None:
         cm = float(height.group(1) or height.group(2))
         kg = float(weight.group(1)) / (2 if weight.group(2) == "斤" else 1)
         source = "你在这句话里说的"
-    elif isinstance(inp.profile.get("height_cm"), int | float) and isinstance(
-        inp.profile.get("weight_kg"), int | float
+    elif (
+        _asks(joined, _BODY_WORDS)
+        and isinstance(inp.profile.get("height_cm"), int | float)
+        and isinstance(inp.profile.get("weight_kg"), int | float)
     ):
         cm, kg = float(inp.profile["height_cm"]), float(inp.profile["weight_kg"])
         source = "你资料里的"
@@ -96,7 +109,10 @@ def bmi_tool(inp: ToolInput) -> ToolResult | None:
 
 
 def calorie_tool(inp: ToolInput) -> ToolResult | None:
-    """每日热量与蛋白质目标：与计划链路同一个计算（engine.calories）。分层不给或信息不全时算不出。"""
+    """每日热量与蛋白质目标：与计划链路同一个计算（engine.calories）。分层不给或信息不全时算不出；
+    问题与吃多少无关时不算。"""
+    if not _asks(inp.text, _ENERGY_WORDS):
+        return None
     data = {k: inp.profile[k] for k in SCREENING_FIELDS if k in inp.profile}
     try:
         screening = Screening.model_validate_json(json.dumps(data))
@@ -161,7 +177,7 @@ def _find_exercise(lib: Library, text: str, context_item: str | None) -> str | N
             lib.get(m.group(1))
             return m.group(1)
         except KeyError:
-            return None
+            pass  # 页面条目已不在动作库里：按问题里的动作名找
     hits = sorted(
         ((len(e.name), e.id) for e in lib.exercises if len(e.name) >= 2 and e.name in text),
         reverse=True,

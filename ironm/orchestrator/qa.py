@@ -64,7 +64,7 @@ class RunRecord(ContractModel):
     context_item: str | None = None  # 带入的条目编号（标识，不含原话）
     matched_cards: tuple[str, ...]  # 查到的问答卡（安全类在前）
     card_ids: tuple[str, ...]  # 回答用到的问答卡
-    personal: tuple[str, ...]  # 用到的“针对你”计算（只记名称，如 bmi_measured）
+    personal: tuple[str, ...]  # 用到的“针对你”数字的依据编号（如 calc:bmi、said:bmi）
     layer: Literal["l0", "l1", "general", "plan_note"]
     degraded: bool
     number_rewrites: int  # 数字校验后重写的次数
@@ -105,6 +105,14 @@ _BMI_RE = re.compile(r"bmi(?:是|为|只有)?(\d{1,2}(?:\.\d)?)")
 
 def _fmt(x: float) -> str:
     return str(int(x)) if float(x).is_integer() else str(x)
+
+
+# 两条路径记同一套编号：问答卡路径的说法名称 → Agent 路径里工具给出的依据编号
+_PERSONAL_REF = {"bmi_measured": "calc:bmi", "bmi_stated": "said:bmi"}
+
+
+def _is_personal(ref: object) -> bool:
+    return str(ref).startswith(("calc:", "said:"))
 
 
 def _personal(text: str) -> tuple[str, dict[str, str]] | None:
@@ -276,7 +284,11 @@ def answer_question(
                 context_item=context_item,
                 matched_cards=tuple(c.id for c in matched),
                 card_ids=_cards_cited(composed.citations, cards),
-                personal=(),
+                personal=tuple(
+                    dict.fromkeys(
+                        str(c["ref"]) for c in composed.citations if _is_personal(c["ref"])
+                    )
+                ),
                 layer="l1" if by_model else "l0",
                 degraded=composed.partial,
                 number_rewrites=composed.rewrites,
@@ -338,7 +350,7 @@ def answer_question(
         context_item=context_item,
         matched_cards=tuple(c.id for c in matched),
         card_ids=tuple(used),
-        personal=() if personal is None else (personal[0],),
+        personal=() if personal is None else (_PERSONAL_REF[personal[0]],),
         layer=layer,  # type: ignore[arg-type]
         degraded=degraded,
         number_rewrites=rewrites,

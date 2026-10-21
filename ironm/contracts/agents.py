@@ -145,13 +145,14 @@ class Opinion(ContractModel):
 
     @model_validator(mode="after")
     def _check_numbers(self) -> Self:
-        # 结论与做法里的数字必须在依据或计算里出现，否则这条意见作废（数字校验前置到意见层）
-        # 依据里写到的数字都算已登记：规则/知识条目的原文本身就可能含数字（如“45 秒”）
+        # 意见每个部分里的数字都必须在依据里出现，否则这条意见作废（数字校验前置到意见层）
+        # 只有依据算来源：规则/知识条目/计算结果的原文本身就可能含数字（如“45 秒”）；
+        # 推理是意见自己写的，不能给自己登记数字（spec [2026-10-21] §12 独立审查 C1）
         registered: set[str] = set()
         for c in self.citations:
             registered |= _numbers(" ".join(v for v in (c.label, c.detail) if v))
-        registered |= _numbers(self.reasoning)
-        used = _numbers(" ".join(v for v in (self.conclusion, self.how) if v))
+        parts = (self.conclusion, self.reasoning, self.how, self.caution, self.uncertain)
+        used = _numbers(" ".join(v for v in parts if v))
         missing = used - registered
         if missing:
             raise ValueError(f"意见里出现没有依据的数字：{sorted(missing)}")

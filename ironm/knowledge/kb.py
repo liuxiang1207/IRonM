@@ -40,6 +40,7 @@ __all__ = [
 ]
 
 RETRIEVAL_RULE = "R-QA-RETRIEVAL"
+RESERVED_PREFIXES = ("card:", "exercise:")
 
 type Level = Literal["guideline", "review", "study", "expert", "card", "library"]
 type Text = Annotated[str, Field(min_length=1)]
@@ -260,7 +261,12 @@ def load_passages(folder: Path | None) -> list[Passage]:
             items = data.get("passages", []) if isinstance(data, dict) else None
             if not isinstance(items, list):
                 raise KnowledgeLoadError("应为 {passages: [...]}")
-            out.extend(Passage.model_validate_json(json.dumps(i)) for i in items)
+            loaded = [Passage.model_validate_json(json.dumps(i)) for i in items]
+            reserved = [p.passage_id for p in loaded if p.passage_id.startswith(RESERVED_PREFIXES)]
+            if reserved:
+                # 这两个前缀留给仓库自带的问答卡与动作库（可完整展示）；外部资料不能冒用
+                raise KnowledgeLoadError(f"编号不能以 card: 或 exercise: 开头：{reserved}")
+            out.extend(loaded)
         except (ValidationError, ValueError) as e:
             raise KnowledgeLoadError(f"{path}：知识段落有误：{e}") from e
     return out

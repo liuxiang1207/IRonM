@@ -15,7 +15,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ironm.agents.answering import SPECS, AgentAnswer
-from ironm.contracts.agents import Opinion
+from ironm.contracts.agents import Citation, Opinion
 from ironm.contracts.model_call import ModelStage
 from ironm.core.numbers import numbers_in, unregistered
 from ironm.llm.gateway import Gateway, Message
@@ -71,6 +71,20 @@ def _render(answers: Sequence[AgentAnswer], cautions: Sequence[str]) -> list[Ans
     parts += [AnswerPart(kind="caution", text=n) for n in dict.fromkeys(notes)]
     parts += [AnswerPart(kind="uncertain", text=o.uncertain) for o in ops if o.uncertain]
     return parts
+
+
+# 自己写的内容（问答卡、动作库）可以完整展示；外部资料只给出处与一小段摘录（spec §12 约束）
+_OWN_REFS = ("card:", "exercise:")
+EXCERPT_CHARS = 80
+
+
+def _shown(c: Citation) -> dict[str, Any]:
+    data = c.model_dump()
+    detail = c.detail or ""
+    external = c.kind == "knowledge" and not c.ref.startswith(_OWN_REFS)
+    if external and len(detail) > EXCERPT_CHARS:
+        data["detail"] = detail[: EXCERPT_CHARS - 1] + "…"
+    return data
 
 
 def _opinion_text(o: Opinion) -> str:
@@ -159,10 +173,14 @@ def compose(
         by_model = parts is not None
     if parts is None:
         parts = _render(with_opinion, cautions)
+    else:
+        # “针对你”的计算（BMI、热量目标）不交给模型改写，原样放在结论之后
+        mine = [p for a in with_opinion for p in _for_you(a.opinion)]  # type: ignore[arg-type]
+        parts = [parts[0], *mine, *parts[1:]]
     if partial:
         parts = [AnswerPart(kind="notice", text=partial_notice), *parts]
     citations = tuple(
-        {"agent": a.agent.value, **c.model_dump()}
+        {"agent": a.agent.value, **_shown(c)}
         for a in with_opinion
         for c in a.opinion.citations  # type: ignore[union-attr]
     )

@@ -39,7 +39,10 @@ def card_opinion(agent: AgentId, found: Iterable[QACard]) -> Opinion | None:
             kind="knowledge",
             ref=card.id,
             label=f"问答卡 {card.id}：{card.conclusion}",
-            detail="；".join(v for v in (card.how, card.why, *card.sources) if v),
+            # 注意与不确定里的数字也要登记，否则这张卡兜底时会被数字校验挡掉
+            detail="；".join(
+                v for v in (card.how, card.why, card.caution, card.uncertain, *card.sources) if v
+            ),
         )
         for card in chosen
     ]

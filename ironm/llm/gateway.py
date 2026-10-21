@@ -7,6 +7,7 @@
 """
 
 import json
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -100,6 +101,9 @@ def _tokens(resp: Mapping[str, object]) -> dict[str, int]:
 
 
 class Gateway:
+    """可被多个线程同时使用（问答时各 Agent 并行调用模型）。调用记录逐条写入、不交叠：
+    记录通常写进同一个数据库连接，交叠的事务会出错。"""
+
     def __init__(
         self,
         config: ModelsConfig,
@@ -117,6 +121,7 @@ class Gateway:
         self._ids = ids
         self._transport = transport
         self._record = record
+        self._record_lock = threading.Lock()
         self._timer = timer
 
     def complete[T](
@@ -182,7 +187,8 @@ class Gateway:
                 }
             )
             calls.append(call)
-            self._record(call)
+            with self._record_lock:
+                self._record(call)
             _log.info(
                 "llm.call",
                 call_id=call.call_id,

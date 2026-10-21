@@ -4,6 +4,7 @@
 import ast
 import json
 import threading
+import time
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -247,7 +248,14 @@ def test_same_number_in_qa_and_plan(extra: dict[str, Any]) -> None:
     tier = classify(screening, as_of=NOW, tz=TZ, rulebook=RULES)
     assert isinstance(tier.tier, Tier)
     qa = calorie_tool(
-        ToolInput(text="", profile=profile, context_item=None, rulebook=RULES, as_of=NOW, tz=TZ)
+        ToolInput(
+            text="我一天要吃多少热量",
+            profile=profile,
+            context_item=None,
+            rulebook=RULES,
+            as_of=NOW,
+            tz=TZ,
+        )
     )
     plan = proposed(
         run_agent(
@@ -438,3 +446,61 @@ def test_lexicon_routes_cross_domain_question_to_both_agents() -> None:
     result = recognize(CROSS, book=load_intent_book(), rulebook=RULES, gateway=None, request_id="r")
     record = _ask(CROSS, result).record
     assert [a for a, _ in record.agents] == [_A.TRAINING_PLANNER, _A.NUTRITIONIST]
+
+
+def test_page_question_only_asks_that_pages_agent() -> None:
+    """训练页上问跨领域的问题：只由训练规划师作答，不叫营养师。"""
+    result = _ask(
+        CROSS,
+        CROSS_INTENT,
+        page="training",
+        page_domain=_A.TRAINING_PLANNER,
+        context_item="today.exercise:sq_goblet",
+    )
+    assert result.record.agents == ((_A.TRAINING_PLANNER, "card"),)
+    assert result.record.card_ids == ("QA-STRENGTH-FREQUENCY",)
+
+
+def test_page_item_reaches_the_exercise_tool() -> None:
+    """动作页问“这个怎么做”：动作教练按页面条目找到动作。"""
+    result = _ask(
+        "这个怎么做",
+        _intent(Intent.EXERCISE_TECHNIQUE),
+        page="training",
+        page_domain=_A.EXERCISE_COACH,
+        context_item="today.exercise:sq_box.set:2",
+    )
+    assert result.record.agents == ((_A.EXERCISE_COACH, "tool"),)
+    assert "exercise:sq_box" in [c["ref"] for c in result.citations]
+
+
+def test_parallel_agents_record_model_calls_one_at_a_time() -> None:
+    """各 Agent 并行调用模型；调用记录写入同一个数据库连接，不能交叠（交叠的事务会报错）。"""
+    barrier = threading.Barrier(2, timeout=5)
+    active, overlaps, recorded = [0], [0], []
+    lock = threading.Lock()
+
+    def record(call: ModelCall) -> None:
+        with lock:
+            active[0] += 1
+            overlaps[0] += active[0] > 1
+        time.sleep(0.02)
+        recorded.append(call.call_id)
+        with lock:
+            active[0] -= 1
+
+    def reply(payload: dict[str, Any]) -> dict[str, object]:
+        barrier.wait()  # 两个 Agent 同时拿到回复、同时写记录
+        return _agent_reply(payload)
+
+    gw = Gateway(
+        load_models(MODELS_PATH),
+        environ=ENV,
+        clock=FixedClock(NOW),
+        ids=SeededIdGenerator(3),
+        transport=Router(agent=reply),
+        record=record,
+    )
+    result = _ask(CROSS, CROSS_INTENT, gw)
+    assert dict(result.record.agents)[_A.NUTRITIONIST] == "model"
+    assert len(recorded) >= 2 and overlaps[0] == 0
