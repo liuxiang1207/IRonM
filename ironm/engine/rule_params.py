@@ -7,11 +7,13 @@ from ironm.engine.calories import (
     FLOOR,
     MACRO,
     PAL,
+    PROTEIN,
     REE,
     DeficitParams,
     FloorParams,
     MacroParams,
     PalParams,
+    ProteinParams,
     ReeParams,
 )
 from ironm.engine.completeness import (
@@ -55,6 +57,7 @@ RULE_PARAMS: dict[str, type[BaseModel]] = {
     DEFICIT: DeficitParams,
     FLOOR: FloorParams,
     MACRO: MacroParams,
+    PROTEIN: ProteinParams,
     DIET_MIN_DATA: DietMinDataParams,
     **{rule_id_for(level): EnergyParams for level in range(1, 6)},
 }

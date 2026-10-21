@@ -26,7 +26,7 @@ rules:
     title: 精力疲惫：只留轻松训练
     status: pending_review
     source: {kind: design}
-    params: {mode: easy, volume_factor: 0.5, rpe_cap_delta: -2}
+    params: {mode: easy, volume_factor: 0.5, rpe_cap_delta: -2, rpe_cap_max: 6}
 
   - id: R-RC-ENERGY-1
     title: 精力很差：只做最低任务或休息
@@ -36,5 +36,7 @@ rules:
       mode: minimum
       volume_factor: 0.0
       rpe_cap_delta: 0
-      safety_hint: 如有胸痛、头晕、心慌、呼吸困难等不适，请先停止训练并走安全通道，而不只是降低训练量。
-    note: 很差时不安排正式训练组；精力选择不替代安全判断。
+      rpe_cap_max: 3  # 最低任务只做很轻松的活动
+      max_minutes: 15
+      safety_hint: 如有胸痛、头晕、心慌、呼吸困难、发热或全身酸痛等不适，请先停止训练并走安全通道，而不只是降低训练量。
+    note: 很差时不安排正式训练组；精力选择不替代安全判断。发热或全身症状时不运动（运动医学常用的“颈部以下症状”原则）。

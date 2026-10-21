@@ -7,7 +7,6 @@
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Protocol, Self, runtime_checkable
 from zoneinfo import ZoneInfo
 
@@ -24,6 +23,7 @@ from ironm.contracts.screening import (
     TierResult,
 )
 from ironm.contracts.unknown import Unknown, UnknownReason, is_known
+from ironm.core.body import bmi as body_bmi
 from ironm.core.clock import age_on
 from ironm.safety.emergency import Assessment
 
@@ -107,13 +107,6 @@ def _any(parts: Sequence[_Check]) -> _Check:
     return _Check(False)
 
 
-def _bmi(height_cm: float, weight_kg: float) -> float:
-    """BMI，按一位小数四舍五入（用十进制计算，避免二进制小数在界值处出错）。"""
-    metres = Decimal(str(height_cm)) / 100
-    value = Decimal(str(weight_kg)) / (metres * metres)
-    return float(value.quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
-
-
 def _paused(flags: Sequence[SafetyFlag], clearances: Sequence[datetime]) -> _Check:
     if not flags:
         return _Check(False)
@@ -170,9 +163,9 @@ def classify(
     today = as_of.astimezone(tz).date()
 
     age = age_on(s.birth_date, today) if is_known(s.birth_date) else None
-    bmi = (
-        _bmi(s.height_cm, s.weight_kg) if is_known(s.height_cm) and is_known(s.weight_kg) else None
-    )
+    bmi = None
+    if is_known(s.height_cm) and is_known(s.weight_kg):
+        bmi = body_bmi(s.height_cm, s.weight_kg)
     bmi_missing = [f for f in ("height_cm", "weight_kg") if not is_known(getattr(s, f))]
     derived = _derived_conditions(flags)
     conditions = frozenset(s.conditions) | derived if is_known(s.conditions) else None

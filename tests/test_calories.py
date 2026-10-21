@@ -48,7 +48,7 @@ def _book(tmp_path: Path, rule_set: str, rule_id: str, **params: Any) -> RuleBoo
     return load_rules(rules)
 
 
-# 女 30 岁、160 厘米、61.1 千克：静息恰为 1300，久坐每日总消耗 2015，A′ 缺口 300 → 1715
+# 女 30 岁、160 厘米、61.1 千克：静息恰为 1300，久坐每日总消耗 1820，A′ 缺口 300 → 1520
 # （结果是整数，便于测底线边界）
 EXACT = Screening(
     birth_date=date(1996, 1, 1),
@@ -60,12 +60,12 @@ EXACT = Screening(
 
 
 def test_floor_boundary(tmp_path: Path) -> None:
-    at = _target(EXACT, Tier.A_PRIME, _book(tmp_path / "a", "calories", "R-CAL-FLOOR", female=1715))
-    assert (at.target_kcal, at.floor_applied, at.deficit_kcal) == (1715, False, 300)
+    at = _target(EXACT, Tier.A_PRIME, _book(tmp_path / "a", "calories", "R-CAL-FLOOR", female=1520))
+    assert (at.target_kcal, at.floor_applied, at.deficit_kcal) == (1520, False, 300)
     above = _target(
-        EXACT, Tier.A_PRIME, _book(tmp_path / "b", "calories", "R-CAL-FLOOR", female=1716)
+        EXACT, Tier.A_PRIME, _book(tmp_path / "b", "calories", "R-CAL-FLOOR", female=1521)
     )
-    assert (above.target_kcal, above.floor_applied, above.deficit_kcal) == (1716, True, 299)
+    assert (above.target_kcal, above.floor_applied, above.deficit_kcal) == (1521, True, 299)
 
 
 def test_plan_tiers_match_safety_decision() -> None:
@@ -80,7 +80,9 @@ def test_plan_tiers_match_safety_decision() -> None:
         ("calories", "R-CAL-MACRO", {"meals": [30, 40, 20]}, "三餐"),
         ("calories", "R-CAL-FLOOR", {"female": 700}, "绝对底线"),
         ("calories", "R-CAL-DEFICIT", {"b": -100}, "R-CAL-DEFICIT"),
-        ("calories", "R-CAL-PAL", {"moderate": 1.5}, "依次增大"),
+        ("calories", "R-CAL-PAL", {"moderate": 1.3}, "依次增大"),
+        ("calories", "R-CAL-PROTEIN", {"max_pct": 35}, "不能超过 100"),
+        ("calories", "R-CAL-PROTEIN", {"g_per_kg_high_protein": 2.2}, "不能超过上限"),
         ("calories", "R-CAL-REE", {"age_coef": "5"}, "R-CAL-REE"),
     ],
 )
@@ -95,6 +97,16 @@ def test_bad_rules_fail_at_startup(
 # ---- 属性 ----
 
 people = st.builds(
+    Screening,
+    # 65 岁以下：老年“只给维持热量”的界值会让体重增加时缺口变大，另由黄金用例覆盖
+    birth_date=st.dates(date(1962, 1, 1), date(2008, 1, 1)),
+    sex=st.sampled_from(Sex),
+    height_cm=st.floats(140, 200).map(lambda h: round(h, 1)),
+    weight_kg=st.floats(40, 160).map(lambda w: round(w, 1)),
+    conditions=st.just(()),
+)
+
+everyone = st.builds(
     Screening,
     birth_date=st.dates(date(1940, 1, 1), date(2008, 1, 1)),
     sex=st.sampled_from(Sex),
@@ -116,10 +128,15 @@ def test_heavier_never_lowers_target(s: Screening, tier: Tier, act: Activity, mo
     )
 
 
-@given(people, plan_tiers, activities)
+@given(everyone, plan_tiers, activities)
 def test_target_never_below_floor_and_meals_add_up(s: Screening, tier: Tier, act: Activity) -> None:
     result = _target(s, tier, activity=act)
     floor = 1500 if s.sex is Sex.MALE else 1200
     assert result.target_kcal >= floor
+    assert result.target_kcal >= result.ree_kcal  # 不低于静息能量消耗
     assert sum(result.meals_kcal) == result.target_kcal
+    m = result.macros
+    kcal = m.carb_g * 4 + m.fat_g * 9 + m.protein_g * 4
+    assert abs(kcal - result.target_kcal) <= 10  # 克数取整的误差
+    assert m.protein_g * 4 <= result.target_kcal * 0.3 + 2  # 蛋白质不超过 30%
     assert result.deficit_kcal >= 0

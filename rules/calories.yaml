@@ -15,13 +15,14 @@ rules:
       female_const: -161.0
 
   - id: R-CAL-PAL
-    title: 身体活动水平（三档取区间中间值）
+    title: 身体活动水平（低 / 中 / 高三档）
     status: pending_review
-    source: {kind: guideline, ref: "FAO/WHO/UNU《Human energy requirements》2001：久坐或轻度 1.40–1.69、中度 1.70–1.99、重度 2.00–2.40"}
+    source: {kind: guideline, ref: "中国营养学会《中国居民膳食营养素参考摄入量（2023版）》PAL 1.40 / 1.70 / 2.00（即 FAO/WHO/UNU 2001 各档下限）"}
     params:
-      sedentary: 1.55
-      moderate: 1.85
-      vigorous: 2.20
+      sedentary: 1.40
+      moderate: 1.70
+      vigorous: 2.00
+    note: 已包含日常运动；计算训练消耗时不得再把运动热量加回（避免重复计算）。
 
   - id: R-CAL-DEFICIT
     title: 按分层的每日能量缺口（千卡）
@@ -31,7 +32,9 @@ rules:
       a: 500  # 国家卫健委《体重管理指导原则（2024年版）》每日减少 500–1000 的下限
       a_prime: 300  # 体态减脂上限【设计】
       b: 500  # 保守层固定 500【设计】
-      collaborative: 300  # 用药协作层更保守【设计，准入与参数待医学顾问审定】
+      collaborative: 300  # 用药协作层：目标按“最低摄入”展示，重点是蛋白质足量【设计】
+      senior_age: 65
+      senior_maintenance_bmi_below: 24.0  # 65 岁及以上且 BMI 低于此值：缺口为 0（老年人 BMI 20–26.9 为宜）
     note: 同时满足多层时取最小的缺口；未列出的分层不给热量目标。
 
   - id: R-CAL-FLOOR
@@ -42,12 +45,13 @@ rules:
       female: 1200
       male: 1500
       absolute: 800
-    note: 取 AHA/ACC/TOS 2013 推荐区间的下端作为底线，是本项目的设计；任何情况不低于绝对底线。
+      not_below_ree: true  # 《成人肥胖食养指南（2024年版）》：摄入应高于基础代谢
+    note: 取 AHA/ACC/TOS 2013 推荐区间的下端作为底线，是本项目的设计；任何情况不低于绝对底线与静息能量消耗。
 
   - id: R-CAL-MACRO
     title: 营养素热量占比与三餐分配（%）
     status: pending_review
-    source: {kind: guideline, ref: "国家卫健委《体重管理指导原则（2024年版）》碳水 50–60、脂肪 20–30、蛋白质 15–20；《中国居民膳食指南（2022）》三餐分配"}
+    source: {kind: guideline, ref: "国家卫健委《成人肥胖食养指南（2024年版）》碳水 50–60、脂肪 20–30、蛋白质 15–20，三餐 3:4:3；高蛋白膳食参照《中国超重/肥胖医学营养治疗指南（2021）》"}
     params:
       carb: 55
       fat: 25
@@ -59,3 +63,22 @@ rules:
       kcal_per_g_fat: 9
       kcal_per_g_protein: 4
       meals: [30, 40, 30]  # 早、中、晚
+
+  - id: R-CAL-PROTEIN
+    title: 蛋白质最低量与上限（按参考体重）
+    status: pending_review
+    source: {kind: guideline, ref: "ACLM/ASN/OMA/TOS 2025 GLP-1 营养联合建议（减重期 1.2–1.6 g/kg 校正体重）；《中国居民膳食营养素参考摄入量（2023版）》65 岁及以上男 72、女 62 克；PROT-AGE 2013"}
+    params:
+      ideal_bmi: 22.0  # 理想体重 = 22 × 身高（米）²
+      adjust_from_bmi: 24.0  # BMI 达到此值时用校正体重 = 理想体重 + 系数 ×（实际 − 理想）
+      adjust_factor: 0.25
+      g_per_kg: 1.2
+      g_per_kg_high_protein: 1.6
+      senior_age: 65
+      senior_male_g: 72
+      senior_female_g: 62
+      max_g_per_kg: 2.0
+      max_pct: 30  # 蛋白质不超过热量的 30%
+      fat_min_pct: 20  # 提高蛋白质时先从脂肪扣，最低到 20%
+      carb_min_pct: 50  # 再从碳水扣，最低到 50%
+    note: 蛋白质取占比算出的量、每千克参考体重的量与老年推荐量中最大者，再受上限约束。肾病用户在 C 层，不走这里。

@@ -1,4 +1,4 @@
-# 黄金用例：热量计算（spec §25）。每条标题写明手算过程；改规则必须同时改这里。
+# 黄金用例：热量计算（spec §25、§26）。每条标题写明手算过程；改规则必须同时改这里。
 target: ironm.engine.calories:calorie_target
 status: active
 inject:
@@ -9,9 +9,11 @@ rules:
 - R-CAL-DEFICIT
 - R-CAL-FLOOR
 - R-CAL-MACRO
+- R-CAL-PROTEIN
 cases:
 - id: G-CAL-001
-  title: 女 30 岁 165 厘米 70 千克、久坐、A：静息 1420.25 → 1420；×1.55 = 2201.39 → 2201；−500 → 1701；碳水 233.89、脂肪 47.25、蛋白质 85.05 克；三餐 510.3 / 680.4 / 差额
+  title: 女 30 岁 165 厘米 70 千克、久坐、A：静息 1420.25 → 1420；×1.40 = 1988.35 → 1988；−500 → 1488；底线 max(1200, 1420)。蛋白质：占比 74.4 克 < 1.2 × 参考体重 62.42（BMI 25.7，理想 59.895 + 0.25 × 10.105）= 74.91 → 75 克，多出 2.02 千卡从脂肪扣：脂肪 369.98/9 = 41.11、碳水 818.4/4 = 204.6；三餐 446.4 / 595.2 /
+    差额
   given:
     screening: &id001
       birth_date: '1996-01-01'
@@ -34,24 +36,25 @@ cases:
   expect:
     status: ok
     ree_kcal: 1420
-    pal: 1.55
-    tdee_kcal: 2201
+    pal: 1.4
+    tdee_kcal: 1988
     deficit_kcal: 500
-    target_kcal: 1701
-    floor_kcal: 1200
+    target_kcal: 1488
+    floor_kcal: 1420
     floor_applied: false
     macros:
-      carb_g: 234
-      fat_g: 47
-      protein_g: 85
+      carb_g: 205
+      fat_g: 41
+      protein_g: 75
       high_protein: false
     meals_kcal:
-    - 510
-    - 680
-    - 511
-    reasons: []
+    - 446
+    - 595
+    - 447
+    reasons:
+    - protein_raised
 - id: G-CAL-002
-  title: 同上、中度活动：×1.85 = 2627.46 → 2627；目标 2127.46 → 2127
+  title: 同上、中度活动：×1.70 = 2414.43 → 2414；目标 1914.43 → 1914
   given:
     screening: *id001
     activity: moderate
@@ -67,12 +70,12 @@ cases:
     as_of: '2026-10-20T04:00:00Z'
     tz: Asia/Shanghai
   expect:
-    tdee_kcal: 2627
-    target_kcal: 2127
-    pal: 1.85
+    tdee_kcal: 2414
+    target_kcal: 1914
+    pal: 1.7
   twin_of: G-CAL-001
 - id: G-CAL-003
-  title: 同上、重度活动：×2.2 = 3124.55 → 3125；目标 2624.55 → 2625
+  title: 同上、高强度：×2.00 = 2840.5 → 2841（0.5 进位）；目标 2340.5 → 2341
   given:
     screening: *id001
     activity: vigorous
@@ -88,12 +91,12 @@ cases:
     as_of: '2026-10-20T04:00:00Z'
     tz: Asia/Shanghai
   expect:
-    tdee_kcal: 3125
-    target_kcal: 2625
+    tdee_kcal: 2841
+    target_kcal: 2341
     deficit_kcal: 500
   twin_of: G-CAL-001
 - id: G-CAL-004
-  title: 男 40 岁（生日当天）180 厘米 90 千克、久坐、A：静息 1830；×1.55 = 2836.5 → 2837（0.5 进位）；目标 2336.5 → 2337；碳水 321.34、脂肪 64.92、蛋白质 116.85 克；三餐 701.1 / 934.8 / 差额
+  title: 男 40 岁（生日当天）180 厘米 90 千克、久坐、A：静息 1830；×1.40 = 2562；目标 2062；底线 max(1500, 1830)。蛋白质占比 103.1 克 > 1.2 × 参考体重 75.96 = 91.15，不抬高；碳水 283.53、脂肪 57.28；三餐 618.6 / 824.8 / 差额
   given:
     screening: &id002
       birth_date: '1986-10-20'
@@ -116,21 +119,22 @@ cases:
   expect:
     status: ok
     ree_kcal: 1830
-    tdee_kcal: 2837
+    tdee_kcal: 2562
     deficit_kcal: 500
-    target_kcal: 2337
-    floor_kcal: 1500
+    target_kcal: 2062
+    floor_kcal: 1830
     macros:
-      carb_g: 321
-      fat_g: 65
-      protein_g: 117
+      carb_g: 284
+      fat_g: 57
+      protein_g: 103
       high_protein: false
     meals_kcal:
-    - 701
-    - 935
-    - 701
+    - 619
+    - 825
+    - 618
+    reasons: []
 - id: G-CAL-005
-  title: 同上、高蛋白：碳水 292.13、脂肪 64.92、蛋白质 146.06 克
+  title: 同上、高蛋白：蛋白质占比 25% = 128.88 克 > 1.6 × 75.96 = 121.54；碳水 257.75、脂肪 57.28
   given:
     screening: *id002
     activity: sedentary
@@ -147,14 +151,14 @@ cases:
     tz: Asia/Shanghai
     high_protein: true
   expect:
-    target_kcal: 2337
+    target_kcal: 2062
     macros:
-      carb_g: 292
-      fat_g: 65
-      protein_g: 146
+      carb_g: 258
+      fat_g: 57
+      protein_g: 129
       high_protein: true
 - id: G-CAL-010
-  title: A′：缺口 300 → 1901
+  title: A′：缺口 300 → 1688
   given:
     screening: *id001
     activity: sedentary
@@ -171,10 +175,10 @@ cases:
     tz: Asia/Shanghai
   expect:
     deficit_kcal: 300
-    target_kcal: 1901
+    target_kcal: 1688
   twin_of: G-CAL-001
 - id: G-CAL-011
-  title: B：缺口 500 → 1701
+  title: B（30 岁、BMI 25.7，不属老年维持）：缺口 500 → 1488
   given:
     screening: *id001
     activity: sedentary
@@ -191,9 +195,9 @@ cases:
     tz: Asia/Shanghai
   expect:
     deficit_kcal: 500
-    target_kcal: 1701
+    target_kcal: 1488
 - id: G-CAL-012
-  title: 协作：缺口 300 → 1901
+  title: 协作：缺口 300 → 1688，写明目标是最低摄入；蛋白质占比 84.4 克已足够
   given:
     screening: *id001
     activity: sedentary
@@ -210,7 +214,9 @@ cases:
     tz: Asia/Shanghai
   expect:
     deficit_kcal: 300
-    target_kcal: 1901
+    target_kcal: 1688
+    reasons:
+    - collaborative_minimum_intake
 - id: G-CAL-013
   title: 主层 B、同时满足 A′ → 取较小缺口 300
   given:
@@ -230,7 +236,7 @@ cases:
     tz: Asia/Shanghai
   expect:
     deficit_kcal: 300
-    target_kcal: 1901
+    target_kcal: 1688
   twin_of: G-CAL-011
 - id: G-CAL-014
   title: A′ 为保守假设（满足的层为空）→ 仍按 A′ 缺口 300
@@ -249,15 +255,111 @@ cases:
     tz: Asia/Shanghai
   expect:
     deficit_kcal: 300
-    target_kcal: 1901
+    target_kcal: 1688
 - id: G-CAL-020
-  title: 女 70 岁 150 厘米 50 千克、B：静息 926.5，×1.55 = 1436.08 → 1436；−500 = 936 低于 1200 → 目标 1200，实际缺口 236
+  title: 女 30 岁 150 厘米 42 千克、A′：静息 1046.5 → 1047，×1.40 = 1465.1 → 1465；−300 = 1165.1 低于 1200 → 目标 1200，实际缺口 265；蛋白质占比 60 克 > 1.2 × 42
+  given:
+    screening:
+      birth_date: '1996-01-01'
+      sex: female
+      height_cm: 150.0
+      weight_kg: 42.0
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: a_prime
+      status: ok
+      matched:
+      - a_prime
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    ree_kcal: 1047
+    tdee_kcal: 1465
+    target_kcal: 1200
+    deficit_kcal: 265
+    floor_kcal: 1200
+    floor_applied: true
+    reasons:
+    - floor_applied
+- id: G-CAL-021
+  title: 女 85 岁 145 厘米 52 千克（BMI 24.7）、B：静息 840.25，×1.40 = 1176.35 → 1176 低于底线 → 目标 1200、实际缺口 0；蛋白质取老年推荐 62 克（占比 60、1.2 × 参考体重 47.69 = 57.2），多出 8 千卡从脂肪扣：脂肪 292/9 = 32.44、碳水 660/4 = 165
+  given:
+    screening:
+      birth_date: '1941-01-01'
+      sex: female
+      height_cm: 145.0
+      weight_kg: 52.0
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: b
+      status: ok
+      matched:
+      - b
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    tdee_kcal: 1176
+    target_kcal: 1200
+    deficit_kcal: 0
+    floor_applied: true
+    macros:
+      carb_g: 165
+      fat_g: 32
+      protein_g: 62
+      high_protein: false
+    reasons:
+    - floor_applied
+    - no_deficit_possible
+    - protein_raised
+- id: G-CAL-022
+  title: 女 30 岁 150 厘米 59.85 千克、A：静息 1225，×1.40 = 1715，−500 = 1215 低于静息 → 底线取 1225（不低于静息能量消耗）；蛋白质 1.2 × 参考体重 52.09 = 62.51 → 63
+  given:
+    screening:
+      birth_date: '1996-01-01'
+      sex: female
+      height_cm: 150.0
+      weight_kg: 59.85
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: a
+      status: ok
+      matched:
+      - a
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+  expect:
+    ree_kcal: 1225
+    tdee_kcal: 1715
+    floor_kcal: 1225
+    target_kcal: 1225
+    deficit_kcal: 490
+    floor_applied: true
+    reasons:
+    - floor_applied
+    - protein_raised
+- id: G-CAL-023
+  title: 女 70 岁 150 厘米 49.5 千克（BMI 22.0）、主层 B → 老年维持：缺口 0；静息 921.5 → 922，×1.40 = 1290.1 → 1290；蛋白质占比 64.5 → 65（高于老年推荐 62 与 1.2 × 49.5）
   given:
     screening:
       birth_date: '1956-01-01'
       sex: female
       height_cm: 150.0
-      weight_kg: 50.0
+      weight_kg: 49.5
       conditions: *id003
     activity: sedentary
     tier:
@@ -265,6 +367,7 @@ cases:
       status: ok
       matched:
       - b
+      - a_prime
       reasons: []
       missing: []
       bmi: 25.0
@@ -272,21 +375,26 @@ cases:
     as_of: '2026-10-20T04:00:00Z'
     tz: Asia/Shanghai
   expect:
-    ree_kcal: 927
-    tdee_kcal: 1436
-    target_kcal: 1200
-    deficit_kcal: 236
-    floor_applied: true
+    ree_kcal: 922
+    tdee_kcal: 1290
+    deficit_kcal: 0
+    target_kcal: 1290
+    floor_applied: false
+    macros:
+      carb_g: 177
+      fat_g: 36
+      protein_g: 65
+      high_protein: false
     reasons:
-    - floor_applied
-- id: G-CAL-021
-  title: 女 80 岁 140 厘米 40 千克：每日总消耗 1106.7 → 1107 低于底线 → 目标 1200，实际缺口 0，提示靠增加活动
+    - senior_maintenance
+- id: G-CAL-024
+  title: 女 70 岁 155 厘米 60 千克（BMI 25.0）、B：不属老年维持；静息 1057.75，×1.40 = 1480.85 → 1481，−500 低于底线 → 1200；蛋白质 1.2 × 参考体重 54.64 = 65.57 → 66（高于老年推荐 62）
   given:
     screening:
-      birth_date: '1946-01-01'
+      birth_date: '1956-01-01'
       sex: female
-      height_cm: 140.0
-      weight_kg: 40.0
+      height_cm: 155.0
+      weight_kg: 60.0
       conditions: *id003
     activity: sedentary
     tier:
@@ -301,13 +409,50 @@ cases:
     as_of: '2026-10-20T04:00:00Z'
     tz: Asia/Shanghai
   expect:
-    tdee_kcal: 1107
     target_kcal: 1200
-    deficit_kcal: 0
-    floor_applied: true
+    deficit_kcal: 281
+    macros:
+      carb_g: 165
+      fat_g: 31
+      protein_g: 66
+      high_protein: false
     reasons:
     - floor_applied
-    - no_deficit_possible
+    - protein_raised
+- id: G-CAL-025
+  title: 女 70 岁 160 厘米 75 千克（BMI 29.3）、B、高蛋白：静息 1239 → 底线 1239；1.6 × 参考体重 60.99 = 97.58 克超过 30% 上限 92.93 → 取 92.93；多出 61.95 千卡全部从脂肪扣到 20%：脂肪 247.8/9 = 27.53、碳水 619.5/4 = 154.88
+  given:
+    screening:
+      birth_date: '1956-01-01'
+      sex: female
+      height_cm: 160.0
+      weight_kg: 75.0
+      conditions: *id003
+    activity: sedentary
+    tier:
+      tier: b
+      status: ok
+      matched:
+      - b
+      reasons: []
+      missing: []
+      bmi: 25.0
+      rule_id: R-SF-TIER
+    as_of: '2026-10-20T04:00:00Z'
+    tz: Asia/Shanghai
+    high_protein: true
+  expect:
+    floor_kcal: 1239
+    target_kcal: 1239
+    macros:
+      carb_g: 155
+      fat_g: 28
+      protein_g: 93
+      high_protein: true
+    reasons:
+    - floor_applied
+    - protein_raised
+    - protein_capped
 - id: G-CAL-030
   title: paused 层 → 不给热量目标
   given:

@@ -85,13 +85,29 @@ def test_local_day_bounds() -> None:
 
 @pytest.mark.parametrize(
     ("level", "sets", "rpe"),
-    [(5, 4, 8), (4, 4, 8), (3, 3, 7), (2, 2, 6), (1, 0, 8)],
+    [(5, 4, 8), (4, 4, 8), (3, 3, 7), (2, 2, 6), (1, 0, 3)],
 )
 def test_adjust_item(level: int, sets: int, rpe: float) -> None:
     item = adjust_item(planned_sets=4, planned_rpe_cap=8, adjustment=_adj(level))
-    assert item.sets == sets
-    if sets:
-        assert item.rpe_cap == rpe
+    assert (item.sets, item.rpe_cap) == (sets, rpe)
+
+
+@pytest.mark.parametrize(("level", "rpe"), [(5, 9.5), (3, 8.5), (2, 6), (1, 3)])
+def test_absolute_rpe_cap(level: int, rpe: float) -> None:
+    """原计划 RPE 9.5：疲惫档不超过 6、很差档不超过 3（spec §26），其余按相对下调。"""
+    assert adjust_item(planned_sets=3, planned_rpe_cap=9.5, adjustment=_adj(level)).rpe_cap == rpe
+
+
+def test_cap_never_raises_easy_plan() -> None:
+    """原计划本来就很轻松：绝对上限不会把它调高。"""
+    assert adjust_item(planned_sets=2, planned_rpe_cap=2, adjustment=_adj(1)).rpe_cap == 2
+    assert adjust_item(planned_sets=2, planned_rpe_cap=5, adjustment=_adj(2)).rpe_cap == 3
+
+
+def test_level_one_time_cap_and_hint() -> None:
+    a = _adj(1)
+    assert a.max_minutes == 15
+    assert a.safety_hint is not None and "发热" in a.safety_hint
 
 
 @pytest.mark.parametrize("level", [3, 2])
