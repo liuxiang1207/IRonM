@@ -17,6 +17,7 @@ class Snapshot(ContractModel):
     user_id: Annotated[str, Field(min_length=1)]
     as_of: UtcDatetime
     tier: Tier | Unknown  # 还没建档时为“未知”
+    tier_matched: tuple[Tier, ...] = ()  # 同时满足的所有分层（热量等计算取更保守的约束）
     precision_by_domain: FrozenMap[Domain, Precision]
     profile: FrozenMap[str, JsonValue]
     metrics: tuple[MetricResult, ...]

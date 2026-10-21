@@ -5,6 +5,7 @@ from typing import Any
 
 from ironm.agents.base import Agent
 from ironm.contracts.agents import AgentOutput
+from ironm.contracts.common import deep_thaw
 from ironm.contracts.roles import AgentId
 from ironm.contracts.screening import Tier, TierResult
 from ironm.contracts.skills import ScenePack
@@ -27,17 +28,42 @@ FULL_PROFILE: dict[str, Any] = {
 }
 
 
-def snapshot(tier: Tier | None, **profile: Any) -> Snapshot:
+def snapshot(
+    tier: Tier | None,
+    *,
+    matched: tuple[Tier, ...] = (),
+    plan_fields: dict[str, Any] | None = None,
+    constraints: tuple[dict[str, Any], ...] = (),
+    diet_precision: str = "P1",
+    **profile: Any,
+) -> Snapshot:
+    plan: dict[str, Any] | None = None
+    if plan_fields is not None:
+        plan = {
+            "version": 1,
+            "parent": None,
+            "fields": plan_fields,
+            "diff": [],
+            "rule_set_versions": {},
+            "skill_versions": {},
+            "created_at": "2026-10-20T00:00:00+00:00",
+        }
     data: dict[str, Any] = {
         "snapshot_id": "s1",
         "user_id": "u1",
         "as_of": "2026-10-21T00:00:00+00:00",
         "tier": tier.value if tier else {"unknown": "insufficient_data"},
-        "precision_by_domain": {"training": "P1", "body": "P1", "diet": "P1", "recovery": "P1"},
+        "tier_matched": [t.value for t in matched],
+        "precision_by_domain": {
+            "training": "P1",
+            "body": "P1",
+            "diet": diet_precision,
+            "recovery": "P1",
+        },
         "profile": profile,
         "metrics": [],
-        "current_plan": None,
-        "constraints": [],
+        "current_plan": plan,
+        "constraints": list(constraints),
         "prior_verdicts": [],
     }
     return Snapshot.model_validate_json(json.dumps(data))
@@ -57,11 +83,17 @@ def tier_result(tier: Tier | None) -> TierResult:
 
 
 def run_agent(
-    agent: AgentId, intent: str, tier: Tier | None, **profile: Any
+    agent: AgentId, intent: str, tier: Tier | None, **kwargs: Any
 ) -> dict[str, AgentOutput]:
-    """返回 {Skill 编号: 输出}；没有加载任何 Skill 时键为 no_skill。"""
+    """返回 {Skill 编号: 输出}；没有加载任何 Skill 时键为 no_skill。kwargs 同 snapshot。"""
     sel = select(
         SKILLS, agent=agent, intent=intent, scene=ScenePack.FAT_LOSS, tier=tier_result(tier)
     )
-    outputs = Agent(agent).execute(snapshot(tier, **profile), sel, BOOK)
+    outputs = Agent(agent).execute(snapshot(tier, **kwargs), sel, BOOK)
     return {o.skill.split("@")[0]: o for o in outputs}
+
+
+def proposed(output: AgentOutput) -> dict[str, Any]:
+    """提案输出 → {字段: 新值}（只读映射转回普通的字典与列表，便于比较）。"""
+    items = getattr(output, "items", ())
+    return {p.field.value: deep_thaw(p.to_value) for p in items if hasattr(p, "to_value")}

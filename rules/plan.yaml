@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=../schemas/rule_set.schema.json
+# 第一版计划（spec §30）：训练规划师、动作教练、营养师的首批 Skill 使用。改动后须同时改 tests/skills/ 下对应测试。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料审定，未经认证教练或注册营养师复核；逐项记录见 spec/review_log.md。
+rule_set: plan
+version: 2026.10.1
+rules:
+  - id: R-TR-START
+    title: 第一版每周训练结构
+    status: approved
+    source: {kind: guideline, ref: "WHO 身体活动指南（2020）：成人每周至少 2 天肌肉力量活动；ACSM 抗阻训练立场：初学者每个动作 1–3 组、8–12 次；IronM 方案 v3.0 §6.2 起点与递增"}
+    params:
+      strength_days: 2
+      strength_days_max: 3
+      three_days_min_available: 5  # 可练天数达到此值时力量训练 3 次
+      slots: [squat, hinge, push, pull, core]
+      sets: 2
+      reps_low: 8
+      reps_high: 12
+      rpe_low: 6
+      rpe_high: 7
+      cardio_start_add: 30  # 当前每周运动分钟 + 30
+      cardio_start_min: 90
+      cardio_start_min_conservative: 60  # B 与协作层
+      review_days: 14
+    note: RPE 上限、每周有氧上限另受安全官约束（R-SF-TIER-LIMITS），取更严者。
+
+  - id: R-EX-MINIMUM
+    title: 最低任务
+    status: approved
+    source: {kind: borrowed, ref: "IronM 方案 v3.0 §6.2：每次训练都有 2–4 个动作、每个 1–3 组的最低版本"}
+    params:
+      patterns: [squat, push, hinge]
+      sets: 2
+
+  - id: R-NU-DIET-MODE
+    title: 默认饮食模式
+    status: approved
+    source: {kind: design}
+    params:
+      by_precision_p3: precise
+      by_precision_p2: simple
+      by_precision_p1: habit
+      by_precision_p0: habit
+    note: 用户选过的模式优先；否则按饮食精度，默认最轻（IronM 方案 v3.0 §6.3 三种模式、§7.1 默认最轻）。

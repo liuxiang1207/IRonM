@@ -486,6 +486,14 @@
       ],
       "title": "Tier"
     },
+    "tier_matched": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Tier"
+      },
+      "title": "Tier Matched",
+      "type": "array"
+    },
     "user_id": {
       "minLength": 1,
       "title": "User Id",

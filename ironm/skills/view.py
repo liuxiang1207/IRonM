@@ -1,6 +1,7 @@
 """按 Skill 声明裁剪的快照（spec §28）：Agent 只能读本次加载的 Skill 声明过的数据。"""
 
 from collections.abc import Iterable
+from datetime import datetime
 
 from pydantic import JsonValue
 
@@ -29,12 +30,18 @@ class SnapshotView:
     def user_id(self) -> str:
         return self._snapshot.user_id
 
+    @property
+    def as_of(self) -> datetime:
+        """快照的计算时间（复核日期等以此为准）。"""
+        return self._snapshot.as_of
+
     def get(self, key: str) -> object | Unknown:
         if key not in self._declared:
             raise UndeclaredDataError(f"本次加载的 Skill 没有声明数据 {key}，不能读取")
         s = self._snapshot
         fixed: dict[str, object] = {
             "tier": s.tier,
+            "tier_matched": s.tier_matched,
             "precision": s.precision_by_domain,
             "current_plan": s.current_plan,
             "constraints": s.constraints,

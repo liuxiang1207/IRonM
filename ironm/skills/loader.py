@@ -8,12 +8,12 @@ SKILL.md 以 YAML 头信息开头（两行 --- 之间），其后是说明正文
 
 import importlib.util
 import json
-from collections.abc import Callable, Iterable, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from ironm.contracts.agents import AgentOutput
 from ironm.contracts.plan import PlanField
@@ -26,7 +26,15 @@ from ironm.rules.loader import RuleBook
 from ironm.safety.decision import plan_allowed
 from ironm.skills.view import SnapshotView
 
-__all__ = ["SKILLS_DIR", "LoadedSkill", "Selection", "SkillLoadError", "load_skills", "select"]
+__all__ = [
+    "SKILLS_DIR",
+    "LoadedSkill",
+    "Selection",
+    "SkillLoadError",
+    "load_skills",
+    "select",
+    "validate_skill_rules",
+]
 
 SKILLS_DIR = Path(__file__).with_name("library")
 _FENCE = "---"
@@ -53,6 +61,8 @@ class LoadedSkill:
     body: str  # 说明正文
     path: Path
     run: SkillRun
+    # skill.py 中的 RULE_PARAMS：用到的规则编号 → 参数类型；服务启动时逐条校验
+    rule_params: Mapping[str, type[BaseModel]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -89,11 +99,12 @@ def parse_skill_md(path: Path) -> LoadedSkill:
     body = "\n".join(lines[end + 1 :]).strip()
     if not body:
         raise SkillLoadError(f"{path}：缺少说明正文")
-    return LoadedSkill(manifest=manifest, body=body, path=path, run=_load_run(path.parent))
+    run, params = _load_module(path.parent)
+    return LoadedSkill(manifest=manifest, body=body, path=path, run=run, rule_params=params)
 
 
-def _load_run(folder: Path) -> SkillRun:
-    """读取 Skill 目录下 skill.py 的 run 函数。"""
+def _load_module(folder: Path) -> tuple[SkillRun, Mapping[str, type[BaseModel]]]:
+    """读取 Skill 目录下 skill.py 的 run 函数与 RULE_PARAMS（可省略）。"""
     source = folder / "skill.py"
     if not source.is_file():
         raise SkillLoadError(f"{folder}：缺少 skill.py")
@@ -107,7 +118,23 @@ def _load_run(folder: Path) -> SkillRun:
     if not callable(run):
         raise SkillLoadError(f"{source}：缺少 run(view, context) 函数")
     skill_run: SkillRun = run
-    return skill_run
+    params = getattr(module, "RULE_PARAMS", {})
+    if not isinstance(params, dict) or not all(
+        isinstance(k, str) and isinstance(v, type) and issubclass(v, BaseModel)
+        for k, v in params.items()
+    ):
+        raise SkillLoadError(f"{source}：RULE_PARAMS 应为 {{规则编号: 参数类型}}")
+    return skill_run, params
+
+
+def validate_skill_rules(skills: Iterable[LoadedSkill], rulebook: RuleBook) -> None:
+    """服务启动时调用：每个 Skill 用到的规则都存在、参数符合声明的类型，否则报错。"""
+    for skill in skills:
+        for rule_id, model in skill.rule_params.items():
+            try:
+                rulebook.get(rule_id).params_as(model)
+            except (KeyError, ValueError) as e:
+                raise SkillLoadError(f"{skill.manifest.versioned}：规则 {rule_id} 有误：{e}") from e
 
 
 def load_skills(root: Path = SKILLS_DIR) -> tuple[LoadedSkill, ...]:

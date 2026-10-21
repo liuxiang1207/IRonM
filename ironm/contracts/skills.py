@@ -16,7 +16,7 @@ type SkillId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$")]
 type DataKey = Annotated[
     str,
     Field(
-        pattern=r"^(tier|precision|current_plan|constraints|prior_verdicts"
+        pattern=r"^(tier|tier_matched|precision|current_plan|constraints|prior_verdicts"
         r"|profile\.[a-z][a-z0-9_]*|metric\.[a-z][a-z0-9_]*)$"
     ),
 ]

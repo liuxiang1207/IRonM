@@ -30,7 +30,7 @@ from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
 from ironm.safety.refusals import REFUSALS_PATH
 from ironm.safety.replies import REPLIES_PATH
-from ironm.skills.loader import SKILLS_DIR, load_skills
+from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
@@ -152,7 +152,8 @@ def create_app(
     # 急症词表、拒答词表与回答模板：启动时校验并互相核对（spec §21–24）
     load_kit(terms_path, refusals_path, replies_path)
     load_library(library_path)  # 动作库：启动时校验（spec §27）
-    load_skills(skills_dir)  # Skill 头信息：启动时校验（spec §28）
+    # Skill 头信息与它们用到的规则参数：启动时校验（spec §28、§30）
+    validate_skill_rules(load_skills(skills_dir), rulebook)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
