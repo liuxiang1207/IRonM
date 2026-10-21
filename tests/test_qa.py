@@ -79,7 +79,8 @@ KNEE_INTENT = _intent(Intent.EXERCISE_TECHNIQUE, "discomfort")
 
 def test_knee_pain_routes_to_coach_with_safety_officer() -> None:
     primary, assistants = route(KNEE_INTENT)
-    assert primary is AgentId.EXERCISE_COACH and assistants == (AgentId.SAFETY_OFFICER,)
+    assert primary is AgentId.EXERCISE_COACH
+    assert AgentId.SAFETY_OFFICER in assistants
 
 
 def test_special_population_adds_assessor_within_limit() -> None:

@@ -14,7 +14,13 @@ from ironm.knowledge.qa_cards import default_cards
 from ironm.llm.config import MODELS_PATH, load_models
 from ironm.llm.gateway import Gateway
 from ironm.orchestrator.chat import load_answer_texts
-from ironm.orchestrator.dispatch import _Butler, check_butler, stages_for
+from ironm.orchestrator.dispatch import (
+    MAX_ASSISTANTS,
+    _Butler,
+    check_butler,
+    route,
+    stages_for,
+)
 from ironm.orchestrator.intent import Intent, IntentResult
 from ironm.orchestrator.qa import answer_question
 from ironm.rules.loader import RULES_DIR, load_rules
@@ -131,7 +137,9 @@ def test_invalid_butler_dispatch_falls_back_to_rule_table(
         record.dispatch == "rule_fallback"
         and record.dispatch_reason == f"dispatch_invalid:{reason}"
     )
-    assert record.primary is _A.TRAINING_PLANNER and record.assistants == (_A.SAFETY_OFFICER,)
+    # 跨领域问题（增肌 + 蛋白质）：营养师按分数进入辅助，安全官必在
+    assert record.primary is _A.TRAINING_PLANNER
+    assert set(record.assistants) == {_A.SAFETY_OFFICER, _A.NUTRITIONIST}
 
 
 def test_recovery_runs_before_training() -> None:
@@ -182,3 +190,47 @@ def test_no_gateway_uses_rule_table() -> None:
 def test_check_butler_accepts_safety_officer_as_primary() -> None:
     out = _Butler(primary="safety_officer", assistants=[], reason_code="safety")
     assert check_butler(out) == (_A.SAFETY_OFFICER, ())
+
+
+# ---- 领域打分（spec [2026-10-21] §5）----
+
+
+def test_single_domain_routes_to_its_owner() -> None:
+    primary, _ = route(_intent(Intent.NUTRITION))
+    assert primary is _A.NUTRITIONIST
+    primary, _ = route(_intent(Intent.RECOVERY_SLEEP))
+    assert primary is _A.RECOVERY
+
+
+def test_cross_domain_puts_second_domain_in_assistants() -> None:
+    primary, assistants = route(CROSS_INTENT)
+    assert primary is _A.TRAINING_PLANNER
+    assert _A.NUTRITIONIST in assistants
+
+
+def test_close_scores_are_both_assistants() -> None:
+    result = _intent(Intent.TRAINING_KNOWLEDGE, Intent.TRAINING_KNOWLEDGE, Intent.NUTRITION)
+    _, assistants = route(result)
+    assert _A.NUTRITIONIST in assistants
+
+
+def test_low_confidence_keeps_primary_but_drops_assistants() -> None:
+    result = _intent(
+        Intent.TRAINING_KNOWLEDGE, Intent.TRAINING_KNOWLEDGE, Intent.NUTRITION, confidence=0.2
+    )
+    primary, assistants = route(result)
+    assert primary is _A.TRAINING_PLANNER
+    assert _A.NUTRITIONIST not in assistants
+
+
+def test_safety_officer_is_never_outvoted() -> None:
+    # 即使分数被其他领域占满，安全官仍在；且不会被当成主责（安全不靠分数竞争）
+    primary, assistants = route(CROSS_INTENT)
+    assert primary is not _A.SAFETY_OFFICER
+    assert _A.SAFETY_OFFICER in assistants
+
+
+def test_special_population_keeps_assessor_under_limit() -> None:
+    _primary, assistants = route(_intent(Intent.WELLNESS, concerns=("special_population",)))
+    assert _A.ASSESSOR in assistants and _A.SAFETY_OFFICER in assistants
+    assert len(assistants) <= MAX_ASSISTANTS

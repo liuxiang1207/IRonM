@@ -28,13 +28,16 @@ from ironm.rules.loader import RuleBook
 __all__ = [
     "BUTLER_AGENTS",
     "DISPATCH_RULE",
+    "DOMAIN_WEIGHTS",
     "MAX_ASSISTANTS",
     "ROUTES",
     "DispatchParams",
     "DispatchPlan",
     "check_butler",
+    "domain_scores",
     "page_plan",
     "plan_dispatch",
+    "rank",
     "route",
     "stages_for",
 ]
@@ -84,6 +87,27 @@ class DispatchParams(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     fast_lane_min_confidence: Annotated[float, Field(gt=0, le=1)]
+    # 领域打分（spec [2026-10-21] §5）：辅助 Agent 的加入门槛与相对主责的最低比例
+    assistant_min_score: Annotated[float, Field(ge=0, le=1)] = 0.45
+    assistant_min_ratio: Annotated[float, Field(ge=0, le=1)] = 0.55
+
+
+# 意图 → 各领域的固有分（spec §5 领域打分）。安全相关的关注点由 _concerns_score 追加
+DOMAIN_WEIGHTS: dict[Intent, dict[AgentId, float]] = {
+    Intent.EXERCISE_TECHNIQUE: {_A.EXERCISE_COACH: 0.9, _A.TRAINING_PLANNER: 0.4},
+    Intent.TRAINING_KNOWLEDGE: {_A.TRAINING_PLANNER: 0.9, _A.EXERCISE_COACH: 0.5},
+    Intent.PLAN: {_A.TRAINING_PLANNER: 0.9, _A.NUTRITIONIST: 0.4, _A.RECOVERY: 0.3},
+    Intent.NUTRITION: {_A.NUTRITIONIST: 0.9, _A.TRAINING_PLANNER: 0.3},
+    Intent.SUPPLEMENTS_DRUGS: {_A.NUTRITIONIST: 0.85, _A.SAFETY_OFFICER: 0.5},
+    Intent.PERSONAL_DATA: {_A.DATA_ANALYST: 0.9, _A.ASSESSOR: 0.3},
+    Intent.LOGGING: {_A.DATA_ANALYST: 0.8, _A.BEHAVIOR_COACH: 0.4},
+    Intent.RECOVERY_SLEEP: {_A.RECOVERY: 0.9, _A.BEHAVIOR_COACH: 0.4},
+    Intent.HABIT_MOTIVATION: {_A.BEHAVIOR_COACH: 0.9, _A.RECOVERY: 0.3},
+    Intent.WELLNESS: {_A.NUTRITIONIST: 0.7, _A.RECOVERY: 0.55},
+    Intent.CHITCHAT: {},
+    Intent.OUT_OF_SCOPE: {},
+    Intent.UNKNOWN: {},
+}
 
 
 class DispatchPlan(ContractModel):
@@ -105,17 +129,69 @@ class _Butler(BaseModel):
     actions: list[str] = ["answer"]
 
 
-def route(result: IntentResult) -> tuple[AgentId, tuple[AgentId, ...]]:
-    """规则路由表：主责 + 辅助（安全官必在，特殊人群加评估师，辅助最多 2 个）。"""
-    primary, extra = ROUTES[result.intent]
-    assistants = [*extra, _A.SAFETY_OFFICER]
-    if "special_population" in result.concerns:
-        assistants.append(_A.ASSESSOR)
+def domain_scores(result: IntentResult) -> dict[AgentId, float]:
+    """意图与领域 → 各专业 Agent 的分数（spec §5 领域打分）。
+
+    关注点不参与打分：安全官、评估师的参与由 route 强制加入，见 _with_safety。
+    安全不能靠分数竞争（spec §5“安全只升不降”）。
+    """
+    scores: dict[AgentId, float] = {}
+
+    def add(agent: AgentId, value: float) -> None:
+        scores[agent] = max(scores.get(agent, 0.0), value)
+
+    for intent in set(result.domains) | {result.intent}:
+        for agent, value in DOMAIN_WEIGHTS.get(intent, {}).items():
+            add(agent, value)
+    # 置信度整体缩放：拿不准时分数一起降低，主责不变但不容易带辅助
+    return {a: round(v * result.confidence, 4) for a, v in scores.items()}
+
+
+def rank(
+    scores: dict[AgentId, float],
+    params: DispatchParams,
+    preferred: AgentId | None = None,
+) -> tuple[AgentId, tuple[AgentId, ...]]:
+    """分数最高者为主责；辅助取过门槛且不低于主责一定比例者，最多 2 个。
+
+    同分时先取本次意图本身的领域（preferred），再按名称排序，保证结果稳定。
+    """
+    if not scores:
+        return _A.SAFETY_OFFICER, ()
+    ordered = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0] is not preferred, kv[0].value))
+    primary, top = ordered[0]
+    floor = max(params.assistant_min_score, top * params.assistant_min_ratio)
+    picked = [a for a, v in ordered[1:] if v >= floor][:MAX_ASSISTANTS]
+    return primary, tuple(picked)
+
+
+_MANDATORY = frozenset({_A.SAFETY_OFFICER, _A.ASSESSOR})
+
+
+def _fit(primary: AgentId, assistants: list[AgentId]) -> tuple[AgentId, ...]:
+    """必要时加入的 Agent 排在最前；超出上限时先去掉非必要的辅助。"""
     unique = [a for a in dict.fromkeys(assistants) if a != primary]
-    # 安全官必须保留；超过上限时先去掉排在前面的普通辅助 Agent
     while len(unique) > MAX_ASSISTANTS:
-        unique.remove(next(a for a in unique if a not in (_A.SAFETY_OFFICER, _A.ASSESSOR)))
-    return primary, tuple(unique)
+        drop = next(a for a in reversed(unique) if a not in _MANDATORY)
+        unique.remove(drop)
+    return tuple(unique)
+
+
+def route(
+    result: IntentResult, params: DispatchParams | None = None
+) -> tuple[AgentId, tuple[AgentId, ...]]:
+    """领域打分 → 主责 + 辅助（安全官必在，特殊人群加评估师，辅助最多 2 个）。"""
+    p = params or DispatchParams(fast_lane_min_confidence=0.7)
+    own = DOMAIN_WEIGHTS.get(result.intent, {})
+    preferred = max(own, key=lambda a: own[a]) if own else None
+    primary, scored = rank(domain_scores(result), p, preferred)
+    # 安全官每条路由都参与；特殊人群再加评估师。两者不参与打分，也不会被挤掉
+    mandatory: list[AgentId] = []
+    if "special_population" in result.concerns:
+        mandatory.append(_A.ASSESSOR)
+    if primary != _A.SAFETY_OFFICER:
+        mandatory.append(_A.SAFETY_OFFICER)
+    return primary, _fit(primary, [*mandatory, *scored])
 
 
 def stages_for(
@@ -177,10 +253,11 @@ def plan_dispatch(
     request_id: str,
     context_item: str | None = None,
 ) -> DispatchPlan:
-    primary, assistants = route(intent)
     if gateway is None or rulebook is None:
+        primary, assistants = route(intent)
         return _plan("rule_table", primary, assistants, None)
     p = rulebook.get(DISPATCH_RULE).params_as(DispatchParams)
+    primary, assistants = route(intent, p)
     if len(intent.domains) <= 1 and intent.confidence >= p.fast_lane_min_confidence:
         return _plan("fast_lane", primary, assistants, None)
     payload = {
