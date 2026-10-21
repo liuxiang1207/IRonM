@@ -47,7 +47,7 @@ from ironm.engine.precision import (
     training_precision,
 )
 from ironm.engine.stats import mean_known
-from ironm.engine.trend import weight_trend
+from ironm.engine.trend import TrendFit, weight_trend
 from ironm.engine.window import (
     JUDGEMENT_WINDOW,
     WindowParams,
@@ -62,7 +62,8 @@ DIET_MIN_DATA = "R-DQ-DIET-ADJ-MIN-DATA"
 class DietMinDataParams(BaseModel):
     window_days: Annotated[int, Field(gt=0)]
     min_diet_days: Annotated[int, Field(ge=1)]
-    min_weigh_ins: Annotated[int, Field(ge=0)]
+    min_weekend_days: Annotated[int, Field(ge=0)]
+    weekend_weekdays: tuple[Annotated[int, Field(ge=1, le=7)], ...]  # ISO 星期：1 为周一
 
 
 class MetricsReport(BaseModel):
@@ -133,18 +134,34 @@ def _weight_trend_metric(
     window = judgement_window(weights, as_of=as_of, tz=tz, rulebook=rulebook)
     max_days = rulebook.get(JUDGEMENT_WINDOW).params_as(WindowParams).max_window_days
     required = window.required_days if isinstance(window.required_days, int) else max_days
-    # 已有数据超过所需天数时窗口随覆盖增长（不超过上限）：“还差 N 天”才能兑现，状态不会来回跳
-    days = min(max_days, max(required, window.covered_days))
-    fit = weight_trend(weights, as_of=as_of, window_days=days, rulebook=rulebook)
+    target = rulebook.get(JUDGEMENT_WINDOW).params_as(WindowParams).target_half_width_kg_per_week
+    # 窗口在“所需天数”到“已覆盖天数”（不超过上限）之间取可信范围达标的最短一个：结论尽量反映近期；
+    # 都不达标时取最长的，“还差 N 天”才能兑现，状态不会来回跳
+    longest = min(max_days, max(required, window.covered_days))
+    days, fit = (
+        longest,
+        weight_trend(weights, as_of=as_of, tz=tz, window_days=longest, rulebook=rulebook),
+    )
+    for candidate in range(min(required, longest), longest):
+        trial = weight_trend(weights, as_of=as_of, tz=tz, window_days=candidate, rulebook=rulebook)
+        half = _half_width(trial)
+        if trial.status == "ok" and half is not None and half <= target:
+            days, fit = candidate, trial
+            break
     fresh = weight_freshness([*earlier, *weights], as_of=as_of, rulebook=rulebook)
     start = as_of - timedelta(days=days)
     effective = effective_weights(weights, as_of=as_of)
     pending = pending_weights(effective, rulebook)
-    pending_in_window = any(e.event_id in pending and e.occurred_at >= start for e in effective)
+    # 超过规定天数仍未确认的读数仍不参与计算、仍列待办，但不再决定状态
+    recent = as_of - timedelta(
+        days=rulebook.get(WEIGHT_JUMP).params_as(WeightJumpParams).pending_status_days
+    )
+    pending_in_window = any(
+        e.event_id in pending and e.occurred_at >= max(start, recent) for e in effective
+    )
 
     needed: tuple[Need, ...] = fit.needed or window.needed
     # “正常”以实际可信范围为准：模型按均匀称重估算的天数可能不够
-    target = rulebook.get(JUDGEMENT_WINDOW).params_as(WindowParams).target_half_width_kg_per_week
     too_wide = False
     if isinstance(fit.ci_low, float) and isinstance(fit.ci_high, float):
         half = (fit.ci_high - fit.ci_low) / 2
@@ -187,6 +204,12 @@ def _weight_trend_metric(
     )
 
 
+def _half_width(fit: TrendFit) -> float | None:
+    if isinstance(fit.ci_low, float) and isinstance(fit.ci_high, float):
+        return (fit.ci_high - fit.ci_low) / 2
+    return None
+
+
 def _diet_kcal_metric(
     meals: list[MealEvent], as_of: datetime, tz: tzinfo, rulebook: RuleBook, precision: Precision
 ) -> MetricResult:
@@ -197,19 +220,22 @@ def _diet_kcal_metric(
     totals = daily_kcal(meals, days=days, tz=tz, as_of=as_of)
     pending = pending_kcal_days(totals, rulebook)
     trusted = {d: t for d, t in totals.items() if d not in pending}
-    known = sum(1 for t in trusted.values() if not isinstance(t, Unknown))
+    known_days = [d for d, t in trusted.items() if not isinstance(t, Unknown)]
+    known = len(known_days)
+    weekend = sum(1 for d in known_days if d.isoweekday() in p.weekend_weekdays)
     value = mean_known(trusted.values())
+    needed_list: list[Need] = []
+    if known < p.min_diet_days:
+        needed_list.append(Need(item="diet_days", count=p.min_diet_days - known))
+    if weekend < p.min_weekend_days:  # 周末摄入通常更高，只有工作日的均值会偏低
+        needed_list.append(Need(item="weekend_diet_days", count=p.min_weekend_days - weekend))
     if pending:
         status = MetricStatus.PENDING_CONFIRM
-    elif known < p.min_diet_days:
+    elif needed_list:
         status = MetricStatus.INSUFFICIENT
     else:
         status = MetricStatus.OK
-    needed = (
-        (Need(item="diet_days", count=p.min_diet_days - known),)
-        if status is MetricStatus.INSUFFICIENT
-        else ()
-    )
+    needed = tuple(needed_list) if status is MetricStatus.INSUFFICIENT else ()
     recent = resolve(meals, as_of=as_of)
     last: datetime | Unknown = recent[-1].occurred_at if recent else not_recorded()
     return MetricResult(

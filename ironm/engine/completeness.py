@@ -2,9 +2,9 @@
 
 from collections.abc import Iterable
 from datetime import date, datetime, timedelta, tzinfo
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ironm.contracts.events import WeightEvent, WorkoutCheckEvent
 from ironm.contracts.metrics import Need
@@ -26,6 +26,7 @@ class CompletionParams(BaseModel):
     score_done: float
     score_half: float
     score_skipped: float
+    min_recorded_share: Annotated[float, Field(gt=0, le=1)]
 
 
 class Freshness(BaseModel):
@@ -40,6 +41,8 @@ class Freshness(BaseModel):
 class Completion(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    # 有记录的计划日占比低于规则下限（或没有计划日）时为 insufficient：没练的日子更可能不打卡
+    status: Literal["ok", "insufficient"]
     rate: float | Unknown  # 只计有打卡记录的计划日
     recorded_days: int
     planned_days: int
@@ -87,7 +90,9 @@ def training_completion(
         score[latest[d].payload.status] if d in latest else not_recorded() for d in days
     ]
     recorded = sum(1 for s in scores if not isinstance(s, Unknown))
+    enough = bool(days) and recorded / len(days) >= p.min_recorded_share
     return Completion(
+        status="ok" if enough else "insufficient",
         rate=mean_known(scores),
         recorded_days=recorded,
         planned_days=len(days),

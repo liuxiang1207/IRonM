@@ -53,7 +53,7 @@ def test_get_rule_and_typed_params() -> None:
     rule = load_rules(RULES_DIR).get("R-DQ-WEIGHT-JUMP")
     params = rule.params_as(JumpParams)
     assert params.max_change_kg == 2.0
-    assert params.window_days == 7
+    assert params.window_days == 8
 
 
 def test_unknown_rule_id() -> None:

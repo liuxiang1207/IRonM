@@ -11,8 +11,9 @@ rules:
     params:
       ci_level: 0.95
       min_readings: 3
-      min_span_days: 3
-    note: 可信范围按 t 分布计算，读数少时自然变宽；少于 3 次无法估计残差、覆盖不足 3 天时斜率不可靠，都不给趋势。
+      min_span_days: 7  # 至少覆盖完整一周，避免被周末效应、节食初期的水分变化主导
+      residual_ar1_rho: 0.4  # 相邻一天的波动相关系数；标准误乘以 √((1+r)/(1−r))，r = 0.4 ^ 平均间隔天数
+    note: 可信范围按 t 分布计算，读数少时自然变宽；同一当地日期只取当天第一次可信读数。少于 3 次无法估计残差、覆盖不足 7 天时斜率不可靠，都不给趋势。
 
   - id: R-MT-TRAINING-COMPLETION
     title: 训练完成度的计分
@@ -23,6 +24,7 @@ rules:
       score_done: 1.0
       score_half: 0.5
       score_skipped: 0.0
+      min_recorded_share: 0.75  # 有记录的计划日占比低于此值时为数据不足（没练的日子更可能不打卡）
     note: 计划日没有打卡记录的记为“未知”，不当作没练，不计入完成度。
 
 

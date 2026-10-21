@@ -177,3 +177,10 @@ def test_followers_must_agree_with_current_within_tolerance() -> None:
     pending = pending_weights(series, BOOK)
     assert series[0].event_id not in pending
     assert series[1].event_id in pending
+
+
+def test_rebaseline_uses_percentage_threshold() -> None:
+    """120 千克时阈值为 3 千克：后续读数与基准只差 2.5 千克 → 不推翻基准（spec §26）。"""
+    base, jump = _w(1, 120.0), _w(2, 116.9)
+    followers = [_w(3, 117.5), _w(4, 117.4)]
+    assert set(pending_weights([base, jump, *followers], BOOK)) == {jump.event_id}

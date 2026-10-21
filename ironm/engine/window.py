@@ -1,7 +1,8 @@
 """判断窗口：先定“需要多确定”，再算“需要多久”，并说明还差什么（spec §19）。参数取自规则表。
 
 模型：窗口 T 天内均匀称重，读数 n = ⌊每周次数 × T / 7⌋ + 1，间隔 d = T / (n−1)，
-Sxx = d²·n·(n²−1)/12，可信范围半宽 = t(½ + 置信水平/2, n−2) × 波动 / √Sxx × 7（千克/周）。
+Sxx = d²·n·(n²−1)/12，可信范围半宽 = t(½ + 置信水平/2, n−2) × 波动 / √Sxx × 7 × 自相关放大倍数
+（千克/周）。
 """
 
 import math
@@ -16,7 +17,7 @@ from ironm.contracts.metrics import Need
 from ironm.contracts.unknown import Unknown, UnknownReason
 from ironm.engine.data_quality import effective_weights, pending_weights
 from ironm.engine.stats import t_quantile
-from ironm.engine.trend import WEIGHT_TREND, TrendParams, weight_trend
+from ironm.engine.trend import WEIGHT_TREND, TrendParams, ar1_factor, weight_trend
 from ironm.rules.loader import RuleBook
 
 JUDGEMENT_WINDOW = "R-MT-JUDGEMENT-WINDOW"
@@ -62,18 +63,19 @@ class WindowAssessment(BaseModel):
     rule_id: str
 
 
-def _half_width(days: int, per_week: float, sd: float, ci_level: float) -> float | None:
+def _half_width(days: int, per_week: float, sd: float, trend: TrendParams) -> float | None:
     n = math.floor(per_week * days / 7) + 1
     if n < 3:
         return None
     gap = days / (n - 1)
     sxx = gap * gap * n * (n * n - 1) / 12
-    return t_quantile(0.5 + ci_level / 2, n - 2) * sd / math.sqrt(sxx) * 7
+    t = t_quantile(0.5 + trend.ci_level / 2, n - 2)
+    return t * sd / math.sqrt(sxx) * 7 * ar1_factor(trend.residual_ar1_rho, gap)
 
 
-def _shortest(per_week: float, sd: float, p: WindowParams, ci_level: float) -> int | None:
+def _shortest(per_week: float, sd: float, p: WindowParams, trend: TrendParams) -> int | None:
     for days in range(p.min_window_days, p.max_window_days + 1):
-        half = _half_width(days, per_week, sd, ci_level)
+        half = _half_width(days, per_week, sd, trend)
         if half is not None and half <= p.target_half_width_kg_per_week:
             return days
     return None
@@ -84,20 +86,20 @@ def required_window_days(
 ) -> WindowPlan:
     """满足确定程度要求的最少天数；超过上限为数据不足，并说明每周至少需称几次。"""
     p = rulebook.get(JUDGEMENT_WINDOW).params_as(WindowParams)
-    ci_level = rulebook.get(WEIGHT_TREND).params_as(TrendParams).ci_level
+    trend = rulebook.get(WEIGHT_TREND).params_as(TrendParams)
     if readings_per_week <= 0:
         need = (Need(item="weigh_ins_per_week", count=1),)
         return WindowPlan(
             status="insufficient", window_days=_INSUFFICIENT, needed=need, rule_id=JUDGEMENT_WINDOW
         )
-    days = _shortest(readings_per_week, residual_sd_kg, p, ci_level)
+    days = _shortest(readings_per_week, residual_sd_kg, p, trend)
     if days is not None:
         return WindowPlan(status="ok", window_days=days, needed=(), rule_id=JUDGEMENT_WINDOW)
     enough = next(
         (
             f
             for f in range(math.floor(readings_per_week) + 1, 8)
-            if _shortest(f, residual_sd_kg, p, ci_level)
+            if _shortest(f, residual_sd_kg, p, trend)
         ),
         None,
     )
@@ -139,7 +141,9 @@ def judgement_window(
         per_week = (len(recent_days) - 1) / oldest * 7
 
     sd_source: Literal["estimated", "default"]
-    fit = weight_trend(trusted, as_of=as_of, window_days=p.frequency_window_days, rulebook=rulebook)
+    fit = weight_trend(
+        trusted, as_of=as_of, tz=tz, window_days=p.frequency_window_days, rulebook=rulebook
+    )
     if (
         fit.status == "ok"
         and fit.n >= p.min_readings_for_sd

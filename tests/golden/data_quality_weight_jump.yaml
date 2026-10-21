@@ -1,11 +1,11 @@
-# 黄金用例：体重短期跳变标“待确认”（R-DQ-WEIGHT-JUMP：7 天内变化超过 2 千克）
+# 黄金用例：体重短期跳变标“待确认”（R-DQ-WEIGHT-JUMP：8 天内变化超过 max(2 千克, 近期水平 × 2.5%)）
 target: ironm.engine.data_quality:weight_jump_pending
 status: active
 inject: [rulebook]
 rules: [R-DQ-WEIGHT-JUMP]
 cases:
   - id: G-DQ-WJ-001
-    title: 3 天内增加恰好 2 千克，不触发
+    title: 80 千克时阈值为 2 千克：3 天内增加恰好 2 千克，不触发
     given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 82.0, current_at: "2026-10-04T00:00:00Z"}
     expect: {pending_confirm: false}
   - id: G-DQ-WJ-002
@@ -18,15 +18,28 @@ cases:
     given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-03T00:00:00Z"}
     expect: {pending_confirm: true}
   - id: G-DQ-WJ-004
-    title: 同样下降 2.5 千克但相隔 8 天，不触发
-    twin_of: G-DQ-WJ-003
-    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-09T00:00:00Z"}
+    title: 同样下降 2.5 千克但相隔 9 天，不触发
+    twin_of: G-DQ-WJ-005
+    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-10T00:00:00Z"}
     expect: {pending_confirm: false}
   - id: G-DQ-WJ-005
-    title: 恰好相隔 7 天下降 2.5 千克，仍在窗口内，触发
-    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-08T00:00:00Z"}
+    title: 恰好相隔 8 天下降 2.5 千克（每周同一天、晚一点称），仍在窗口内，触发
+    given: {previous_kg: 80.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 77.5, current_at: "2026-10-09T00:00:00Z"}
     expect: {pending_confirm: true}
   - id: G-DQ-WJ-006
     title: 首次称重，没有可比的上一次，不触发
     given: {previous_kg: null, previous_at: null, current_kg: 95.0, current_at: "2026-10-01T00:00:00Z"}
     expect: {pending_confirm: false}
+  - id: G-DQ-WJ-007
+    title: 120 千克时阈值为 3 千克（2.5%）：一周下降 2.9 千克，不触发
+    given: {previous_kg: 120.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 117.1, current_at: "2026-10-08T00:00:00Z"}
+    expect: {pending_confirm: false}
+  - id: G-DQ-WJ-008
+    title: 120 千克时一周下降 3.1 千克，触发
+    twin_of: G-DQ-WJ-007
+    given: {previous_kg: 120.0, previous_at: "2026-10-01T00:00:00Z", current_kg: 116.9, current_at: "2026-10-08T00:00:00Z"}
+    expect: {pending_confirm: true}
+  - id: G-DQ-WJ-009
+    title: 磅当千克录入（82.5 千克录成 181.9）远超阈值，触发
+    given: {previous_kg: 82.5, previous_at: "2026-10-01T00:00:00Z", current_kg: 181.9, current_at: "2026-10-02T00:00:00Z"}
+    expect: {pending_confirm: true}

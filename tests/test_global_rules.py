@@ -176,8 +176,8 @@ def test_trend_keeps_device_readings_after_confirmation() -> None:
     ws = _weights(10)
     confirm = _fix(ws[-1], {"weight_kg": ws[-1].payload.weight_kg})
     as_of = datetime(2026, 10, 11, tzinfo=UTC)
-    before = weight_trend(ws, as_of=as_of, window_days=14, rulebook=BOOK)
-    after = weight_trend([*ws, confirm], as_of=as_of, window_days=14, rulebook=BOOK)
+    before = weight_trend(ws, as_of=as_of, tz=UTC, window_days=14, rulebook=BOOK)
+    after = weight_trend([*ws, confirm], as_of=as_of, tz=UTC, window_days=14, rulebook=BOOK)
     assert before.n == after.n == 10
 
 
@@ -201,8 +201,8 @@ def test_trend_respects_as_of_for_corrections() -> None:
         recorded_at="2026-10-30T00:00:00+00:00",
     )
     as_of = datetime(2026, 10, 7, tzinfo=UTC)
-    a = weight_trend(ws, as_of=as_of, window_days=14, rulebook=BOOK)
-    b = weight_trend([*ws, late_fix], as_of=as_of, window_days=14, rulebook=BOOK)
+    a = weight_trend(ws, as_of=as_of, tz=UTC, window_days=14, rulebook=BOOK)
+    b = weight_trend([*ws, late_fix], as_of=as_of, tz=UTC, window_days=14, rulebook=BOOK)
     assert a.model_dump() == b.model_dump()
 
 
@@ -217,8 +217,8 @@ def test_order_independent(seed: int) -> None:
     as_of = datetime(2026, 10, 9, tzinfo=UTC)
     assert pending_weights(ws, BOOK) == pending_weights(shuffled, BOOK)
     assert (
-        weight_trend(ws, as_of=as_of, window_days=14, rulebook=BOOK).model_dump()
-        == weight_trend(shuffled, as_of=as_of, window_days=14, rulebook=BOOK).model_dump()
+        weight_trend(ws, as_of=as_of, tz=UTC, window_days=14, rulebook=BOOK).model_dump()
+        == weight_trend(shuffled, as_of=as_of, tz=UTC, window_days=14, rulebook=BOOK).model_dump()
     )
 
 

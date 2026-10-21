@@ -22,11 +22,17 @@ KCAL_RANGE = "R-DQ-KCAL-RANGE"
 
 
 class WeightJumpParams(BaseModel):
-    max_change_kg: float
-    window_days: int
+    max_change_kg: Annotated[float, Field(gt=0)]
+    max_change_pct: Annotated[float, Field(ge=0)]
+    window_days: Annotated[int, Field(gt=0)]
     baseline_readings: Annotated[int, Field(ge=1)]
     rebaseline_after: Annotated[int, Field(ge=1)]
     rebaseline_tolerance_kg: Annotated[float, Field(gt=0)]
+    pending_status_days: Annotated[int, Field(gt=0)]
+
+    def threshold_kg(self, level_kg: float) -> float:
+        """跳变阈值：固定千克数与近期水平的百分比，取较大者。"""
+        return max(self.max_change_kg, self.max_change_pct / 100 * level_kg)
 
 
 class KcalRangeParams(BaseModel):
@@ -49,13 +55,16 @@ def weight_jump_pending(
     current_kg: float,
     current_at: datetime,
 ) -> PendingCheck:
-    """规定天数内（含）体重变化超过规定幅度 → 待确认。没有可比读数时不标。"""
+    """规定天数内（含）体重变化超过阈值 → 待确认；没有可比读数时不标。
+
+    阈值取固定千克数与近期水平百分比中较大者。
+    """
     p = rulebook.get(WEIGHT_JUMP).params_as(WeightJumpParams)
     if previous_kg is None or previous_at is None:
         return PendingCheck(pending_confirm=False, rule_id=WEIGHT_JUMP)
     within = abs(current_at - previous_at) <= timedelta(days=p.window_days)
     # 四舍五入到微克级，避免 82.0 - 80.0 这类浮点误差让“恰好等于”变成“超过”
-    jumped = round(abs(current_kg - previous_kg), 6) > p.max_change_kg
+    jumped = round(abs(current_kg - previous_kg), 6) > round(p.threshold_kg(previous_kg), 6)
     return PendingCheck(pending_confirm=within and jumped, rule_id=WEIGHT_JUMP)
 
 
@@ -131,7 +140,7 @@ def _followers_agree(
     kg = e.payload.weight_kg
     return all(
         abs(f.payload.weight_kg - kg) <= p.rebaseline_tolerance_kg
-        and abs(f.payload.weight_kg - baseline_kg) > p.max_change_kg
+        and abs(f.payload.weight_kg - baseline_kg) > p.threshold_kg(baseline_kg)
         for f in followers
     )
 

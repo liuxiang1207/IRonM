@@ -1,23 +1,26 @@
 # 黄金用例：判断窗口（R-MT-JUDGEMENT-WINDOW，置信水平取 R-MT-WEIGHT-TREND）。
 # 模型：窗口 T 天内均匀称重，读数 n = ⌊每周次数 × T / 7⌋ + 1，间隔 d = T / (n−1)，
-#       Sxx = d²·n·(n²−1)/12，半宽 = t(0.975, n−2) × 波动 / √Sxx × 7（千克/周），取最小的 T 使半宽 ≤ 0.25。
-# 手算核对（每天称、波动 0.5）：
-#   T = 21：n = 22，Sxx = 22×483/12 = 885.5，标准误 = 0.5/√885.5 = 0.016803 千克/天 = 0.11762 千克/周，
-#           t(0.975, 20) = 2.086，半宽 = 0.2453 ≤ 0.25 ✓
-#   T = 20：n = 21，Sxx = 21×440/12 = 770，标准误 = 0.5/√770 × 7 = 0.12613，t(0.975, 19) = 2.093，半宽 = 0.2640 > 0.25
+#       Sxx = d²·n·(n²−1)/12，半宽 = t(0.975, n−2) × 波动 / √Sxx × 7 × 自相关放大倍数（千克/周），
+#       放大倍数 = √((1+r)/(1−r))，r = 0.4 ^ d；取最小的 T 使半宽 ≤ 0.25。
+# 手算核对（每天称、波动 0.5；d = 1，r = 0.4，放大倍数 = √(1.4/0.6) = 1.5275）：
+#   T = 28：n = 29，Sxx = 29×840/12 = 2030，标准误 = 0.5/√2030 × 7 × 1.5275 = 0.11866 千克/周，
+#           t(0.975, 27) = 2.052，半宽 = 0.2435 ≤ 0.25 ✓
+#   T = 27：n = 28，Sxx = 28×783/12 = 1827，标准误 = 0.5/√1827 × 7 × 1.5275 = 0.12507，t(0.975, 26) = 2.056，半宽 = 0.2571 > 0.25
+# 每周 2 次：T = 34：n = 10，d = 3.778，r = 0.0314，放大 1.0319，Sxx = 1177.4，半宽 = 2.306 × 0.10526 = 0.2427 ✓；
+#            T = 33：n = 10，d = 3.667，r = 0.0347，放大 1.0354，Sxx = 1109.2，半宽 = 0.2509 > 0.25
 target: ironm.engine.window:required_window_days
 status: active
 inject: [rulebook]
 rules: [R-MT-JUDGEMENT-WINDOW, R-MT-WEIGHT-TREND]
 cases:
   - id: G-WIN-001
-    title: 每天称、波动 0.5 千克 → 21 天
+    title: 每天称、波动 0.5 千克 → 28 天（相邻读数波动相关，每天称并不比隔几天称多出同样的信息）
     given: {readings_per_week: 7, residual_sd_kg: 0.5}
-    expect: {status: ok, window_days: 21}
+    expect: {status: ok, window_days: 28}
   - id: G-WIN-002
-    title: 每周 2 次、波动 0.5 千克 → 32 天
+    title: 每周 2 次、波动 0.5 千克 → 34 天
     given: {readings_per_week: 2, residual_sd_kg: 0.5}
-    expect: {status: ok, window_days: 32}
+    expect: {status: ok, window_days: 34}
   - id: G-WIN-003
     title: 每周 1 次、波动 0.5 千克 → 42 天
     given: {readings_per_week: 1, residual_sd_kg: 0.5}

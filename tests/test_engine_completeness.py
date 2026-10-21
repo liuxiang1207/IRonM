@@ -181,3 +181,26 @@ def test_pending_kcal_days_only_known_totals() -> None:
 def test_coverage_unknown_without_planned_days() -> None:
     c = training_completion([], planned_days=[], tz=SH, rulebook=BOOK)
     assert isinstance(c.coverage, Unknown)
+
+
+def test_completion_insufficient_below_recorded_share() -> None:
+    """有记录的计划日占比低于 75% → 数据不足，仍给出已记录日的完成度（spec §26）。"""
+    two_of_three = training_completion(
+        [_wo("2026-10-19T20:00:00+08:00", "done"), _wo("2026-10-20T20:00:00+08:00", "done")],
+        planned_days=[D1, D2, D3],
+        tz=SH,
+        rulebook=BOOK,
+    )
+    assert two_of_three.status == "insufficient" and two_of_three.rate == 1.0
+    all_three = training_completion(
+        [
+            _wo("2026-10-19T20:00:00+08:00", "done"),
+            _wo("2026-10-20T20:00:00+08:00", "done"),
+            _wo("2026-10-21T20:00:00+08:00", "half"),
+        ],
+        planned_days=[D1, D2, D3],
+        tz=SH,
+        rulebook=BOOK,
+    )
+    assert all_three.status == "ok"
+    assert training_completion([], planned_days=[], tz=SH, rulebook=BOOK).status == "insufficient"

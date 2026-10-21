@@ -65,7 +65,7 @@ def test_default_sd_when_few_readings() -> None:
 def test_extra_weigh_in_hint() -> None:
     events = [_w(d, 80.0) for d in (0, 7, 14, 21)]
     r = judgement_window(events, as_of=AS_OF, tz=SH, rulebook=BOOK)
-    assert r.faster_by_days == 10  # 每周 1 次 → 2 次：42 天 → 32 天
+    assert r.faster_by_days == 8  # 每周 1 次 → 2 次：42 天 → 34 天
 
 
 def test_no_weighing() -> None:

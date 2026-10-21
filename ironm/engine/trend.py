@@ -1,8 +1,11 @@
-"""体重趋势：最小二乘线性回归、斜率标准误、按 t 分布的可信范围。参数取自规则表。"""
+"""体重趋势：最小二乘线性回归、斜率标准误、按 t 分布的可信范围。参数取自规则表。
+
+相邻读数的波动彼此相关（今天偏重，明天多半也偏重），按一阶自相关放大标准误，避免可信范围偏窄。
+"""
 
 import math
 from collections.abc import Iterable, Sequence
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, tzinfo
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,6 +25,7 @@ class TrendParams(BaseModel):
     ci_level: Annotated[float, Field(gt=0, lt=1)]
     min_readings: Annotated[int, Field(ge=3)]  # 少于 3 次无法估计残差
     min_span_days: Annotated[float, Field(gt=0)]
+    residual_ar1_rho: Annotated[float, Field(ge=0, lt=1)]  # 相隔一天的波动相关系数
 
 
 class TrendFit(BaseModel):
@@ -64,8 +68,12 @@ def fit_trend(
     ci_level: float,
     min_readings: int,
     min_span_days: float,
+    ar1_rho: float = 0.0,
 ) -> TrendFit:
-    """points：(天数, 千克)。天数的起点无关紧要，截距取第一次读数时刻的拟合值。"""
+    """points：(天数, 千克)。天数的起点无关紧要，截距取第一次读数时刻的拟合值。
+
+    ar1_rho：相隔一天的波动相关系数；按平均间隔折算后放大标准误（见 ar1_factor）。
+    """
     n = len(points)
     xs = [float(x) for x, _ in points]
     ys = [float(y) for _, y in points]
@@ -88,7 +96,7 @@ def fit_trend(
     intercept = y_mean - slope * x_mean
     sse = sum((y - (intercept + slope * x)) ** 2 for x, y in zip(xs, ys, strict=True))
     residual_var = sse / (n - 2)
-    se = math.sqrt(residual_var / sxx)
+    se = math.sqrt(residual_var / sxx) * ar1_factor(ar1_rho, span / (n - 1))
     half = t_quantile(0.5 + ci_level / 2, n - 2) * se
     week = 7.0
     return TrendFit(
@@ -106,12 +114,26 @@ def fit_trend(
     )
 
 
+def ar1_factor(rho: float, gap_days: float) -> float:
+    """一阶自相关下标准误的放大倍数 √((1+r)/(1−r))，r = rho ^ 平均间隔天数。"""
+    if rho <= 0 or gap_days <= 0:
+        return 1.0
+    r = rho**gap_days
+    return math.sqrt((1 + r) / (1 - r))
+
+
 def weight_trend(
-    events: Iterable[WeightEvent], *, as_of: datetime, window_days: int, rulebook: RuleBook
+    events: Iterable[WeightEvent],
+    *,
+    as_of: datetime,
+    tz: tzinfo,
+    window_days: int,
+    rulebook: RuleBook,
 ) -> TrendFit:
     """窗口 [as_of - window_days, as_of] 内的趋势。
 
-    只用有效、非待确认、与最近一次读数同一数据流的读数（不同的秤不混算）。
+    只用有效、非待确认、与最近一次读数同一数据流的读数（不同的秤不混算）；
+    同一当地日期只取当天第一次读数（一天称多次不应让读数虚增、可信范围变窄）。
     """
     p = rulebook.get(WEIGHT_TREND).params_as(TrendParams)
     items = effective_weights(events, as_of=as_of)
@@ -122,9 +144,17 @@ def weight_trend(
     if in_window:
         stream = in_window[-1].stream_key  # effective_weights 已按时间排序
         in_window = [e for e in in_window if e.stream_key == stream]
+    first_of_day: dict[date, WeightEvent] = {}
+    for e in in_window:  # 已按时间排序
+        first_of_day.setdefault(e.occurred_at.astimezone(tz).date(), e)
+    in_window = list(first_of_day.values())
     points = [
         ((e.occurred_at - start).total_seconds() / 86400, e.payload.weight_kg) for e in in_window
     ]
     return fit_trend(
-        points, ci_level=p.ci_level, min_readings=p.min_readings, min_span_days=p.min_span_days
+        points,
+        ci_level=p.ci_level,
+        min_readings=p.min_readings,
+        min_span_days=p.min_span_days,
+        ar1_rho=p.residual_ar1_rho,
     )

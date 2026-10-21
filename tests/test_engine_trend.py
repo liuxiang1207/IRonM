@@ -9,7 +9,7 @@ import pytest
 
 from ironm.contracts.events import EVENT_ADAPTER, WeightEvent
 from ironm.engine.stats import t_quantile
-from ironm.engine.trend import fit_trend, weight_trend
+from ironm.engine.trend import ar1_factor, fit_trend, weight_trend
 from ironm.rules.loader import RULES_DIR, load_rules
 
 BOOK = load_rules(RULES_DIR)
@@ -68,12 +68,15 @@ def test_only_eligible_readings_used() -> None:
     d = _w(24, 81.0)
     old_scale_late = _w(23, 90.0, stream="scale:gym")  # 另一台秤，且不是最近一次读数的数据流
     events = [too_old, a, b, spike, wrong, fixed, c, d, old_scale_late]
-    fit = weight_trend(events, as_of=START + timedelta(days=24), window_days=14, rulebook=BOOK)
+    fit = weight_trend(
+        events, as_of=START + timedelta(days=24), tz=UTC, window_days=14, rulebook=BOOK
+    )
     expected = fit_trend(
         [(10, 82.4), (13, 82.1), (17, 81.6), (20, 81.7), (24, 81.0)],
         ci_level=0.95,
         min_readings=3,
-        min_span_days=3,
+        min_span_days=7,
+        ar1_rho=0.4,
     )
     # 天数起点不同只带来 1e-12 级的浮点差异
     assert fit.model_dump() == pytest.approx(expected.model_dump())
@@ -86,7 +89,9 @@ def test_latest_stream_wins() -> None:
         _w(8, 80.6, stream="scale:gym"),
         _w(11, 80.3, stream="scale:gym"),
     ]
-    fit = weight_trend(events, as_of=START + timedelta(days=12), window_days=14, rulebook=BOOK)
+    fit = weight_trend(
+        events, as_of=START + timedelta(days=12), tz=UTC, window_days=14, rulebook=BOOK
+    )
     assert fit.n == 2 and fit.status == "insufficient"  # 只用新秤的 2 次读数
 
 
@@ -98,8 +103,8 @@ def test_ci_level_from_rule_table(tmp_path: Path) -> None:
         (rules / f.name).write_text(text, encoding="utf-8")
     events = [_w(d, kg) for d, kg in ((0, 82.4), (3, 82.1), (7, 81.6), (10, 81.7), (14, 81.0))]
     as_of = START + timedelta(days=14)
-    wide = weight_trend(events, as_of=as_of, window_days=14, rulebook=BOOK)
-    narrow = weight_trend(events, as_of=as_of, window_days=14, rulebook=load_rules(rules))
+    wide = weight_trend(events, as_of=as_of, tz=UTC, window_days=14, rulebook=BOOK)
+    narrow = weight_trend(events, as_of=as_of, tz=UTC, window_days=14, rulebook=load_rules(rules))
     assert narrow.ci_level == 0.90
     assert isinstance(wide.ci_low, float) and isinstance(wide.ci_high, float)
     assert isinstance(narrow.ci_low, float) and isinstance(narrow.ci_high, float)
@@ -120,7 +125,47 @@ def test_min_span_days_must_be_positive(tmp_path: Path) -> None:
     rules = tmp_path / "rules"
     rules.mkdir()
     for f in RULES_DIR.glob("*.yaml"):
-        text = f.read_text(encoding="utf-8").replace("min_span_days: 3", "min_span_days: 0")
+        text = f.read_text(encoding="utf-8").replace("min_span_days: 7", "min_span_days: 0")
         (rules / f.name).write_text(text, encoding="utf-8")
     with pytest.raises(RuleParamError, match="R-MT-WEIGHT-TREND"):
         validate_rule_params(load_rules(rules))
+
+
+# ---- 审定后修订（spec §26） ----
+
+
+def test_ar1_factor() -> None:
+    assert ar1_factor(0.0, 1.0) == 1.0
+    assert ar1_factor(0.4, 1.0) == pytest.approx((1.4 / 0.6) ** 0.5)
+    assert ar1_factor(0.4, 7.0) == pytest.approx(1.0016, abs=1e-4)  # 每周称一次几乎不相关
+
+
+def test_autocorrelation_widens_ci() -> None:
+    points = [(d, 80 - 0.1 * d + (0.3 if d % 2 else -0.3)) for d in range(15)]
+    plain = fit_trend(points, ci_level=0.95, min_readings=3, min_span_days=7)
+    corr = fit_trend(points, ci_level=0.95, min_readings=3, min_span_days=7, ar1_rho=0.4)
+    assert corr.slope_kg_per_week == plain.slope_kg_per_week
+    assert isinstance(plain.se_kg_per_week, float)
+    assert corr.se_kg_per_week == pytest.approx(plain.se_kg_per_week * ar1_factor(0.4, 1.0))
+
+
+def test_same_day_readings_count_once() -> None:
+    """一天称 3 次只取当天第一次：读数条数不虚增。"""
+    once = [_w(d, 82 - 0.1 * d) for d in range(0, 15, 2)]
+    many = [*once, *(_w(d + 0.3, 82.6 - 0.1 * d) for d in range(0, 15, 2))]  # 同日晚些时候更重
+    as_of = START + timedelta(days=15)
+    a = weight_trend(once, as_of=as_of, tz=UTC, window_days=20, rulebook=BOOK)
+    b = weight_trend(many, as_of=as_of, tz=UTC, window_days=20, rulebook=BOOK)
+    assert a.n == b.n == 8
+    assert a.model_dump() == b.model_dump()
+
+
+def test_span_below_a_week_insufficient() -> None:
+    fit = weight_trend(
+        [_w(d, 80 - 0.1 * d) for d in range(0, 7)],
+        as_of=START + timedelta(days=7),
+        tz=UTC,
+        window_days=14,
+        rulebook=BOOK,
+    )
+    assert fit.status == "insufficient"  # 覆盖 6 天，不足 7 天
