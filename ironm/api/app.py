@@ -14,18 +14,21 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ironm import __version__
 from ironm.contracts.events import EVENT_ADAPTER, EnergyCheckEvent, Event, WeightEvent
+from ironm.contracts.screening import SafetyFlag
 from ironm.core.clock import Clock, SystemClock, local_day_bounds
 from ironm.core.config import Settings, load_settings
+from ironm.core.ids import IdGenerator, RandomIdGenerator
 from ironm.core.log import configure_logging, get_logger
 from ironm.engine.energy import EnergyAdjustment, energy_today
 from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.knowledge.baseline import BASELINE_PATH, load_baseline
 from ironm.knowledge.exercises import LIBRARY_PATH, load_library
+from ironm.orchestrator.chat import MAX_TEXT_CHARS, ChatDeps, respond
 from ironm.rules.loader import load_rules
 from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
@@ -35,6 +38,7 @@ from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
+from ironm.store.safety import SafetyFlagStore
 
 log = get_logger("ironm.api")
 
@@ -50,6 +54,16 @@ MAX_BATCH = 500
 _EARLIER_WEIGHTS = 10  # 回看范围之外再取几次称重：足以找到一次可信读数
 MAX_BODY_BYTES = 2 * 1024 * 1024
 _USER_RE = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
+
+
+class ChatRequest(BaseModel):
+    """对话请求：用户的一句话（去掉首尾空白后 1–2000 个字）。"""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", strict=True, str_strip_whitespace=True)
+
+    text: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
+
+
 _NOT_OWNER = {"loc": ["user_id"], "msg": "记录不属于当前用户", "type": "forbidden_user"}
 _STATUS_CODES = {"created": 201, "duplicate": 200, "conflict": 409}
 
@@ -143,6 +157,7 @@ def create_app(
     library_path: Path = LIBRARY_PATH,
     baseline_path: Path = BASELINE_PATH,
     skills_dir: Path = SKILLS_DIR,
+    ids: IdGenerator | None = None,
 ) -> FastAPI:
     """配置、规则表、安全文件、动作库或 Skill 有误时在这里直接失败。
 
@@ -152,7 +167,8 @@ def create_app(
     rulebook = load_rules(settings.rules_dir)
     validate_rule_params(rulebook)
     # 急症词表、拒答词表与回答模板：启动时校验并互相核对（spec §21–24）
-    load_kit(terms_path, refusals_path, replies_path)
+    kit = load_kit(terms_path, refusals_path, replies_path)
+    id_gen = ids or RandomIdGenerator()
     load_library(library_path)  # 动作库：启动时校验（spec §27）
     load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
     # Skill 头信息与它们用到的规则参数：启动时校验（spec §28、§30）
@@ -185,6 +201,27 @@ def create_app(
         if x_ironm_user is None or not _USER_RE.fullmatch(x_ironm_user):
             raise HTTPException(status_code=401, detail="缺少当前用户")
         return x_ironm_user
+
+    @app.post("/chat")
+    def chat(
+        body: Annotated[bytes, Depends(raw_body)],
+        user: Annotated[str, Depends(current_user)],
+    ) -> JSONResponse:
+        """对话（spec [2026-10-21] §3）：先过急症与拒答检查；本人的急症或红旗记安全标记。"""
+        try:
+            request = ChatRequest.model_validate_json(body)
+        except ValidationError as e:
+            log.info("chat.submitted", status="invalid")
+            return _invalid(_errors(e))
+        with closing(connect(settings.db_path)) as conn:
+            flags = SafetyFlagStore(conn, id_gen)
+
+            def record_flag(u: str, req: str, flag: SafetyFlag) -> None:
+                flags.add(u, req, flag)
+
+            deps = ChatDeps(kit=kit, clock=clock, ids=id_gen, record_flag=record_flag)
+            reply = respond(user, request.text, deps)
+        return JSONResponse(content=reply.model_dump(mode="json"))
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
