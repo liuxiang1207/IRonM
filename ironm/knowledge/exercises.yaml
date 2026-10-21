@@ -1,0 +1,905 @@
+# 动作库（spec §27）。首批 50 个动作，说明为原创中文，只能由人修改。
+# 2026-10-21 由 Claude 受项目负责人委托，对照 ACSM《运动测试与运动处方指南》与 NSCA《体能训练概论》的公开资料撰写与审定，
+# 未经认证教练复核；逐项记录见 spec/review_log.md。
+# 字段：pattern 动作模式；equipment 需要的器材（徒手为空）；difficulty 1–3；
+#       avoid_if 有这些身体限制时排除；caution_if 仍可选，但附上下面 restrictions 中的提示；
+#       easier / harder 降阶与进阶（同一模式）；default 该模式的默认安全动作（出错或没有其他候选时使用）。
+version: "1.0"
+review: approved
+
+restrictions:
+  knee_pain:
+    name: 膝盖疼
+    caution: 膝盖疼：只在不痛的幅度内做，下蹲浅一些；疼痛超过轻微（10 分里超过 3 分）或做完更疼时停止。
+  low_back_pain:
+    name: 腰疼
+    caution: 腰疼：保持腰背中立、不憋气，先减轻重量；出现放射到腿的疼痛或麻木时停止。
+  shoulder_pain:
+    name: 肩膀疼
+    caution: 肩膀疼：只在不痛的角度内做，手臂不要高过不舒服的位置；疼痛加重时停止。
+  wrist_pain:
+    name: 手腕疼
+    caution: 手腕疼：可以握拳、握哑铃或用前臂支撑来减少手腕弯折；疼痛加重时停止。
+  ankle_pain:
+    name: 脚踝疼
+    caution: 脚踝疼：避免跳跃和快速变向，动作放慢；走路都疼时先停止这个动作。
+
+environments:
+  hotel: [chair]
+  home: [chair, step, dumbbell, band]
+  gym: [chair, step, dumbbell, kettlebell, barbell, rack, bench, band, cable, machine, pull_up_bar, cardio_machine, jump_rope]
+
+exercises:
+  # ---------------- 下蹲 ----------------
+  - id: sq_sit_to_stand
+    name: 椅子坐站
+    pattern: squat
+    equipment: [chair]
+    difficulty: 1
+    default: true
+    caution_if: [knee_pain]
+    key_points:
+      - 坐在椅子前半部分，双脚与肩同宽、平踩地面
+      - 上身稍前倾，用脚跟和整个脚掌发力站起
+      - 站直后慢慢坐回，臀部轻触椅面再站起
+    common_errors:
+      - 用手撑大腿或扶手借力
+      - 膝盖向内扣
+    self_check:
+      - 站起时膝盖是否一直朝向脚尖方向？
+    harder: sq_box
+
+  - id: sq_box
+    name: 箱式深蹲
+    pattern: squat
+    equipment: [bench]
+    difficulty: 1
+    caution_if: [knee_pain]
+    key_points:
+      - 背对箱子或训练凳站立，双脚略宽于肩
+      - 臀部向后下方坐，轻触箱面后立即站起
+      - 箱子高度以不痛、能控制为准，逐步降低
+    common_errors:
+      - 重重坐到箱子上再起身
+      - 脚跟离地
+    self_check:
+      - 每次触箱是否轻而可控？
+    easier: sq_sit_to_stand
+    harder: sq_bodyweight
+
+  - id: sq_bodyweight
+    name: 徒手深蹲
+    pattern: squat
+    difficulty: 1
+    caution_if: [knee_pain]
+    key_points:
+      - 双脚略宽于肩，脚尖稍向外
+      - 臀部向后下方坐，胸口朝前，膝盖与脚尖同向
+      - 下到能保持背部中立的深度，用全脚掌站起
+    common_errors:
+      - 膝盖向内扣
+      - 弯腰低头
+      - 重心落在脚尖
+    self_check:
+      - 最低点时背部是否仍然挺直？
+    easier: sq_box
+    harder: sq_goblet
+
+  - id: sq_wall_sit
+    name: 靠墙静蹲
+    pattern: squat
+    difficulty: 1
+    caution_if: [knee_pain]
+    key_points:
+      - 背贴墙，双脚离墙一步，与肩同宽
+      - 沿墙下滑到膝盖不痛的角度，保持正常呼吸
+      - 膝盖在脚踝正上方或稍后
+    common_errors:
+      - 憋气
+      - 膝盖超过脚尖太多
+    self_check:
+      - 保持期间能否正常说话？
+    easier: sq_sit_to_stand
+
+  - id: sq_goblet
+    name: 高脚杯深蹲
+    pattern: squat
+    equipment: [dumbbell]
+    difficulty: 2
+    caution_if: [knee_pain, low_back_pain]
+    key_points:
+      - 双手竖握一只哑铃贴在胸前
+      - 下蹲时肘部在两膝之间，胸口朝前
+      - 用全脚掌发力站起，站直时收紧臀部
+    common_errors:
+      - 哑铃离开胸口、身体前倾
+      - 膝盖向内扣
+    self_check:
+      - 最后两次是否还能保持同样的动作？
+    easier: sq_bodyweight
+    harder: sq_back_barbell
+
+  - id: sq_leg_press
+    name: 腿举
+    pattern: squat
+    equipment: [machine]
+    difficulty: 2
+    caution_if: [knee_pain, low_back_pain]
+    key_points:
+      - 背和臀部全程贴紧靠垫，双脚与肩同宽踩在踏板中部
+      - 下放到臀部不离开靠垫的深度
+      - 推起时膝盖不要完全锁死
+    common_errors:
+      - 下放过深导致臀部翘起、腰离开靠垫
+      - 推起时猛地锁死膝盖
+    self_check:
+      - 最低点时腰是否仍贴着靠垫？
+    easier: sq_box
+    harder: sq_back_barbell
+
+  - id: sq_back_barbell
+    name: 杠铃后蹲
+    pattern: squat
+    equipment: [barbell, rack]
+    difficulty: 3
+    avoid_if: [low_back_pain]
+    caution_if: [knee_pain, shoulder_pain]
+    key_points:
+      - 杠铃放在上背部肌肉上，双手握紧、肘部向下
+      - 下蹲前吸气收紧躯干，膝盖与脚尖同向
+      - 在深蹲架内练习，安全杠调到最低点稍下方
+    common_errors:
+      - 起身时臀部先抬、变成弯腰
+      - 不设安全杠
+    self_check:
+      - 安全杠是否已调到合适高度？
+    easier: sq_goblet
+
+  # ---------------- 髋铰链 ----------------
+  - id: hg_glute_bridge
+    name: 臀桥
+    pattern: hinge
+    difficulty: 1
+    default: true
+    caution_if: [low_back_pain]
+    key_points:
+      - 仰卧屈膝，双脚平踩地面、与髋同宽
+      - 用脚跟发力抬起臀部，到肩、髋、膝一条线
+      - 顶端收紧臀部停一秒，再慢慢放下
+    common_errors:
+      - 抬得过高、腰部过度后弯
+      - 用脚尖发力
+    self_check:
+      - 发力的是臀部而不是腰吗？
+    harder: hg_single_leg_bridge
+
+  - id: hg_hip_hinge
+    name: 徒手髋铰链
+    pattern: hinge
+    difficulty: 1
+    caution_if: [low_back_pain]
+    key_points:
+      - 双脚与髋同宽，膝盖微屈
+      - 臀部向后推，上身前倾，背部保持中立
+      - 感到大腿后侧拉伸时停住，夹紧臀部站直
+    common_errors:
+      - 弯腰代替向后推臀
+      - 膝盖弯得太多变成下蹲
+    self_check:
+      - 前倾时背部是否一直平直？
+    easier: hg_glute_bridge
+    harder: hg_db_rdl
+
+  - id: hg_single_leg_bridge
+    name: 单腿臀桥
+    pattern: hinge
+    difficulty: 2
+    unilateral: true
+    caution_if: [low_back_pain]
+    key_points:
+      - 仰卧屈膝，一条腿伸直或抱膝
+      - 支撑腿脚跟发力抬起臀部，骨盆保持水平
+      - 两侧次数相同
+    common_errors:
+      - 骨盆向一侧倾斜
+    self_check:
+      - 抬起时两侧髋部是否一样高？
+    easier: hg_glute_bridge
+
+  - id: hg_db_rdl
+    name: 哑铃罗马尼亚硬拉
+    pattern: hinge
+    equipment: [dumbbell]
+    difficulty: 2
+    caution_if: [low_back_pain]
+    key_points:
+      - 双手持哑铃于大腿前，膝盖微屈
+      - 臀部向后推，哑铃贴着腿下滑
+      - 背部中立，下到大腿后侧明显拉伸即可，夹紧臀部站起
+    common_errors:
+      - 弯腰去够地面
+      - 哑铃离腿太远
+    self_check:
+      - 下放时哑铃是否一直贴近腿？
+    easier: hg_hip_hinge
+    harder: hg_bb_deadlift
+
+  - id: hg_hip_thrust
+    name: 哑铃臀推
+    pattern: hinge
+    equipment: [bench, dumbbell]
+    difficulty: 2
+    caution_if: [low_back_pain]
+    key_points:
+      - 上背靠在训练凳边缘，哑铃放在髋部并用手扶稳
+      - 脚跟发力抬髋，到肩、髋、膝一条线
+      - 顶端收紧臀部，下巴微收
+    common_errors:
+      - 顶端腰部过度后弯
+      - 双脚离身体太远或太近
+    self_check:
+      - 顶端时小腿是否大致垂直地面？
+    easier: hg_glute_bridge
+
+  - id: hg_back_extension
+    name: 罗马椅背伸
+    pattern: hinge
+    equipment: [machine]
+    difficulty: 2
+    caution_if: [low_back_pain]
+    key_points:
+      - 垫子放在髋骨下方，双脚固定
+      - 以髋为轴前屈，再用臀部和大腿后侧发力抬起
+      - 抬到身体成一条直线即可
+    common_errors:
+      - 抬起时过度后仰
+      - 甩动借力
+    self_check:
+      - 顶端身体是否成一条直线、没有后仰？
+    easier: hg_hip_hinge
+
+  - id: hg_kb_swing
+    name: 壶铃摆荡
+    pattern: hinge
+    equipment: [kettlebell]
+    difficulty: 3
+    avoid_if: [low_back_pain]
+    caution_if: [shoulder_pain]
+    key_points:
+      - 臀部向后推把壶铃引到两腿之间，背部中立
+      - 用髋部快速前送把壶铃推出去，手臂只负责引导
+      - 壶铃摆到胸口高度即可，下落时顺势后推臀部
+    common_errors:
+      - 用手臂把壶铃举起来
+      - 变成下蹲动作
+    self_check:
+      - 发力是否来自髋部的快速前送？
+    easier: hg_db_rdl
+
+  - id: hg_bb_deadlift
+    name: 杠铃硬拉
+    pattern: hinge
+    equipment: [barbell]
+    difficulty: 3
+    avoid_if: [low_back_pain]
+    key_points:
+      - 杠铃在脚掌中部上方，小腿靠近杠铃
+      - 起拉前吸气收紧躯干，背部中立
+      - 杠铃贴腿上行，站直时不要后仰
+    common_errors:
+      - 起拉时弯腰
+      - 杠铃离身体太远
+    self_check:
+      - 起拉瞬间背部是否保持中立？
+    easier: hg_db_rdl
+
+  # ---------------- 单腿 ----------------
+  - id: lg_supported_split_squat
+    name: 扶椅分腿蹲
+    pattern: lunge
+    equipment: [chair]
+    difficulty: 1
+    default: true
+    unilateral: true
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 一手扶椅背，两脚前后分开站稳
+      - 身体垂直下降，前脚全脚掌着地
+      - 下到不痛的深度，用前腿发力站起，两侧次数相同
+    common_errors:
+      - 身体前冲、重心落在前脚尖
+      - 前膝向内扣
+    self_check:
+      - 下降时身体是否垂直向下？
+    harder: lg_reverse_lunge
+
+  - id: lg_step_up
+    name: 台阶上步
+    pattern: lunge
+    equipment: [step]
+    difficulty: 1
+    unilateral: true
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 选择不高于膝盖、稳固的台阶
+      - 整只脚踩上台阶，用上面那条腿发力站起
+      - 慢慢下来，两侧交替或分组完成
+    common_errors:
+      - 用下面那条腿蹬地借力
+      - 台阶过高
+    self_check:
+      - 站上去时主要是上面那条腿在用力吗？
+    easier: lg_supported_split_squat
+
+  - id: lg_reverse_lunge
+    name: 后撤步
+    pattern: lunge
+    difficulty: 2
+    unilateral: true
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 站直后一条腿向后撤一大步
+      - 身体垂直下降到后膝接近地面
+      - 前脚发力回到站立，两侧交替
+    common_errors:
+      - 步子太小、前膝前冲
+      - 上身前倾过多
+    self_check:
+      - 回到站立时是否稳定、不晃？
+    easier: lg_supported_split_squat
+    harder: lg_bulgarian
+
+  - id: lg_lateral_lunge
+    name: 侧弓步
+    pattern: lunge
+    difficulty: 2
+    unilateral: true
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 双脚并拢，一侧向外跨一大步
+      - 臀部向后坐到跨出的腿上，另一条腿伸直
+      - 两脚脚尖朝前，推地回到起始位置
+    common_errors:
+      - 膝盖向内扣
+      - 脚跟离地
+    self_check:
+      - 弯曲的那侧膝盖是否与脚尖同向？
+    easier: lg_supported_split_squat
+
+  - id: lg_db_lunge
+    name: 哑铃箭步蹲
+    pattern: lunge
+    equipment: [dumbbell]
+    difficulty: 2
+    unilateral: true
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 双手持哑铃垂于体侧
+      - 向前迈一步，身体垂直下降
+      - 前脚发力回到起始位置，两侧交替
+    common_errors:
+      - 迈步太小导致前膝过度前冲
+      - 落地不稳、左右晃
+    self_check:
+      - 每一步落地是否稳定？
+    easier: lg_reverse_lunge
+    harder: lg_bulgarian
+
+  - id: lg_bulgarian
+    name: 保加利亚分腿蹲
+    pattern: lunge
+    equipment: [bench]
+    difficulty: 3
+    unilateral: true
+    avoid_if: [knee_pain]
+    caution_if: [ankle_pain]
+    key_points:
+      - 后脚脚背放在训练凳上，前脚离凳一大步
+      - 身体垂直下降到前大腿接近水平
+      - 前脚全脚掌发力站起
+    common_errors:
+      - 前脚离凳太近，膝盖前冲
+      - 后腿发力过多
+    self_check:
+      - 主要感到前腿在用力吗？
+    easier: lg_reverse_lunge
+
+  # ---------------- 推 ----------------
+  - id: ps_wall_push
+    name: 推墙俯卧撑
+    pattern: push
+    difficulty: 1
+    default: true
+    caution_if: [wrist_pain, shoulder_pain]
+    key_points:
+      - 面对墙站立，双手与肩同高、略宽于肩撑墙
+      - 身体成一条直线，屈肘让胸口靠近墙
+      - 推墙回到起始位置
+    common_errors:
+      - 塌腰或撅臀
+      - 肘部向两侧张得太开
+    self_check:
+      - 身体是否从头到脚成一条直线？
+    harder: ps_incline_push
+
+  - id: ps_incline_push
+    name: 上斜俯卧撑
+    pattern: push
+    equipment: [chair]
+    difficulty: 1
+    caution_if: [wrist_pain, shoulder_pain]
+    key_points:
+      - 双手撑在稳固的桌面、床沿或靠墙的椅面上
+      - 身体成一条直线，胸口下降到接近支撑面
+      - 推起时收紧腹部和臀部
+    common_errors:
+      - 支撑物不稳
+      - 塌腰
+    self_check:
+      - 支撑物是否稳固、不会滑动？
+    easier: ps_wall_push
+    harder: ps_knee_push
+
+  - id: ps_knee_push
+    name: 跪姿俯卧撑
+    pattern: push
+    difficulty: 1
+    caution_if: [wrist_pain, shoulder_pain]
+    key_points:
+      - 双膝着地，双手略宽于肩
+      - 从头到膝成一条直线，胸口下降到接近地面
+      - 推起时不要塌腰
+    common_errors:
+      - 撅臀
+      - 只做一半幅度
+    self_check:
+      - 每次胸口是否都接近地面？
+    easier: ps_incline_push
+    harder: ps_push_up
+
+  - id: ps_push_up
+    name: 俯卧撑
+    pattern: push
+    difficulty: 2
+    caution_if: [wrist_pain, shoulder_pain]
+    key_points:
+      - 双手略宽于肩，身体从头到脚成一条直线
+      - 肘部与身体约成 45 度角下降
+      - 胸口接近地面后推起
+    common_errors:
+      - 塌腰
+      - 肘部完全张开
+    self_check:
+      - 最后几次是否仍保持身体平直？
+    easier: ps_knee_push
+
+  - id: ps_machine_chest
+    name: 坐姿推胸器
+    pattern: push
+    equipment: [machine]
+    difficulty: 1
+    caution_if: [shoulder_pain]
+    key_points:
+      - 调整座椅让把手与胸部中段同高
+      - 背贴靠背，推出时不要完全锁死肘部
+      - 慢慢收回到胸前有轻微拉伸即可
+    common_errors:
+      - 座椅过低导致肩膀前顶
+      - 收回过深
+    self_check:
+      - 推的过程中肩膀是否保持下沉？
+    easier: ps_wall_push
+    harder: ps_db_bench
+
+  - id: ps_db_bench
+    name: 哑铃卧推
+    pattern: push
+    equipment: [dumbbell, bench]
+    difficulty: 2
+    caution_if: [shoulder_pain, wrist_pain]
+    key_points:
+      - 仰卧在凳上，双脚踩地，肩胛骨收紧下沉
+      - 哑铃下放到胸部两侧，肘部略低于肩
+      - 推起时手腕保持中立
+    common_errors:
+      - 下放过深、肩膀前顶
+      - 手腕向后折
+    self_check:
+      - 下放到底时肩膀前面是否有不适？
+    easier: ps_machine_chest
+    harder: ps_bb_bench
+
+  - id: ps_db_shoulder_press
+    name: 坐姿哑铃推举
+    pattern: push
+    equipment: [dumbbell]
+    difficulty: 2
+    avoid_if: [shoulder_pain]
+    caution_if: [low_back_pain]
+    key_points:
+      - 坐直，哑铃举到肩膀两侧，掌心朝前
+      - 收紧腹部，把哑铃向上推到手臂接近伸直
+      - 慢慢下放到耳朵高度附近
+    common_errors:
+      - 推起时腰部后仰
+      - 耸肩
+    self_check:
+      - 推起时腰部是否保持中立、没有后仰？
+    easier: ps_wall_push
+
+  - id: ps_bb_bench
+    name: 杠铃卧推
+    pattern: push
+    equipment: [barbell, bench, rack]
+    difficulty: 3
+    avoid_if: [shoulder_pain]
+    caution_if: [wrist_pain]
+    key_points:
+      - 在有保护的卧推架上练习，或请人保护
+      - 肩胛骨收紧下沉，杠铃下放到胸骨下半部
+      - 前臂垂直地面，推起时双脚稳定踩地
+    common_errors:
+      - 杠铃在胸口弹起
+      - 臀部离开凳面
+    self_check:
+      - 是否有保护或安全杠？
+    easier: ps_db_bench
+
+  # ---------------- 拉 ----------------
+  - id: pl_prone_yt
+    name: 俯卧肩胛后收
+    pattern: pull
+    difficulty: 1
+    default: true
+    caution_if: [shoulder_pain]
+    key_points:
+      - 俯卧，额头垫毛巾，双臂向前斜上方或向两侧伸开
+      - 先把肩胛骨向后下方收紧，再把手臂抬离地面
+      - 停两秒后慢慢放下
+    common_errors:
+      - 耸肩
+      - 用腰后仰代替肩胛发力
+    self_check:
+      - 抬手时是否感到两侧肩胛骨在向中间靠拢？
+    harder: pl_doorframe_row
+
+  - id: pl_doorframe_row
+    name: 门框划船
+    pattern: pull
+    difficulty: 1
+    unilateral: true
+    caution_if: [shoulder_pain]
+    key_points:
+      - 面对坚固的门框站立，一手抓住门框边缘
+      - 双脚靠近门框，身体后倾，手臂伸直
+      - 收紧肩胛把身体拉回，后倾越多越难
+    common_errors:
+      - 抓的是门板而不是门框
+      - 只用手臂拉、耸肩
+    self_check:
+      - 门框是否牢固、手是否抓稳？
+    easier: pl_prone_yt
+    harder: pl_inverted_row
+
+  - id: pl_band_row
+    name: 弹力带划船
+    pattern: pull
+    equipment: [band]
+    difficulty: 1
+    caution_if: [shoulder_pain]
+    key_points:
+      - 弹力带固定在胸口高度的稳固物体上
+      - 坐直或站直，肘部贴近身体向后拉
+      - 拉到底时肩胛骨向中间收紧
+    common_errors:
+      - 耸肩
+      - 身体后仰借力
+    self_check:
+      - 拉到底时肩胛骨是否收紧？
+    easier: pl_prone_yt
+    harder: pl_db_row
+
+  - id: pl_band_pull_apart
+    name: 弹力带拉开
+    pattern: pull
+    equipment: [band]
+    difficulty: 1
+    caution_if: [shoulder_pain]
+    key_points:
+      - 双手与肩同宽握住弹力带，手臂向前平举
+      - 向两侧拉开到弹力带接近胸口
+      - 慢慢回到起始位置
+    common_errors:
+      - 耸肩
+      - 手臂弯曲过多
+    self_check:
+      - 拉开时肩膀是否保持下沉？
+    easier: pl_prone_yt
+
+  - id: pl_db_row
+    name: 单臂哑铃划船
+    pattern: pull
+    equipment: [dumbbell, chair]
+    difficulty: 2
+    unilateral: true
+    caution_if: [low_back_pain, shoulder_pain]
+    key_points:
+      - 一手一膝撑在稳固的椅子或训练凳上，背部平直
+      - 另一手持哑铃，肘部贴身向髋部方向拉
+      - 拉到顶端停一秒，慢慢放下，两侧次数相同
+    common_errors:
+      - 转动身体借力
+      - 拉向肩膀而不是髋部
+    self_check:
+      - 拉的过程中躯干是否保持不转？
+    easier: pl_band_row
+
+  - id: pl_lat_pulldown
+    name: 高位下拉
+    pattern: pull
+    equipment: [machine]
+    difficulty: 1
+    caution_if: [shoulder_pain]
+    key_points:
+      - 坐稳后大腿压在护垫下，双手略宽于肩握杆
+      - 先下沉肩胛，再把杠拉到锁骨附近
+      - 慢慢放回到手臂接近伸直
+    common_errors:
+      - 拉到颈后
+      - 身体大幅后仰借力
+    self_check:
+      - 拉杠时是否先下沉肩膀？
+    easier: pl_band_row
+    harder: pl_pull_up
+
+  - id: pl_seated_cable_row
+    name: 坐姿绳索划船
+    pattern: pull
+    equipment: [cable]
+    difficulty: 1
+    caution_if: [low_back_pain]
+    key_points:
+      - 坐直，双脚踩稳，膝盖微屈
+      - 肘部贴身向后拉到腹部
+      - 回放时身体保持直立，不要前后摆动
+    common_errors:
+      - 身体前后摇摆借力
+      - 耸肩
+    self_check:
+      - 拉的时候上身是否基本不动？
+    easier: pl_band_row
+
+  - id: pl_inverted_row
+    name: 反向划船
+    pattern: pull
+    equipment: [rack]
+    difficulty: 2
+    caution_if: [shoulder_pain]
+    key_points:
+      - 杠铃固定在深蹲架或史密斯架的腰部高度
+      - 仰躺在杠下双手握杠，身体成一条直线
+      - 把胸口拉向杠，停一秒后慢慢放下；双脚越靠前越难
+    common_errors:
+      - 塌腰
+      - 只拉到一半
+    self_check:
+      - 身体是否从头到脚成一条直线？
+    easier: pl_doorframe_row
+    harder: pl_pull_up
+
+  - id: pl_pull_up
+    name: 引体向上
+    pattern: pull
+    equipment: [pull_up_bar]
+    difficulty: 3
+    avoid_if: [shoulder_pain]
+    key_points:
+      - 双手略宽于肩握杠，身体自然悬垂
+      - 先下沉肩胛，再把下巴拉过横杠
+      - 慢慢放下到手臂接近伸直
+    common_errors:
+      - 摆动身体借力
+      - 只做半程
+    self_check:
+      - 每次是否从接近伸直的位置开始？
+    easier: pl_inverted_row
+
+  # ---------------- 核心 ----------------
+  - id: co_dead_bug
+    name: 死虫
+    pattern: core
+    difficulty: 1
+    default: true
+    caution_if: [low_back_pain]
+    key_points:
+      - 仰卧，双臂朝天花板，髋和膝都屈成直角
+      - 腰部轻贴地面，慢慢伸出对侧的手和腿
+      - 收回后换另一侧，全程正常呼吸
+    common_errors:
+      - 腰部离开地面
+      - 动作太快
+    self_check:
+      - 伸腿时腰部是否一直贴地？
+    harder: co_bird_dog
+
+  - id: co_bird_dog
+    name: 鸟狗式
+    pattern: core
+    difficulty: 1
+    caution_if: [wrist_pain, low_back_pain]
+    key_points:
+      - 四点跪姿，手在肩下、膝在髋下
+      - 慢慢伸出对侧的手和腿到与身体成一条线
+      - 骨盆保持水平，停两秒后收回换边
+    common_errors:
+      - 骨盆转向一侧
+      - 抬腿过高导致腰部后弯
+    self_check:
+      - 伸腿时背上像放了一杯水不会洒吗？
+    easier: co_dead_bug
+    harder: co_front_plank
+
+  - id: co_front_plank
+    name: 平板支撑
+    pattern: core
+    difficulty: 2
+    caution_if: [low_back_pain, shoulder_pain]
+    key_points:
+      - 前臂撑地，肘在肩正下方
+      - 收紧腹部和臀部，身体从头到脚成一条直线
+      - 保持正常呼吸，动作变形就停
+    common_errors:
+      - 塌腰
+      - 憋气
+    self_check:
+      - 能否在保持期间正常说话？
+    easier: co_bird_dog
+
+  - id: co_side_plank
+    name: 侧桥
+    pattern: core
+    difficulty: 2
+    caution_if: [shoulder_pain]
+    key_points:
+      - 侧卧，前臂撑地，肘在肩正下方
+      - 抬起髋部，身体成一条直线；难度太大可屈膝
+      - 两侧时间相同
+    common_errors:
+      - 髋部下塌
+      - 身体前后倾斜
+    self_check:
+      - 从头到脚是否在一条直线上？
+    easier: co_bird_dog
+
+  - id: co_pallof
+    name: 弹力带抗旋转推
+    pattern: core
+    equipment: [band]
+    difficulty: 2
+    caution_if: [low_back_pain]
+    key_points:
+      - 弹力带固定在胸口高度，侧对固定点站立
+      - 双手握带放在胸前，向前推直手臂
+      - 抵抗弹力带的拉力，身体不转动，停两秒后收回
+    common_errors:
+      - 身体被拉得转向固定点
+      - 耸肩
+    self_check:
+      - 推出时身体是否保持正对前方？
+    easier: co_dead_bug
+
+  - id: co_farmer_carry
+    name: 农夫行走
+    pattern: core
+    equipment: [dumbbell]
+    difficulty: 2
+    caution_if: [low_back_pain, wrist_pain]
+    key_points:
+      - 双手各提一只哑铃，站直、肩膀下沉
+      - 小步匀速向前走，身体不左右晃
+      - 走完规定距离或时间后放下
+    common_errors:
+      - 身体向一侧歪
+      - 耸肩
+    self_check:
+      - 走路时身体是否保持直立不晃？
+    easier: co_dead_bug
+
+  # ---------------- 有氧 ----------------
+  - id: cd_brisk_walk
+    name: 快走
+    pattern: cardio
+    difficulty: 1
+    default: true
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 步速以能说话但不能唱歌为准
+      - 手臂自然摆动，步幅不要过大
+      - 先慢走 3 到 5 分钟热身
+    common_errors:
+      - 一开始就走得太快
+    self_check:
+      - 走的时候能完整说一句话吗？
+    harder: cd_jog
+
+  - id: cd_march
+    name: 原地踏步
+    pattern: cardio
+    difficulty: 1
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 原地抬膝踏步，手臂配合摆动
+      - 节奏以微微出汗、能说话为准
+      - 可以分成几段，每段不少于 10 分钟
+    common_errors:
+      - 落地太重
+    self_check:
+      - 落地是否轻而稳？
+    harder: cd_brisk_walk
+
+  - id: cd_bike
+    name: 固定单车
+    pattern: cardio
+    equipment: [cardio_machine]
+    difficulty: 1
+    caution_if: [knee_pain]
+    key_points:
+      - 调整座椅高度，踩到最低点时膝盖微屈
+      - 阻力以能说话但不能唱歌为准
+      - 前 5 分钟低阻力热身
+    common_errors:
+      - 座椅过低导致膝盖弯曲过多
+    self_check:
+      - 踩到最低点时膝盖是否仍微屈？
+    easier: cd_march
+
+  - id: cd_elliptical
+    name: 椭圆机
+    pattern: cardio
+    equipment: [cardio_machine]
+    difficulty: 1
+    caution_if: [knee_pain, ankle_pain]
+    key_points:
+      - 双脚全程踩在踏板上，身体直立
+      - 手推拉把手配合腿部
+      - 强度以能说话但不能唱歌为准
+    common_errors:
+      - 身体趴在把手上
+    self_check:
+      - 是否主要靠腿在发力？
+    easier: cd_march
+
+  - id: cd_jog
+    name: 慢跑
+    pattern: cardio
+    difficulty: 2
+    avoid_if: [ankle_pain]
+    caution_if: [knee_pain]
+    key_points:
+      - 步频稍快、步幅较小，落地在身体正下方
+      - 速度以能说短句为准
+      - 新手可以跑走交替，逐步增加跑的时间
+    common_errors:
+      - 步幅过大、脚跟重重落地
+      - 一开始就跑太快
+    self_check:
+      - 跑的时候能说出短句吗？
+    easier: cd_brisk_walk
+    harder: cd_jump_rope
+
+  - id: cd_jump_rope
+    name: 跳绳
+    pattern: cardio
+    equipment: [jump_rope]
+    difficulty: 3
+    avoid_if: [knee_pain, ankle_pain]
+    key_points:
+      - 用前脚掌轻跳，膝盖微屈缓冲
+      - 手腕转绳，肘部贴近身体
+      - 分组进行，每组之间休息
+    common_errors:
+      - 跳得过高、落地过重
+      - 用整个手臂甩绳
+    self_check:
+      - 落地是否轻而有弹性？
+    easier: cd_jog

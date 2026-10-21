@@ -24,6 +24,7 @@ from ironm.core.log import configure_logging, get_logger
 from ironm.engine.energy import EnergyAdjustment, energy_today
 from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
+from ironm.knowledge.exercises import LIBRARY_PATH, load_library
 from ironm.rules.loader import load_rules
 from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
@@ -137,13 +138,15 @@ def create_app(
     terms_path: Path = TERMS_PATH,
     refusals_path: Path = REFUSALS_PATH,
     replies_path: Path = REPLIES_PATH,
+    library_path: Path = LIBRARY_PATH,
 ) -> FastAPI:
-    """配置、规则表或安全文件有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
+    """配置、规则表、安全文件或动作库有误时在这里直接失败；迁移在服务启动时执行，失败则启动失败。"""
     configure_logging(settings, clock, log_stream)
     rulebook = load_rules(settings.rules_dir)
     validate_rule_params(rulebook)
     # 急症词表、拒答词表与回答模板：启动时校验并互相核对（spec §21–24）
     load_kit(terms_path, refusals_path, replies_path)
+    load_library(library_path)  # 动作库：启动时校验（spec §27）
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
