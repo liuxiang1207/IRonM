@@ -139,6 +139,8 @@ _DEFAULT_TZ = ZoneInfo("Asia/Shanghai")
 
 
 _GENERAL = (Intent.CHITCHAT, Intent.APP_HELP)
+# 不走专业流程的意图；带关注点或命中安全类卡时要改走专业流程（超范围也一样，独立审查）
+_NOT_PROFESSIONAL = (*_GENERAL, Intent.OUT_OF_SCOPE)
 # 关注点对应的提醒（answer_texts 里的 caution_<名称>）
 _CONCERN_CAUTION = {"discomfort": "discomfort", "special_population": "special"}
 # 带关注点的闲聊按关注点归到专业领域：身体不适 → 动作（含疼痛时的调整），特殊人群 → 训练知识
@@ -274,12 +276,12 @@ def respond(
         safety_hit = next(
             (c for c, _ in deps.cards.matches(text) if c.agent == AgentId.SAFETY_OFFICER), None
         )
-        if result.intent in _GENERAL and safety_hit is not None and not result.concerns:
-            # 命中安全类问答卡的话（“两周后婚礼一天只吃一顿”）不当闲聊：按卡的意图走专业流程
+        if result.intent in _NOT_PROFESSIONAL and safety_hit is not None and not result.concerns:
+            # 命中安全类问答卡的话（“两周后婚礼一天只吃一顿”）不当闲聊或超范围：按卡的意图走专业流程
             result = result.model_copy(
                 update={"intent": Intent(safety_hit.intents[0]), "clarify": False}
             )
-        if result.intent in _GENERAL and result.concerns:
+        if result.intent in _NOT_PROFESSIONAL and result.concerns:
             # 这句话里提到身体不适或特殊人群（“你好，我怀孕了还能练吗”）：走专业流程，
             # 不由通用 Agent 回答（spec [2026-10-21] §12）。只看这句话本身，画像带来的关注点
             # 不改变闲聊的走向，否则有健康状况的用户说“你好”也会进专业流程

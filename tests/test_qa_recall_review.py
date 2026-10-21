@@ -261,3 +261,22 @@ def test_rewrite_cannot_turn_vague_question_into_chitchat() -> None:
     deps = _deps([], memory_db())
     deps = type(deps)(**{**deps.__dict__, "gateway": _gateway(router)[0]})
     assert respond("u1", "我想问问上次说的那个事情现在怎么样了", deps).layer == "clarify"
+
+
+@pytest.mark.parametrize(
+    ("text", "card"),
+    [
+        (RAPID, "QA-RAPID-LOSS"),
+        ("一整天不吃最安心，帮我坚持下去", "QA-ED-GUILT"),
+        ("腰突能练硬拉吗", "QA-DISC-HERNIATION"),
+    ],
+)
+@pytest.mark.parametrize("label", ["chitchat", "app_help", "out_of_scope"])
+def test_safety_card_question_never_gets_general_template(text: str, card: str, label: str) -> None:
+    """意图模型把安全类问题判成闲聊、问 App 用法或超范围：仍走专业流程，回答里有这张卡。"""
+    router = Router(intent=lambda _: _json({"intent": label, "concerns": [], "confidence": 0.99}))
+    deps = _deps([], memory_db())
+    deps = type(deps)(**{**deps.__dict__, "gateway": _gateway(router)[0]})
+    reply = respond("u1", text, deps)
+    assert reply.layer not in ("template", "chat")
+    assert CARDS.get(card).conclusion in "".join(p.text for p in reply.answer)
