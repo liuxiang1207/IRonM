@@ -101,19 +101,40 @@ class Negation(ContractModel):
     # 说法后紧跟这个字：以前发生过（拒答词表等不需要时不写）
     past_after: Term | None = None
     past_not_followed_by: tuple[Term, ...] = ()  # 再接这些字时不是“以前发生过”（“晕倒过去”）
-    recurrence: tuple[Term, ...] = ()  # 句中有这些复发说法：以前发生过的也照常算（“又疼”）
-    # 句中有这些近期字样：以前发生过的也照常算（“今天跑步时，晕倒过一次”）……
+    # 同一分句或后面的分句有复发说法：以前发生过的也照常算（“以前胸口疼过，今天又疼了”）……
+    recurrence: tuple[Term, ...] = ()
+    # ……但后面那个分句说的是别的部位时不算（“以前晕倒过，最近腿也疼”）
+    body_parts: tuple[Term, ...] = ()
+    # 同一分句或前一个分句有近期字样：以前发生过的也照常算（“今天跑步的时候，晕倒过一次”）……
     recent: tuple[Term, ...] = ()
-    # ……但所在分句里有这些久远的时间时不算（“去年晕倒过一次，最近想开始减肥”）
+    # ……但所在分句有久远的时间、又没有近期字样时不算（“去年晕倒过一次，最近想开始减肥”）
     remote: tuple[Term, ...] = ()
 
     @model_validator(mode="after")
     def _check(self) -> Self:
         past = [] if self.past_after is None else [self.past_after]
         words = [*self.before, *self.exceptions, *past, *self.past_not_followed_by]
-        for word in [*words, *self.recurrence, *self.recent, *self.remote]:
+        words += [*self.recurrence, *self.body_parts, *self.recent, *self.remote]
+        for word in words:
             check_term(word)
         return self
+
+    def past_counts(self, parts: list[str]) -> list[bool]:
+        """每个分句里“以前发生过”的说法是否照常算。"""
+
+        def has(clause: str, words: tuple[str, ...]) -> bool:
+            return any(w in clause for w in words)
+
+        marks: list[bool] = []
+        for i, clause in enumerate(parts):
+            later = parts[i + 1 :]
+            again = has(clause, self.recurrence) or any(
+                has(c, self.recurrence) and not has(c, self.body_parts) for c in later
+            )
+            here = has(clause, self.recent)
+            near = here or (i > 0 and has(parts[i - 1], self.recent))
+            marks.append(again or (near and (here or not has(clause, self.remote))))
+        return marks
 
     def counts(self, clause: str, start: int, end: int, past_counts: bool) -> bool:
         """clause[start:end] 这一处说法算不算出现。"""
@@ -191,9 +212,7 @@ class Phrasebook(ContractModel):
         """这句话里出现的症状编号。"""
         parts = clauses(text)
         neg = self.negation
-        again = any(w in c for c in parts for w in neg.recurrence)
-        recent = any(w in c for c in parts for w in neg.recent)
-        marked = [(c, again or (recent and not any(w in c for w in neg.remote))) for c in parts]
+        marked = list(zip(parts, neg.past_counts(parts), strict=True))
         return frozenset(
             s.id for s in self.symptoms if any(s.matches(c, neg, r) for c, r in marked)
         )

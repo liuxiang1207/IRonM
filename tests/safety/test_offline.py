@@ -49,6 +49,7 @@ def _random_texts(n: int) -> list[str]:
         *neg.exceptions,
         *neg.recurrence,
         *neg.recent,
+        *neg.body_parts,
         *neg.remote,
         neg.past_after,
         *neg.past_not_followed_by,

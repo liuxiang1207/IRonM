@@ -33,6 +33,7 @@ export interface Negation {
   past_after: string | null;
   past_not_followed_by: string[];
   recurrence: string[];
+  body_parts: string[];
   recent: string[];
   remote: string[];
 }
@@ -185,14 +186,22 @@ function symptomMatches(symptom: Symptom, clause: string, neg: Negation, pastCou
   return symptom.blood_pressure !== null && bloodPressureMatches(symptom.blood_pressure, clause);
 }
 
+// 第 i 个分句里“以前发生过”的说法是否照常算（与 Negation.past_counts 对应）
+function pastCountsAt(neg: Negation, parts: string[], i: number): boolean {
+  const has = (c: string, words: string[]) => words.some((w) => c.includes(w));
+  const clause = parts[i];
+  const later = parts.slice(i + 1);
+  const again =
+    has(clause, neg.recurrence) || later.some((c) => has(c, neg.recurrence) && !has(c, neg.body_parts));
+  const here = has(clause, neg.recent);
+  const near = here || (i > 0 && has(parts[i - 1], neg.recent));
+  return again || (near && (here || !has(clause, neg.remote)));
+}
+
 export function assess(book: TermBook, text: string): Assessment {
   const parts = clauses(book, text);
   const neg = book.negation;
-  // 以前发生过的照常算：句中有复发说法；或句中有近期字样且所在分句没有久远的时间
-  const has = (c: string, words: string[]) => words.some((w) => c.includes(w));
-  const again = parts.some((c) => has(c, neg.recurrence));
-  const recent = parts.some((c) => has(c, neg.recent));
-  const marked = parts.map((c): [string, boolean] => [c, again || (recent && !has(c, neg.remote))]);
+  const marked = parts.map((c, i): [string, boolean] => [c, pastCountsAt(neg, parts, i)]);
   const present = new Set(
     book.symptoms.filter((s) => marked.some(([c, r]) => symptomMatches(s, c, neg, r))).map((s) => s.id),
   );
