@@ -45,6 +45,7 @@ from ironm.orchestrator.chat import (
     respond,
 )
 from ironm.orchestrator.intent import INTENT_RULE, IntentParams, load_intent_book
+from ironm.orchestrator.pages import PAGE_INTENTS, PageContext
 from ironm.orchestrator.qa import RunRecord
 from ironm.rules.loader import load_rules
 from ironm.safety.decision import load_kit
@@ -80,6 +81,7 @@ class ChatRequest(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid", strict=True, str_strip_whitespace=True)
 
     text: str = Field(min_length=1, max_length=MAX_TEXT_CHARS)
+    context: PageContext | None = None  # 从功能页带入的页面与条目标识
 
 
 _NOT_OWNER = {"loc": ["user_id"], "msg": "记录不属于当前用户", "type": "forbidden_user"}
@@ -276,7 +278,38 @@ def create_app(
             log.info("chat.submitted", status="invalid")
             return _invalid(_errors(e))
         with closing(connect(settings.db_path)) as conn:
-            reply = respond(user, request.text, chat_deps(conn))
+            reply = respond(user, request.text, chat_deps(conn), page_context=request.context)
+        background.add_task(save_turn, user, request.text, reply)
+        return JSONResponse(content=reply.model_dump(mode="json"))
+
+    @app.post("/pages/{page}/ask")
+    def page_ask(
+        page: str,
+        body: Annotated[bytes, Depends(raw_body)],
+        user: Annotated[str, Depends(current_user)],
+        background: BackgroundTasks,
+    ) -> JSONResponse:
+        """功能页提问（spec [2026-10-21] §3、§10）。
+
+        与管家对话用同一套安全前置；只调用本功能的专业 Agent 与安全官。
+        """
+        if page not in PAGE_INTENTS:
+            return JSONResponse(status_code=404, content={"status": "not_found"})
+        try:
+            request = ChatRequest.model_validate_json(body)
+        except ValidationError as e:
+            log.info("pages.asked", status="invalid")
+            return _invalid(_errors(e))
+        if request.context is not None and request.context.page != page:
+            return JSONResponse(status_code=422, content={"status": "invalid_context"})
+        with closing(connect(settings.db_path)) as conn:
+            reply = respond(
+                user,
+                request.text,
+                chat_deps(conn),
+                page=page,
+                page_context=request.context,
+            )
         background.add_task(save_turn, user, request.text, reply)
         return JSONResponse(content=reply.model_dump(mode="json"))
 

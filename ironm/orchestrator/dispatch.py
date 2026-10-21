@@ -33,6 +33,7 @@ __all__ = [
     "DispatchParams",
     "DispatchPlan",
     "check_butler",
+    "page_plan",
     "plan_dispatch",
     "route",
     "stages_for",
@@ -76,7 +77,7 @@ _TRAINING = frozenset({_A.TRAINING_PLANNER, _A.EXERCISE_COACH})
 # 管家可以输出的动作；其余（写入计划、记录、画像）一律不通过
 BUTLER_ACTIONS = frozenset({"answer", "plan_change_note", "profile_candidate"})
 
-type Source = Literal["fast_lane", "butler", "rule_fallback", "rule_table"]
+type Source = Literal["fast_lane", "butler", "rule_fallback", "rule_table", "page"]
 
 
 class DispatchParams(BaseModel):
@@ -149,6 +150,12 @@ def check_butler(out: _Butler) -> tuple[AgentId, tuple[AgentId, ...]] | str:
     return agents[0], tuple(agents[1:])
 
 
+def page_plan(primary: AgentId) -> DispatchPlan:
+    """功能页提问：只调用本功能的主责 Agent 与安全官，不经管家调度。"""
+    assistants = () if primary == _A.SAFETY_OFFICER else (_A.SAFETY_OFFICER,)
+    return _plan("page", primary, assistants, None)
+
+
 def _plan(
     source: Source, primary: AgentId, assistants: tuple[AgentId, ...], reason: str | None
 ) -> DispatchPlan:
@@ -168,6 +175,7 @@ def plan_dispatch(
     rulebook: RuleBook | None,
     gateway: Gateway | None,
     request_id: str,
+    context_item: str | None = None,
 ) -> DispatchPlan:
     primary, assistants = route(intent)
     if gateway is None or rulebook is None:
@@ -180,6 +188,7 @@ def plan_dispatch(
         "intent": intent.intent.value,
         "domains": [d.value for d in intent.domains],
         "concerns": list(intent.concerns),
+        "context_item": context_item,
         "agents": sorted(a.value for a in BUTLER_AGENTS),
     }
     result = gateway.complete(

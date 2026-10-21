@@ -15,3 +15,4 @@ profile_immediate: 我记下了你提到的健康状况，之后的建议会按�
 profile_pending: 我注意到你的训练条件可能有变化，确认后会更新你的资料。
 bmi_measured: 按你说的身高 {height} 厘米、体重 {weight} 公斤，BMI 约 {bmi}。成人 BMI 低于 18.5 为体重过低，18.5–23.9 为正常。
 bmi_stated: 你说的 BMI 是 {bmi}。成人 BMI 低于 18.5 为体重过低，18.5–23.9 为正常。
+page_handoff: 这个问题涉及其他方面，我帮你转到管家对话，在那里接着问就好，刚才看的内容会一起带过去。

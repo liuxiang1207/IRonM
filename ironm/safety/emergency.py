@@ -32,6 +32,7 @@ __all__ = [
     "assess",
     "clauses",
     "default_book",
+    "escalate_during_training",
     "load_terms",
 ]
 
@@ -117,3 +118,19 @@ def default_book() -> TermBook:
 def assess(text: str) -> Assessment:
     """用内置词表判定一句话。"""
     return default_book().assess(text)
+
+
+# 训练中出现的心血管、呼吸、晕厥类红旗升为急症（spec [2026-10-21] §3：上下文只能提高判定）
+EXERTIONAL_RULE = "EM-EXERTIONAL"
+EXERTIONAL_CATEGORIES = frozenset({"cardiovascular", "respiratory", "syncope"})
+
+
+def escalate_during_training(assessment: Assessment) -> Assessment:
+    """用户正在训练页上（带着训练上下文）时调用：运动中的胸痛、气短、头晕按急症处理。"""
+    if assessment.level != "red_flag" or not EXERTIONAL_CATEGORIES & set(assessment.categories):
+        return assessment
+    return Assessment(
+        level="emergency",
+        rule_ids=(*assessment.rule_ids, EXERTIONAL_RULE),
+        categories=assessment.categories,
+    )

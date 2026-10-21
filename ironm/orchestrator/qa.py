@@ -35,6 +35,7 @@ from ironm.llm.validate import json_model
 from ironm.orchestrator.dispatch import (
     MAX_ASSISTANTS,
     ROUTES,
+    DispatchPlan,
     plan_dispatch,
     route,
 )
@@ -108,7 +109,9 @@ class RunRecord(ContractModel):
     intent: Intent
     primary: AgentId
     assistants: tuple[AgentId, ...]
-    dispatch: Literal["fast_lane", "butler", "rule_fallback", "rule_table"]
+    dispatch: Literal["fast_lane", "butler", "rule_fallback", "rule_table", "page"]
+    page: str | None = None  # 功能页提问时的页面
+    context_item: str | None = None  # 带入的条目编号（标识，不含原话）
     dispatch_reason: str | None = None  # 管家的理由代码，或校验失败的原因
     steps: tuple[Step, ...]
     layer: Literal["l0", "l1", "general", "plan_note"]
@@ -325,12 +328,22 @@ def answer_question(
     request_id: str,
     agents: Mapping[AgentId, AgentFn] = AGENTS,
     rulebook: RuleBook | None = None,
+    forced: DispatchPlan | None = None,
+    page: str | None = None,
+    context_item: str | None = None,
 ) -> QAResult:
-    """rulebook 为空或没有模型时，调度一律按规则路由表。"""
+    """rulebook 为空或没有模型时，调度一律按规则路由表；forced 为功能页提问的固定调度。"""
     fixed = _Texts.model_validate(texts.model_dump())
     if intent.intent not in ROUTES:
         raise ValueError(f"意图 {intent.intent} 不经过问答编排（由对话入口处理）")
-    plan = plan_dispatch(text, intent, rulebook=rulebook, gateway=gateway, request_id=request_id)
+    plan = forced or plan_dispatch(
+        text,
+        intent,
+        rulebook=rulebook,
+        gateway=gateway,
+        request_id=request_id,
+        context_item=context_item,
+    )
     primary, assistants = plan.primary, plan.assistants
     steps: list[Step] = []
     facts: list[Fact] = []
@@ -397,6 +410,8 @@ def answer_question(
         assistants=assistants,
         dispatch=plan.source,
         dispatch_reason=plan.reason_code,
+        page=page,
+        context_item=context_item,
         steps=tuple(steps),
         layer=layer,  # type: ignore[arg-type]
         degraded=degraded,
