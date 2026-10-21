@@ -32,8 +32,15 @@ from ironm.core.log import get_logger
 from ironm.knowledge.qa_cards import CardBook, PartKind, QACard
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
+from ironm.orchestrator.dispatch import (
+    MAX_ASSISTANTS,
+    ROUTES,
+    plan_dispatch,
+    route,
+)
 from ironm.orchestrator.intent import Concern, Intent, IntentResult
 from ironm.orchestrator.numbers import numbers_in, unregistered
+from ironm.rules.loader import RuleBook
 from ironm.safety.matching import clauses
 
 __all__ = [
@@ -50,23 +57,8 @@ __all__ = [
 ]
 
 _A = AgentId
-MAX_ASSISTANTS = 2
 ANSWER_TEMPLATE = "answer_l1@1.0.0"
 PROMPT_PATH = Path(__file__).parent / "prompts" / "answer_l1.md"
-
-# 意图 → (主 Agent, 辅助 Agent)。安全官另行加入，不在此表
-ROUTES: dict[Intent, tuple[AgentId, tuple[AgentId, ...]]] = {
-    Intent.EXERCISE_TECHNIQUE: (_A.EXERCISE_COACH, ()),
-    Intent.TRAINING_KNOWLEDGE: (_A.TRAINING_PLANNER, ()),
-    Intent.PLAN: (_A.TRAINING_PLANNER, ()),
-    Intent.NUTRITION: (_A.NUTRITIONIST, ()),
-    Intent.SUPPLEMENTS_DRUGS: (_A.NUTRITIONIST, ()),
-    Intent.PERSONAL_DATA: (_A.DATA_ANALYST, ()),
-    Intent.LOGGING: (_A.DATA_ANALYST, ()),
-    Intent.RECOVERY_SLEEP: (_A.RECOVERY, ()),
-    Intent.HABIT_MOTIVATION: (_A.BEHAVIOR_COACH, ()),
-    Intent.WELLNESS: (_A.NUTRITIONIST, (_A.RECOVERY,)),
-}
 
 # 每个 Agent 可以调用的工具（白名单）
 TOOLS: dict[AgentId, frozenset[str]] = {
@@ -103,6 +95,7 @@ class Step(ContractModel):
 
     agent: AgentId
     stage: Literal["gather"]
+    stage_index: int = 0  # 第几阶段（0 起）；同一阶段并行
     status: Literal["ok", "no_opinion"]
     reason_code: str | None = None
     tools: tuple[str, ...] = ()
@@ -115,6 +108,8 @@ class RunRecord(ContractModel):
     intent: Intent
     primary: AgentId
     assistants: tuple[AgentId, ...]
+    dispatch: Literal["fast_lane", "butler", "rule_fallback", "rule_table"]
+    dispatch_reason: str | None = None  # 管家的理由代码，或校验失败的原因
     steps: tuple[Step, ...]
     layer: Literal["l0", "l1", "general", "plan_note"]
     degraded: bool
@@ -150,23 +145,12 @@ class _Texts(BaseModel):
 
 @dataclass(frozen=True)
 class _Ask:
-    """交给每个 Agent 的输入：只有问题本身，不含其他 Agent 的输出。"""
+    """交给每个 Agent 的输入：问题本身与前面阶段汇总出的依据编号，不含同阶段其他 Agent 的输出。"""
 
     text: str
     intent: Intent
     concerns: tuple[Concern, ...]
-
-
-def route(result: IntentResult) -> tuple[AgentId, tuple[AgentId, ...]]:
-    primary, extra = ROUTES[result.intent]
-    assistants = [*extra, _A.SAFETY_OFFICER]
-    if "special_population" in result.concerns:
-        assistants.append(_A.ASSESSOR)
-    unique = [a for a in dict.fromkeys(assistants) if a != primary]
-    # 安全官必须保留；超过上限时先去掉排在前面的普通辅助 Agent
-    while len(unique) > MAX_ASSISTANTS:
-        unique.remove(next(a for a in unique if a not in (_A.SAFETY_OFFICER, _A.ASSESSOR)))
-    return primary, tuple(unique)
+    prior: tuple[str, ...] = ()  # 前面阶段拿出的依据编号
 
 
 class _Toolbox:
@@ -340,18 +324,29 @@ def answer_question(
     gateway: Gateway | None,
     request_id: str,
     agents: Mapping[AgentId, AgentFn] = AGENTS,
+    rulebook: RuleBook | None = None,
 ) -> QAResult:
+    """rulebook 为空或没有模型时，调度一律按规则路由表。"""
     fixed = _Texts.model_validate(texts.model_dump())
     if intent.intent not in ROUTES:
         raise ValueError(f"意图 {intent.intent} 不经过问答编排（由对话入口处理）")
-    primary, assistants = route(intent)
-    ask = _Ask(text=text, intent=intent.intent, concerns=intent.concerns)
-    order = (primary, *assistants)
-    # 同一阶段并行；每个 Agent 只拿到 ask，彼此看不到输出，全部结束后再汇总
-    with ThreadPoolExecutor(max_workers=len(order)) as pool:
-        results = list(pool.map(lambda a: _run_agent(a, ask, cards, agents), order))
-    steps = [step for step, _ in results]
-    facts = [f for _, fs in results for f in fs]
+    plan = plan_dispatch(text, intent, rulebook=rulebook, gateway=gateway, request_id=request_id)
+    primary, assistants = plan.primary, plan.assistants
+    steps: list[Step] = []
+    facts: list[Fact] = []
+    for index, stage in enumerate(plan.stages):
+        ask = _Ask(
+            text=text,
+            intent=intent.intent,
+            concerns=intent.concerns,
+            prior=tuple(f.source_id for f in facts),
+        )
+        # 同一阶段并行；每个 Agent 只拿到 ask，彼此看不到输出，全部结束后再汇总
+        with ThreadPoolExecutor(max_workers=len(stage)) as pool:
+            jobs = [pool.submit(_run_agent, a, ask, cards, agents) for a in stage]
+            results = [job.result() for job in jobs]
+        steps += [step.model_copy(update={"stage_index": index}) for step, _ in results]
+        facts += [f for _, fs in results for f in fs]
     card_ids = list(dict.fromkeys(f.source_id for f in facts if f.kind == "card"))
     cautions = [getattr(fixed, f.source_id) for f in facts if f.kind == "caution"]
     caution_parts = [AnswerPart(kind="caution", text=c) for c in cautions]
@@ -376,8 +371,10 @@ def answer_question(
         parts = [AnswerPart(kind="answer", text=fixed.general), *caution_parts]
     else:
         best = cards.get(ranked[0])
-        # 安全官的卡就是为这类情况审定的：直接用，安全提示附在后面
-        direct = not cautions or safety_first
+        # 安全官的卡就是为这类情况审定的：直接用，安全提示附在后面；
+        # 要融入安全提示，或要把两个以上领域的卡合在一起回答时，才需要 L1
+        domains = {owner[c] for c in card_ids} - {_A.SAFETY_OFFICER}
+        direct = (not cautions and len(domains) <= 1) or safety_first
         l1_parts: list[AnswerPart] | None = None
         if not direct and gateway is not None:
             chosen = [cards.get(c) for c in ranked]
@@ -398,6 +395,8 @@ def answer_question(
         intent=intent.intent,
         primary=primary,
         assistants=assistants,
+        dispatch=plan.source,
+        dispatch_reason=plan.reason_code,
         steps=tuple(steps),
         layer=layer,  # type: ignore[arg-type]
         degraded=degraded,

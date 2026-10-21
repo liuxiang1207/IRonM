@@ -83,6 +83,8 @@ class IntentResult(ContractModel):
     confidence: Annotated[float, Field(ge=0, le=1)]
     source: Source
     clarify: bool  # 是否应先追问
+    # 词表命中的全部意图（命中多的在前），用来判断是否只涉及单一领域
+    domains: tuple[Intent, ...] = ()
 
 
 def _words(groups: list[str]) -> tuple[str, ...]:
@@ -147,6 +149,7 @@ def rule_intent(text: str, book: IntentBook, p: IntentParams) -> IntentResult:
         confidence=conf,
         source="rule",
         clarify=False,
+        domains=tuple(i for i, n in ranked if n > 0),
     )
 
 
@@ -171,8 +174,16 @@ def _merge(rule: IntentResult, model: _ModelIntent | None) -> IntentResult:
         intent, conf, source = model.intent, model.confidence, "model"
     else:
         intent, conf, source = rule.intent, rule.confidence, "rule"
+    domains = tuple(
+        dict.fromkeys([*rule.domains, *([intent] if intent is not Intent.UNKNOWN else [])])
+    )
     return IntentResult(
-        intent=intent, concerns=concerns, confidence=conf, source=source, clarify=False
+        intent=intent,
+        concerns=concerns,
+        confidence=conf,
+        source=source,
+        clarify=False,
+        domains=domains,
     )
 
 

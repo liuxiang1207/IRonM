@@ -110,7 +110,7 @@ def test_agents_run_in_parallel_and_see_only_the_question() -> None:
     agents = {**AGENTS, AgentId.EXERCISE_COACH: waiting, AgentId.SAFETY_OFFICER: waiting}
     result = _ask(KNEE, KNEE_INTENT, agents=agents)
     assert [s.status for s in result.record.steps] == ["ok", "ok"]
-    assert seen == [{"text", "intent", "concerns"}] * 2
+    assert seen == [{"text", "intent", "concerns", "prior"}] * 2
 
 
 def test_failing_assistant_becomes_no_opinion() -> None:

@@ -6,7 +6,8 @@
         "capture",
         "answer",
         "review_semantic",
-        "reflect"
+        "reflect",
+        "dispatch"
       ],
       "title": "ModelStage",
       "type": "string"

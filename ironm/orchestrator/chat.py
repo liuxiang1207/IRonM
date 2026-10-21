@@ -193,6 +193,7 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
                 texts=deps.texts,
                 gateway=deps.gateway,
                 request_id=request_id,
+                rulebook=deps.rulebook,
             )
             deps.record_run(user_id, qa.record)
             layer, answer, degraded = qa.record.layer, qa.parts, qa.record.degraded
