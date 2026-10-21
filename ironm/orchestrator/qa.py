@@ -23,12 +23,12 @@ from ironm.contracts.model_call import ModelStage
 from ironm.contracts.roles import AgentId
 from ironm.core.body import bmi
 from ironm.core.log import get_logger
+from ironm.core.numbers import numbers_in, unregistered
 from ironm.knowledge.qa_cards import CardBook, PartKind, QACard
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
 from ironm.orchestrator.domains import DOMAIN_WEIGHTS, select_domains
 from ironm.orchestrator.intent import Concern, Intent, IntentResult
-from ironm.orchestrator.numbers import numbers_in, unregistered
 from ironm.rules.loader import RuleBook
 from ironm.safety.matching import clauses
 

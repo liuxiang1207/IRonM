@@ -1,4 +1,10 @@
-"""Agent 输出：约束、提案、判定、追问、无意见。越权与输出类型在契约层校验。"""
+"""Agent 输出：约束、提案、判定、追问、意见、无意见。越权与输出类型在契约层校验。
+
+意见（opinion）是问答链路的输出，与提案共用一个原则：结论必须能追溯到依据。
+- 每个数字必须出现在 calculation 或 facts 里；
+- 每条结论必须有规则或知识来源；
+- reasoning 只描述“依据怎么得到结论”，不引入新的断言。
+"""
 
 from collections.abc import Mapping
 from datetime import date
@@ -117,6 +123,47 @@ class VerdictOutput(_OutputBase):
     items: tuple[Verdict, ...] = Field(min_length=1)
 
 
+class Citation(ContractModel):
+    """一条可追溯的依据。用户在回答上点“为什么”时逐条展开。"""
+
+    kind: Literal["rule", "knowledge", "record", "calculation"]
+    ref: Text  # 规则编号、知识条目编号、记录编号，或计算结果的标识
+    label: Text  # 给用户看的一句话，如“体重 70 公斤（3 月 12 日记录）”
+    detail: Text | None = None  # 更深一层：规则摘要、记录时间与来源、公式与代入值
+
+
+class Opinion(ContractModel):
+    """一个 Agent 对本次提问的专业意见（问答链路）。"""
+
+    conclusion: Text
+    citations: tuple[Citation, ...] = Field(min_length=1)  # 结论的依据，至少一条
+    reasoning: Text  # 依据怎么得到结论（模板生成，不自由发挥）
+    how: Text | None = None
+    caution: Text | None = None
+    uncertain: Text | None = None
+
+    @model_validator(mode="after")
+    def _check_numbers(self) -> Self:
+        # 结论与做法里的数字必须在依据或计算里出现，否则这条意见作废（数字校验前置到意见层）
+        registered: set[str] = set()
+        for c in self.citations:
+            if c.kind == "calculation":
+                registered |= _numbers(" ".join(v for v in (c.label, c.detail) if v))
+        registered |= _numbers(self.reasoning)
+        used = _numbers(" ".join(v for v in (self.conclusion, self.how) if v))
+        missing = used - registered
+        if missing:
+            raise ValueError(f"意见里出现没有依据的数字：{sorted(missing)}")
+        return self
+
+
+def _numbers(text: str) -> set[str]:
+    """意见层的数字提取：与回答校验同一份实现，避免两处规则漂移。"""
+    from ironm.core.numbers import numbers_in
+
+    return numbers_in(text)
+
+
 MAX_QUESTIONS = 3  # 每次最多追问几项（spec §29）
 
 
@@ -140,13 +187,23 @@ class QuestionsOutput(_OutputBase):
         return self
 
 
+class OpinionOutput(_OutputBase):
+    kind: Literal[OutputKind.OPINION]
+    items: tuple[Opinion, ...] = Field(min_length=1)
+
+
 class NoOpinionOutput(_OutputBase):
     kind: Literal[OutputKind.NO_OPINION]
     reason_code: Text | None = None
 
 
 type AgentOutput = Annotated[
-    ConstraintOutput | ProposalOutput | VerdictOutput | QuestionsOutput | NoOpinionOutput,
+    ConstraintOutput
+    | ProposalOutput
+    | VerdictOutput
+    | QuestionsOutput
+    | OpinionOutput
+    | NoOpinionOutput,
     Field(discriminator="kind"),
 ]
 

@@ -16,6 +16,46 @@
       "title": "AgentId",
       "type": "string"
     },
+    "Citation": {
+      "additionalProperties": false,
+      "description": "一条可追溯的依据。用户在回答上点“为什么”时逐条展开。",
+      "properties": {
+        "detail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "kind": {
+          "enum": [
+            "rule",
+            "knowledge",
+            "record",
+            "calculation"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/Text"
+        },
+        "ref": {
+          "$ref": "#/$defs/Text"
+        }
+      },
+      "required": [
+        "kind",
+        "ref",
+        "label"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
     "Constraint": {
       "additionalProperties": false,
       "description": "边界，如“热量不得低于 1200 千卡”“禁止跳跃类动作”。",
@@ -120,6 +160,98 @@
         "kind"
       ],
       "title": "NoOpinionOutput",
+      "type": "object"
+    },
+    "Opinion": {
+      "additionalProperties": false,
+      "description": "一个 Agent 对本次提问的专业意见（问答链路）。",
+      "properties": {
+        "caution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "minItems": 1,
+          "title": "Citations",
+          "type": "array"
+        },
+        "conclusion": {
+          "$ref": "#/$defs/Text"
+        },
+        "how": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reasoning": {
+          "$ref": "#/$defs/Text"
+        },
+        "uncertain": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "conclusion",
+        "citations",
+        "reasoning"
+      ],
+      "title": "Opinion",
+      "type": "object"
+    },
+    "OpinionOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentId"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Opinion"
+          },
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "opinion",
+          "title": "Kind",
+          "type": "string"
+        },
+        "skill": {
+          "$ref": "#/$defs/VersionedName"
+        }
+      },
+      "required": [
+        "agent",
+        "skill",
+        "kind",
+        "items"
+      ],
+      "title": "OpinionOutput",
       "type": "object"
     },
     "PlanField": {
@@ -376,6 +508,7 @@
     "mapping": {
       "constraint": "#/$defs/ConstraintOutput",
       "no_opinion": "#/$defs/NoOpinionOutput",
+      "opinion": "#/$defs/OpinionOutput",
       "proposal": "#/$defs/ProposalOutput",
       "questions": "#/$defs/QuestionsOutput",
       "verdict": "#/$defs/VerdictOutput"
@@ -394,6 +527,9 @@
     },
     {
       "$ref": "#/$defs/QuestionsOutput"
+    },
+    {
+      "$ref": "#/$defs/OpinionOutput"
     },
     {
       "$ref": "#/$defs/NoOpinionOutput"

@@ -22,19 +22,21 @@ class OutputKind(StrEnum):
     VERDICT = "verdict"
     NO_OPINION = "no_opinion"
     QUESTIONS = "questions"  # 追问：只有评估师可以产出
+    OPINION = "opinion"  # 专业意见：问答链路，带依据与溯源
 
 
-_C, _P, _V, _N, _Q = OutputKind
+_C, _P, _V, _N, _Q, _O = OutputKind
 
 AGENT_OUTPUT_KINDS: dict[AgentId, frozenset[OutputKind]] = {
-    AgentId.ASSESSOR: frozenset({_C, _N, _Q}),
-    AgentId.SAFETY_OFFICER: frozenset({_C, _V, _N}),
-    AgentId.DATA_ANALYST: frozenset({_C, _N}),
-    AgentId.RECOVERY: frozenset({_C, _N}),
-    AgentId.TRAINING_PLANNER: frozenset({_P, _N}),
-    AgentId.EXERCISE_COACH: frozenset({_P, _N}),
-    AgentId.NUTRITIONIST: frozenset({_P, _N}),
-    AgentId.BEHAVIOR_COACH: frozenset({_P, _N}),
+    AgentId.ASSESSOR: frozenset({_C, _N, _Q, _O}),
+    AgentId.SAFETY_OFFICER: frozenset({_C, _V, _N, _O}),
+    AgentId.DATA_ANALYST: frozenset({_C, _N, _O}),
+    AgentId.RECOVERY: frozenset({_C, _N, _O}),
+    AgentId.TRAINING_PLANNER: frozenset({_P, _N, _O}),
+    AgentId.EXERCISE_COACH: frozenset({_P, _N, _O}),
+    AgentId.NUTRITIONIST: frozenset({_P, _N, _O}),
+    AgentId.BEHAVIOR_COACH: frozenset({_P, _N, _O}),
+    # 审查类只在计划链路工作，不对用户给意见
     AgentId.EVIDENCE_REVIEWER: frozenset({_V, _N}),
     AgentId.QUALITY_REVIEWER: frozenset({_V, _N}),
 }

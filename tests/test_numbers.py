@@ -2,7 +2,7 @@
 
 import pytest
 
-from ironm.orchestrator.numbers import numbers_in, unregistered
+from ironm.core.numbers import numbers_in, unregistered
 
 
 @pytest.mark.parametrize(
