@@ -46,10 +46,15 @@ class SkillLoadError(ValueError):
 
 @dataclass(frozen=True)
 class SkillContext:
-    """运行一个 Skill 时除快照外能用的东西：Skill 自身与规则簿。"""
+    """运行一个 Skill 时除快照外能用的东西：Skill 自身、规则簿，以及本次请求。
+
+    text / context_item 只在问答链路里有值；计划链路为空。
+    """
 
     skill: "LoadedSkill"
     rulebook: RuleBook
+    text: str = ""
+    context_item: str | None = None
 
 
 type SkillRun = Callable[[SnapshotView, SkillContext], AgentOutput]

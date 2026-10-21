@@ -32,20 +32,39 @@ class Agent:
         self.strict = strict
 
     def execute(
-        self, snapshot: Snapshot, selection: Selection, rulebook: RuleBook
+        self,
+        snapshot: Snapshot,
+        selection: Selection,
+        rulebook: RuleBook,
+        *,
+        text: str = "",
+        context_item: str | None = None,
     ) -> tuple[AgentOutput, ...]:
         """逐个运行本次加载的 Skill；没有 Skill 时只返回一份“本次无意见”。"""
         if selection.agent != self.agent_id:
             raise AgentContractError(f"选择结果属于 {selection.agent}，不是 {self.agent_id}")
         if not selection.loaded:
             return (self._no_opinion(NO_SKILL, "no_matching_skill"),)
-        return tuple(self._run_one(snapshot, skill, rulebook) for skill in selection.loaded)
+        return tuple(
+            self._run_one(snapshot, skill, rulebook, text, context_item)
+            for skill in selection.loaded
+        )
 
-    def _run_one(self, snapshot: Snapshot, skill: LoadedSkill, rulebook: RuleBook) -> AgentOutput:
+    def _run_one(
+        self,
+        snapshot: Snapshot,
+        skill: LoadedSkill,
+        rulebook: RuleBook,
+        text: str,
+        context_item: str | None,
+    ) -> AgentOutput:
         m = skill.manifest
         try:
             view = SnapshotView(snapshot, m.requires_data)
-            output = skill.run(view, SkillContext(skill=skill, rulebook=rulebook))
+            output = skill.run(
+                view,
+                SkillContext(skill=skill, rulebook=rulebook, text=text, context_item=context_item),
+            )
             self._check(output, skill)
             return output
         except Exception as e:

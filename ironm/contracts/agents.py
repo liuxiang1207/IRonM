@@ -6,9 +6,10 @@
 - reasoning 只描述“依据怎么得到结论”，不引入新的断言。
 """
 
+import json
 from collections.abc import Mapping
 from datetime import date
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 
 from pydantic import Field, TypeAdapter, model_validator
 
@@ -145,16 +146,28 @@ class Opinion(ContractModel):
     @model_validator(mode="after")
     def _check_numbers(self) -> Self:
         # 结论与做法里的数字必须在依据或计算里出现，否则这条意见作废（数字校验前置到意见层）
+        # 依据里写到的数字都算已登记：规则/知识条目的原文本身就可能含数字（如“45 秒”）
         registered: set[str] = set()
         for c in self.citations:
-            if c.kind == "calculation":
-                registered |= _numbers(" ".join(v for v in (c.label, c.detail) if v))
+            registered |= _numbers(" ".join(v for v in (c.label, c.detail) if v))
         registered |= _numbers(self.reasoning)
         used = _numbers(" ".join(v for v in (self.conclusion, self.how) if v))
         missing = used - registered
         if missing:
             raise ValueError(f"意见里出现没有依据的数字：{sorted(missing)}")
         return self
+
+
+def make_opinion(context: Any, opinion: Opinion) -> "AgentOutput":
+    """Skill 产出意见的公共写法：自动填上所属 Agent 与 Skill 版本。"""
+    m = context.skill.manifest
+    data = {
+        "agent": m.owner_agent.value,
+        "skill": m.versioned,
+        "kind": "opinion",
+        "items": [opinion.model_dump()],
+    }
+    return AGENT_OUTPUT_ADAPTER.validate_json(json.dumps(data, ensure_ascii=False, default=str))
 
 
 def _numbers(text: str) -> set[str]:

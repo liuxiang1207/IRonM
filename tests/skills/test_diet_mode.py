@@ -8,7 +8,7 @@ from tests.skills.helpers import proposed, run_agent
 
 
 def _mode(**kwargs: object) -> object:
-    out = run_agent(AgentId.NUTRITIONIST, "goal.create", Tier.A, **kwargs)["diet_mode"]
+    out = run_agent(AgentId.NUTRITIONIST, "goal.create", Tier.A, profile=kwargs)["diet_mode"]
     return proposed(out)["diet_mode"]
 
 

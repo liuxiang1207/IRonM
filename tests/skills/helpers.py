@@ -8,7 +8,7 @@ from ironm.contracts.agents import AgentOutput
 from ironm.contracts.common import deep_thaw
 from ironm.contracts.roles import AgentId
 from ironm.contracts.screening import Tier, TierResult
-from ironm.contracts.skills import ScenePack
+from ironm.contracts.skills import ScenePack, SkillMode
 from ironm.contracts.snapshot import Snapshot
 from ironm.contracts.unknown import Unknown, UnknownReason
 from ironm.rules.loader import RULES_DIR, load_rules
@@ -84,13 +84,36 @@ def tier_result(tier: Tier | None) -> TierResult:
 
 
 def run_agent(
-    agent: AgentId, intent: str, tier: Tier | None, **kwargs: Any
+    agent: AgentId,
+    intent: str,
+    tier: Tier | None,
+    *,
+    mode: SkillMode = SkillMode.PLAN,
+    text: str = "",
+    context_item: str | None = None,
+    scene: ScenePack = ScenePack.FAT_LOSS,
+    profile: dict[str, Any] | None = None,
+    **kwargs: Any,
 ) -> dict[str, AgentOutput]:
-    """返回 {Skill 编号: 输出}；没有加载任何 Skill 时键为 no_skill。kwargs 同 snapshot。"""
+    """返回 {Skill 编号: 输出}；没有加载任何 Skill 时键为 no_skill。
+
+    profile 单独传入（其余 kwargs 同 snapshot），避免与切换链路用的关键字参数冲突。
+    """
     sel = select(
-        SKILLS, agent=agent, intent=intent, scene=ScenePack.FAT_LOSS, tier=tier_result(tier)
+        SKILLS,
+        agent=agent,
+        intent=intent,
+        scene=scene,
+        tier=tier_result(tier),
+        mode=mode,
     )
-    outputs = Agent(agent).execute(snapshot(tier, **kwargs), sel, BOOK)
+    outputs = Agent(agent).execute(
+        snapshot(tier, **(profile or {}), **kwargs),
+        sel,
+        BOOK,
+        text=text,
+        context_item=context_item,
+    )
     return {o.skill.split("@")[0]: o for o in outputs}
 
 
