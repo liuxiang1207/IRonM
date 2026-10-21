@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>IronM</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="bar" id="bar" hidden>
+    <span class="brand">IronM</span>
+    <nav id="nav">
+      <a href="#today" data-view="today">今日</a>
+      <a href="#chat" data-view="chat">对话</a>
+      <a href="#progress" data-view="progress">进展</a>
+      <a href="#plan" data-view="plan">计划</a>
+      <a href="#me" data-view="me">我的</a>
+    </nav>
+  </header>
+  <main id="view" aria-live="polite"></main>
+</body>
+</html>

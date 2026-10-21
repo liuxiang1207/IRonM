@@ -15,7 +15,8 @@ from typing import IO, Annotated, Any, Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from ironm import __version__
@@ -72,6 +73,9 @@ from ironm.store.reviews import DecisionStore
 from ironm.store.safety import ModelCallStore, RunStore, SafetyFlagStore
 
 log = get_logger("ironm.api")
+
+# 网页版（spec [2026-10-21] §19）：静态页面，只调用下面这些接口
+WEB_DIR = Path(__file__).parent / "web"
 
 # 错误位置里只保留合规的字段名；用户自造的键名可能就是健康数据原文
 _SAFE_LOC_RE = re.compile(r"[A-Za-z0-9_]{1,64}")
@@ -523,6 +527,18 @@ def create_app(
             return JSONResponse(status_code=404, content={"status": "not_found"})
         record = RunRecord.model_validate_json(found[1])
         return JSONResponse(content=record.model_dump(mode="json"))
+
+    @app.get("/", include_in_schema=False)
+    def home() -> RedirectResponse:
+        """网站首页：进入网页版（spec §19）。"""
+        return RedirectResponse("/web/")
+
+    @app.get("/auth/options")
+    def auth_options() -> JSONResponse:
+        """网页登录页可用的方式：开发与测试环境另可直接填用户名进入（spec §19）。"""
+        return JSONResponse({"dev_user_login": settings.env != "prod"})
+
+    app.mount("/web", StaticFiles(directory=WEB_DIR, html=True), name="web")
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
