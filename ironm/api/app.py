@@ -28,10 +28,12 @@ from ironm.engine.metrics_view import build_metrics, lookback_days
 from ironm.engine.rule_params import validate_rule_params
 from ironm.knowledge.baseline import BASELINE_PATH, load_baseline
 from ironm.knowledge.exercises import LIBRARY_PATH, load_library
+from ironm.knowledge.qa_cards import load_cards
 from ironm.llm.config import load_models
 from ironm.llm.gateway import Gateway
 from ironm.orchestrator.chat import MAX_TEXT_CHARS, ChatDeps, load_answer_texts, respond
 from ironm.orchestrator.intent import INTENT_RULE, IntentParams, load_intent_book
+from ironm.orchestrator.qa import RunRecord
 from ironm.rules.loader import load_rules
 from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
@@ -41,7 +43,7 @@ from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
 from ironm.store.db import connect
 from ironm.store.events import AppendResult, EventStore
 from ironm.store.migrate import MIGRATIONS_DIR, migrate
-from ironm.store.safety import ModelCallStore, SafetyFlagStore
+from ironm.store.safety import ModelCallStore, RunStore, SafetyFlagStore
 
 log = get_logger("ironm.api")
 
@@ -178,6 +180,7 @@ def create_app(
     intents = load_intent_book()
     rulebook.get(INTENT_RULE).params_as(IntentParams)
     texts = load_answer_texts()
+    cards = load_cards()  # 问答卡（spec [2026-10-21] §6）
     env = os.environ if environ is None else environ
     load_library(library_path)  # 动作库：启动时校验（spec §27）
     load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
@@ -227,9 +230,13 @@ def create_app(
             flags = SafetyFlagStore(conn, id_gen)
 
             calls = ModelCallStore(conn)
+            runs = RunStore(conn)
 
             def record_flag(u: str, req: str, flag: SafetyFlag) -> None:
                 flags.add(u, req, flag)
+
+            def record_run(u: str, record: RunRecord) -> None:
+                runs.add(u, record.request_id, record.model_dump_json())
 
             gateway = Gateway(models, environ=env, clock=clock, ids=id_gen, record=calls.add)
             deps = ChatDeps(
@@ -237,13 +244,25 @@ def create_app(
                 clock=clock,
                 ids=id_gen,
                 record_flag=record_flag,
+                record_run=record_run,
                 intents=intents,
+                cards=cards,
                 rulebook=rulebook,
                 texts=texts,
                 gateway=gateway,
             )
             reply = respond(user, request.text, deps)
         return JSONResponse(content=reply.model_dump(mode="json"))
+
+    @app.get("/chat/runs/{request_id}")
+    def chat_run(request_id: str, user: Annotated[str, Depends(current_user)]) -> JSONResponse:
+        """按请求编号回放问答运行记录（spec [2026-10-21] §5）；只能看自己的。"""
+        with closing(connect(settings.db_path)) as conn:
+            found = RunStore(conn).get(request_id)
+        if found is None or found[0] != user:
+            return JSONResponse(status_code=404, content={"status": "not_found"})
+        record = RunRecord.model_validate_json(found[1])
+        return JSONResponse(content=record.model_dump(mode="json"))
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

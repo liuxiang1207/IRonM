@@ -16,6 +16,7 @@ from ironm.contracts.screening import SafetyFlag
 from ironm.core.clock import FixedClock
 from ironm.core.config import load_settings
 from ironm.core.ids import SeededIdGenerator
+from ironm.knowledge.qa_cards import default_cards
 from ironm.orchestrator.chat import ChatDeps, load_answer_texts, respond
 from ironm.orchestrator.intent import load_intent_book
 from ironm.rules.loader import RULES_DIR, load_rules
@@ -32,7 +33,9 @@ def _deps(flags: list[tuple[str, str, SafetyFlag]]) -> ChatDeps:
         clock=FixedClock(NOW),
         ids=SeededIdGenerator(7),
         record_flag=lambda user, req, flag: flags.append((user, req, flag)),
+        record_run=lambda user, record: None,
         intents=load_intent_book(),
+        cards=default_cards(),
         rulebook=load_rules(RULES_DIR),
         texts=load_answer_texts(),
     )

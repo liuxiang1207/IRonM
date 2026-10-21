@@ -36,7 +36,7 @@ def test_out_of_scope_gets_fixed_answer() -> None:
 def test_fitness_question_recognized_with_concern() -> None:
     reply = respond("u1", "深蹲时膝盖疼怎么办", _deps([]))
     assert reply.intent == "exercise_technique" and reply.concerns == ("discomfort",)
-    assert reply.layer == "pending"
+    assert reply.layer in ("l0", "l1")
 
 
 def test_emergency_skips_intent() -> None:

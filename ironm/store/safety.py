@@ -99,3 +99,24 @@ class ModelCallStore:
                     del data[key]
             out.append(ModelCall.model_validate(data))
         return out
+
+
+class RunStore:
+    """问答运行记录（spec [2026-10-21] §5）：保存的是不含原话的 JSON，读回时由调用方解析。"""
+
+    def __init__(self, conn: sqlite3.Connection) -> None:
+        self._conn = conn
+
+    def add(self, user_id: str, request_id: str, record_json: str) -> None:
+        with transaction(self._conn):
+            self._conn.execute(
+                "INSERT INTO chat_runs (request_id, user_id, record) VALUES (?, ?, ?)",
+                (request_id, user_id, record_json),
+            )
+
+    def get(self, request_id: str) -> tuple[str, str] | None:
+        """(用户, 记录 JSON)；没有时为 None。"""
+        row = self._conn.execute(
+            "SELECT user_id, record FROM chat_runs WHERE request_id = ?", (request_id,)
+        ).fetchone()
+        return None if row is None else (row["user_id"], row["record"])

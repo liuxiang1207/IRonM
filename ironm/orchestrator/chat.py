@@ -4,7 +4,7 @@
   说的是旁人时照常给急救指引，但不给本人记标记、不暂停本人的计划。
 - 命中拒答：先给拒答模板，再接问答链路允许的部分。
 - 意图识别：归不进任何领域时追问 1 句；闲聊与超范围用固定说法回答。
-- 编排与回答生成（§5–§6）完成前，其余意图的回答层标为 pending。
+- 其余意图交给问答编排（qa）：L0 问答卡、L1 模型表达、一般说明，或计划调整说明。
 回答中不含用户原话。
 """
 
@@ -22,8 +22,10 @@ from ironm.core.clock import Clock
 from ironm.core.ids import IdGenerator
 from ironm.core.log import get_logger
 from ironm.core.yamlfile import load_yaml
+from ironm.knowledge.qa_cards import CardBook
 from ironm.llm.gateway import Gateway
 from ironm.orchestrator.intent import Concern, Intent, IntentBook, recognize
+from ironm.orchestrator.qa import AnswerPart, RunRecord, answer_question
 from ironm.rules.loader import RuleBook
 from ironm.safety.decision import SafetyKit
 from ironm.safety.refusals import RefusalKind
@@ -46,7 +48,7 @@ ANSWER_TEXTS_PATH = Path(__file__).with_name("answer_texts.yaml")
 
 _log = get_logger("ironm.chat")
 
-type Layer = Literal["safety", "clarify", "template", "pending"]
+type Layer = Literal["safety", "clarify", "template", "l0", "l1", "general", "plan_note"]
 
 
 class AnswerTexts(BaseModel):
@@ -57,17 +59,15 @@ class AnswerTexts(BaseModel):
     clarify: Annotated[str, Field(min_length=1)]
     chitchat: Annotated[str, Field(min_length=1)]
     out_of_scope: Annotated[str, Field(min_length=1)]
+    general: Annotated[str, Field(min_length=1)]
+    degraded: Annotated[str, Field(min_length=1)]
+    plan_change: Annotated[str, Field(min_length=1)]
+    caution_discomfort: Annotated[str, Field(min_length=1)]
+    caution_special: Annotated[str, Field(min_length=1)]
 
 
 def load_answer_texts(path: Path = ANSWER_TEXTS_PATH) -> AnswerTexts:
     return AnswerTexts.model_validate(load_yaml(path))
-
-
-class AnswerPart(ContractModel):
-    """问答回答的一部分（§6 的统一结构在回答生成完成后补齐）。"""
-
-    kind: Literal["clarify", "answer"]
-    text: Annotated[str, Field(min_length=1)]
 
 
 class ChatReply(ContractModel):
@@ -81,6 +81,7 @@ class ChatReply(ContractModel):
     concerns: tuple[Concern, ...]
     sections: tuple[ReplySection, ...]  # 安全与拒答模板
     answer: tuple[AnswerPart, ...]
+    degraded: bool = False  # 是否降级（回答里已写明）
 
 
 @dataclass(frozen=True)
@@ -89,7 +90,9 @@ class ChatDeps:
     clock: Clock
     ids: IdGenerator
     record_flag: Callable[[str, str, SafetyFlag], None]  # (用户, 请求编号, 标记)
+    record_run: Callable[[str, RunRecord], None]  # (用户, 运行记录)
     intents: IntentBook
+    cards: CardBook
     rulebook: RuleBook
     texts: AnswerTexts
     gateway: Gateway | None = None  # 没有时只用词表识别意图
@@ -106,6 +109,7 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
     intent: Intent | None = None
     concerns: tuple[Concern, ...] = ()
     answer: tuple[AnswerPart, ...] = ()
+    degraded = False
     layer: Layer
     if assessment.level != "none":
         if subject == "self":
@@ -129,14 +133,23 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
             request_id=request_id,
         )
         intent, concerns = result.intent, result.concerns
-        if result.clarify:
+        if result.clarify or intent is Intent.UNKNOWN:
             layer, answer = "clarify", (AnswerPart(kind="clarify", text=deps.texts.clarify),)
         elif intent is Intent.CHITCHAT:
             layer, answer = "template", (AnswerPart(kind="answer", text=deps.texts.chitchat),)
         elif intent is Intent.OUT_OF_SCOPE:
             layer, answer = "template", (AnswerPart(kind="answer", text=deps.texts.out_of_scope),)
         else:
-            layer = "pending"
+            qa = answer_question(
+                text,
+                result,
+                cards=deps.cards,
+                texts=deps.texts,
+                gateway=deps.gateway,
+                request_id=request_id,
+            )
+            deps.record_run(user_id, qa.record)
+            layer, answer, degraded = qa.record.layer, qa.parts, qa.record.degraded
     _log.info(
         "chat.replied",
         request_id=request_id,
@@ -155,4 +168,5 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
         concerns=concerns,
         sections=sections,
         answer=answer,
+        degraded=degraded,
     )

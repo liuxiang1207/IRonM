@@ -1,0 +1,246 @@
+# 问答卡（spec [2026-10-21] §6 L0）：高频、低风险问题的审定答案，也是 L1 回答的知识来源。
+# 每张卡：适用意图、负责的 Agent、匹配说法（match：几组词，每组至少命中一个）、统一结构的各部分、依据。
+# 卡里出现的数字即为登记过的数字（spec §7）：回答中引用时视为有来源。
+# 说法要写成统一后的形式：半角、小写、不含空白与分句符号。
+# 2026-10-21 由 Claude 受项目负责人委托对照公开资料撰写与审定，未经认证教练或注册营养师复核；记录见 spec/review_log.md。
+version: "1.0"
+review: approved
+
+cards:
+  # ---- 动作技术 ----
+  - id: QA-SQUAT-VALGUS
+    intents: [exercise_technique]
+    agent: exercise_coach
+    match: [[深蹲, 蹲], [内扣, 往里扣, 膝盖往里]]
+    conclusion: 深蹲时膝盖内扣多半是臀部发力不足或站姿不合适，先减重量、把动作做对。
+    why: 膝盖内扣时，膝关节承受更多扭转的力，久了容易不舒服；臀中肌参与少也会让下肢力线不稳。
+    how: 双脚略宽于肩、脚尖稍向外；下蹲时想着“膝盖跟着脚尖方向走”；先用自重或较轻重量，配合臀桥、侧向弹力带走步练臀部。
+    caution: 如果膝盖疼痛、肿胀或有卡住感，先停下这个动作并咨询医生或康复师。
+    sources: ["NSCA《体能训练概论》第 4 版：深蹲技术要点"]
+
+  - id: QA-SQUAT-KNEE-PAIN
+    intents: [exercise_technique]
+    agent: exercise_coach
+    match: [[深蹲, 蹲], [膝盖疼, 膝盖痛, 膝盖不舒服, 膝盖酸, 膝关节疼]]
+    conclusion: 深蹲时膝盖不舒服，先减轻重量、减小下蹲幅度，检查动作；疼痛明显就先停下这个动作。
+    why: 重量过大、膝盖内扣或重心太靠前，都会让膝盖承受更多压力。
+    how: 改用自重或较轻重量；蹲到不疼的深度为止；膝盖跟着脚尖方向走，重心放在全脚掌；可以先用箱式深蹲或臀桥替代。
+    caution: 如果是刺痛、肿胀、卡住感，或者休息后仍持续疼痛，请先停止下肢训练并咨询医生或康复师。
+    sources: ["NSCA《体能训练概论》第 4 版：深蹲技术要点"]
+
+  - id: QA-DEADLIFT-BACK
+    intents: [exercise_technique]
+    agent: exercise_coach
+    match: [[硬拉], [腰, 背, 弓背, 塌腰]]
+    conclusion: 硬拉保护腰部的关键是全程保持背部中立、杠铃贴近身体、用髋发力。
+    why: 弓背会让腰椎承受过大的弯曲负荷；杠铃离身体越远，腰部的力矩越大。
+    how: 起拉前收紧核心、肩胛下沉；想着“把地面推开”，同时髋和膝一起伸展；杠铃沿小腿和大腿上滑。先用较轻重量练熟动作。
+    caution: 训练中或训练后腰部刺痛、腿部发麻，立即停止并就医。
+    sources: ["NSCA《体能训练概论》第 4 版：硬拉技术要点"]
+
+  - id: QA-BENCH-GRIP
+    intents: [exercise_technique]
+    agent: exercise_coach
+    match: [[卧推], [握距, 握多宽, 手放, 握法]]
+    conclusion: 卧推一般握距略宽于肩，下放到最低点时前臂大致垂直地面。
+    why: 握距过宽会加大肩部压力，过窄则更多用到三头肌；前臂垂直时发力最直接。
+    how: 肩胛骨后收下沉、双脚踩稳；杠铃下放到胸部中下方，再推起。肩部不适时可以稍窄握距、减小下放幅度。
+    caution: 推举时肩部刺痛或弹响伴疼痛，先停止该动作并咨询医生或康复师。
+    sources: ["NSCA《体能训练概论》第 4 版：卧推技术要点"]
+
+  - id: QA-PULLUP-ZERO
+    intents: [exercise_technique, training_knowledge]
+    agent: exercise_coach
+    match: [[引体], [做不了, 一个都, 拉不上, 怎么练]]
+    conclusion: 一个引体向上都做不了很常见，可以从更容易的拉类动作开始逐步过渡。
+    why: 引体向上需要背部和手臂能拉起全身重量，从较轻的版本练起更容易持续进步。
+    how: 依次练反向划船（斜身拉）、弹力带辅助引体、离心引体（跳上去后慢慢放下）；每周练 2 次左右。
+    caution: 肩部疼痛时停止，不要靠甩身体硬拉。
+    sources: ["NSCA《体能训练概论》第 4 版：渐进超负荷原则"]
+
+  - id: QA-PUSHUP-FORM
+    intents: [exercise_technique]
+    agent: exercise_coach
+    match: [[俯卧撑], [标准, 塌腰, 姿势, 怎么做]]
+    conclusion: 标准俯卧撑要求身体从头到脚跟保持一条直线，不塌腰、不撅臀。
+    why: 塌腰会让腰部代偿受力，撅臀则减少了胸部和核心的参与。
+    how: 双手略宽于肩，收紧腹部和臀部；下降到胸部接近地面再推起。做不了标准版时，先做跪姿或推墙俯卧撑。
+    caution: 手腕或肩部疼痛时，可改用拳撑或推墙，并减少次数。
+    sources: ["ACSM《运动测试与运动处方指南》第 11 版：肌肉力量与耐力"]
+
+  # ---- 训练知识 ----
+  - id: QA-STRENGTH-FREQUENCY
+    intents: [training_knowledge]
+    agent: training_planner
+    match: [[增肌, 力量训练, 练力量, 撸铁], [几次, 频率, 一周练, 每周练]]
+    conclusion: 成人每周至少 2 天力量训练，同一肌群每周练 2 次左右效果较好。
+    why: WHO 建议成人每周至少 2 天进行涉及主要肌群的肌肉力量活动；研究显示同一肌群每周 2 次比 1 次更有利于增肌。
+    how: 时间少时每周 2 次全身训练；时间多时可以 3–4 次，按上下肢或推拉分开。
+    uncertain: 每个人恢复能力不同，练后长时间疲劳就要减少次数。
+    sources: ["WHO 身体活动和久坐行为指南（2020）", "Schoenfeld 等 2016，训练频率与肌肥大的荟萃分析"]
+
+  - id: QA-SETS-REPS
+    intents: [training_knowledge]
+    agent: training_planner
+    match: [[几组, 组数], [几次, 次数, 多少次]]
+    conclusion: 初学者每个动作 1–3 组、每组 8–12 次，做到还能再做 2–3 次时停下，就是不错的起点。
+    why: ACSM 对初学者的建议是每个动作 1–3 组、8–12 次；留一点余力能保证动作质量、降低受伤风险。
+    how: 能轻松完成 12 次时，下次稍微加重量；练到第 2–3 个月，可以逐步加到每个动作 3 组。
+    sources: ["ACSM 立场声明：健康成人抗阻训练的渐进模式（2009）"]
+
+  - id: QA-CARDIO-ORDER
+    intents: [training_knowledge]
+    agent: training_planner
+    match: [[有氧], [力量, 无氧], [先, 后, 顺序]]
+    conclusion: 以增肌或力量为主时，先做力量训练再做有氧；以耐力为主时可以反过来。
+    why: 先做的项目精力最充足；力量训练前先做大量有氧，会降低力量训练的表现。
+    how: 同一天都做时，先力量、后有氧；或者把有氧放在另一天。
+    sources: ["ACSM《运动测试与运动处方指南》第 11 版"]
+
+  - id: QA-WEEKLY-ACTIVITY
+    intents: [training_knowledge]
+    agent: training_planner
+    match: [[有氧, 跑步, 运动], [多久, 多少分钟, 每周多少, 一周多少]]
+    conclusion: 成人每周 150–300 分钟中等强度有氧，或 75–150 分钟较大强度有氧，再加每周至少 2 天力量训练。
+    why: 这是 WHO 2020 年身体活动指南对成人的建议，与中国人群身体活动指南一致。
+    how: 可以拆成每周 5 天、每天 30–60 分钟；刚开始从更少的量开始，每周逐步增加。
+    sources: ["WHO 身体活动和久坐行为指南（2020）", "中国人群身体活动指南（2021）"]
+
+  - id: QA-WARMUP
+    intents: [training_knowledge]
+    agent: training_planner
+    match: [[热身, 拉伸], [训练前, 练之前, 运动前, 要不要, 怎么]]
+    conclusion: 训练前做 5–10 分钟动态热身，比长时间静态拉伸更合适。
+    why: 动态热身能提高体温和关节活动度；训练前长时间静态拉伸可能暂时降低力量表现。
+    how: 先慢跑或开合跳 3–5 分钟，再做与当天训练相关的动作（如徒手深蹲、弹力带肩部动作），最后用轻重量做几组正式动作。
+    sources: ["ACSM《运动测试与运动处方指南》第 11 版：热身与整理活动"]
+
+  # ---- 恢复与睡眠 ----
+  - id: QA-DOMS
+    intents: [recovery_sleep]
+    agent: recovery
+    match: [[酸痛, 酸, doms], [第二天, 练完, 两天, 正常吗]]
+    conclusion: 练后 1–3 天肌肉酸痛（延迟性肌肉酸痛）很常见，通常几天内自行缓解。
+    why: 新动作或加大训练量后，肌肉需要适应，酸痛一般在练后 24–72 小时最明显。
+    how: 可以做轻松的活动、散步或低强度骑车；酸痛明显时让这组肌肉多休息一天。
+    caution: 如果酸痛异常剧烈、肌肉明显肿胀，或尿色像浓茶、酱油，请立即就医。
+    sources: ["ACSM 资料：延迟性肌肉酸痛"]
+
+  - id: QA-SLEEP
+    intents: [recovery_sleep]
+    agent: recovery
+    match: [[睡, 睡眠, 失眠]]
+    conclusion: 成人每晚睡 7 小时以上，对训练恢复和体重管理都有帮助。
+    why: 睡眠不足会影响训练表现和恢复，还会让人更容易饿。
+    how: 固定起床时间；睡前 1 小时少看手机；晚上不要太晚做高强度训练；下午以后少喝咖啡和浓茶。
+    caution: 长期失眠、白天严重嗜睡或打鼾憋醒，请咨询医生。
+    sources: ["美国睡眠医学会与睡眠研究会成人睡眠时长共识（2015）"]
+
+  # ---- 饮食 ----
+  - id: QA-PROTEIN
+    intents: [nutrition]
+    agent: nutritionist
+    match: [[蛋白质, 蛋白], [多少, 吃多少, 每天, 一天]]
+    conclusion: 规律做力量训练时，每天每千克体重约 1.6 克蛋白质，对增肌就够了。
+    why: 研究显示，蛋白质摄入达到每千克体重约 1.6 克后，增肌效果基本不再增加。
+    how: 分到三餐里，每餐有一份肉、蛋、豆制品或奶制品；不够时再考虑蛋白粉补充。
+    caution: 有肾脏疾病的人，蛋白质摄入请先咨询医生。
+    sources: ["Morton 等 2018，蛋白质补充与抗阻训练的荟萃分析"]
+
+  - id: QA-TAKEOUT
+    intents: [nutrition]
+    agent: nutritionist
+    match: [[外卖, 食堂, 下馆子, 在外面吃], [怎么选, 选什么, 吃什么, 怎么吃]]
+    conclusion: 点外卖或吃食堂时，按“一份蛋白质、一份蔬菜、一份主食”来选，少选油炸和浓汁的菜。
+    why: 这样搭配能吃够蛋白质和蔬菜，也更容易控制油和盐。
+    how: 优先选清蒸、白灼、炖的菜；主食选米饭或粗粮，分量按平时；汤汁和蘸料少放。
+    sources: ["中国居民膳食指南（2022）：平衡膳食准则"]
+
+  - id: QA-LATE-SNACK
+    intents: [nutrition]
+    agent: nutritionist
+    match: [[宵夜, 晚上饿, 睡前吃, 晚上吃]]
+    conclusion: 晚上饿了可以吃一点，选蛋白质为主、分量小的食物。
+    why: 一天的总摄入比吃饭的时间更重要；睡前吃太多、太油会影响睡眠。
+    how: 一杯牛奶或无糖酸奶、一个鸡蛋或一小把坚果；尽量在睡前 1 小时以前吃完。
+    sources: ["中国居民膳食指南（2022）"]
+
+  # ---- 补剂 ----
+  - id: QA-CREATINE
+    intents: [supplements_drugs]
+    agent: nutritionist
+    match: [[肌酸]]
+    conclusion: 一水肌酸是证据最充分的运动补剂之一，常用量是每天 3–5 克，长期服用。
+    why: 肌酸能提高短时间高强度训练的表现，配合力量训练有助于增加力量和肌肉量。
+    how: 每天固定时间随餐或随水服用，不需要先“冲击”；保证喝够水。
+    caution: 有肾脏疾病或正在服药时，先咨询医生；未成年人不建议自行服用。
+    sources: ["国际运动营养学会（ISSN）关于肌酸的立场声明（2017）"]
+
+  - id: QA-PROTEIN-POWDER
+    intents: [supplements_drugs]
+    agent: nutritionist
+    match: [[蛋白粉]]
+    conclusion: 蛋白粉只是方便的蛋白质来源，饮食中蛋白质够了就不必喝。
+    why: 蛋白粉和肉、蛋、奶里的蛋白质作用相同，效果取决于一天总的蛋白质够不够。
+    how: 饮食不方便吃够蛋白质时，用 1 勺蛋白粉补充；选成分简单、有正规检测的产品。
+    caution: 乳糖不耐受的人选分离乳清或植物蛋白；有肾脏疾病先咨询医生。
+    sources: ["国际运动营养学会（ISSN）关于蛋白质与运动的立场声明（2017）"]
+
+  - id: QA-L-CARNITINE
+    intents: [supplements_drugs]
+    agent: nutritionist
+    match: [[左旋肉碱]]
+    conclusion: 目前没有可靠证据表明健康人吃左旋肉碱能帮助减脂。
+    why: 人体自身能合成足够的肉碱；补充研究的结果不一致，效果很小或没有。
+    how: 把精力放在饮食总量、蛋白质和规律训练上，比依赖这类补剂更可靠。
+    sources: ["国际运动营养学会（ISSN）运动营养综述（2018）"]
+
+  # ---- 习惯 ----
+  - id: QA-CONSISTENCY
+    intents: [habit_motivation]
+    agent: behavior_coach
+    match: [[坚持, 放弃, 三天打鱼, 不想练, 懒]]
+    conclusion: 坚持不下来很常见，先把门槛降低，比靠意志力硬撑更有效。
+    why: 习惯靠固定的时间和场景养成；目标太大、太难时，更容易中途放弃。
+    how: 先定一个“最低任务”（比如每次只练 10 分钟），固定在每周同样的几天和时间；完成后记录下来；漏了一次，下次照常继续就行。
+    sources: ["习惯形成研究：Lally 等 2010"]
+
+  - id: QA-NO-TIME
+    intents: [habit_motivation]
+    agent: behavior_coach
+    match: [[没时间, 太忙, 加班]]
+    conclusion: 时间少时，短时间的训练也有用，关键是每周练得上。
+    why: 每周总活动量更重要，零散的 10 分钟也能累计。
+    how: 用 20 分钟的全身训练（深蹲、俯卧撑、划船、平板支撑循环）；上下班多走路、爬楼梯。
+    sources: ["WHO 身体活动和久坐行为指南（2020）：任何时长的活动都有益"]
+
+  # ---- 养生 ----
+  - id: QA-DETOX-FASTING
+    intents: [wellness]
+    agent: nutritionist
+    match: [[断食, 排毒, 清肠]]
+    conclusion: “断食排毒”没有可靠证据，人体靠肝脏和肾脏排出代谢废物，不需要靠断食“排毒”。
+    why: 长时间断食可能导致低血糖、乏力和肌肉流失，对正在训练的人不利。
+    how: 想调整饮食，可以规律三餐、多吃蔬菜和全谷物、少吃加工食品。
+    caution: 有糖尿病、正在怀孕或有进食障碍史的人，不要自行断食。
+    sources: ["中国居民膳食指南（2022）"]
+
+  - id: QA-FOOT-SOAK
+    intents: [wellness]
+    agent: recovery
+    match: [[泡脚]]
+    conclusion: 泡脚可以帮助放松、改善睡前的舒适感，但不能替代运动或治疗疾病。
+    why: 温水泡脚能让人放松，有助于入睡；“排毒”“治病”这类说法没有可靠证据。
+    how: 水温 40 度左右、10–20 分钟即可；饭后马上泡、水太烫都不合适。
+    caution: 糖尿病人足部感觉迟钝，容易烫伤，要先用手试水温。
+    sources: ["《中国公民中医养生保健素养》（2014）"]
+
+  - id: QA-GOJI
+    intents: [wellness]
+    agent: nutritionist
+    match: [[枸杞]]
+    conclusion: 枸杞是一种食材，可以作为饮食的一部分，但没有可靠证据表明它能减肥或增肌。
+    why: 枸杞含有一些维生素和植物化合物，日常少量食用没有问题；“补肾”“减肥”等功效缺乏可靠研究支持。
+    how: 当作水果或配料少量食用就好；训练与饮食的效果主要取决于总量和规律。
+    caution: 正在服用华法林等抗凝药的人，食用前请咨询医生。
+    sources: ["《中国公民中医养生保健素养》（2014）"]
