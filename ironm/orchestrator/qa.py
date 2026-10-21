@@ -86,6 +86,7 @@ class RetrievalTrace(ContractModel):
     keyword: tuple[str, ...]  # 关键词一路召回的段落编号
     vector: tuple[str, ...]  # 向量一路召回的段落编号
     kept: tuple[tuple[str, float], ...]  # 重排后留下的段落与分数
+    vector_status: str = "off"  # ok / off / warming / unavailable
 
 
 class QAResult(ContractModel):
@@ -224,13 +225,15 @@ def _trace(a: AgentAnswer) -> RetrievalTrace:
         keyword=r.keyword,
         vector=r.vector,
         kept=tuple((x.passage.passage_id, round(x.score, 3)) for x in r.passages),
+        vector_status=r.vector_status,
     )
 
 
 def _degraded(answers: Sequence[AgentAnswer], has_model: bool) -> list[str]:
-    """降级发生的步骤：向量一路不可用、重排退回覆盖比例、Agent 退回工具或问答卡。"""
-    vector_down = any(a.retrieval and a.retrieval.vector_status == "unavailable" for a in answers)
-    out = ["vector:unavailable"] if vector_down else []
+    """降级发生的步骤：向量一路不可用或还在预热、重排退回覆盖比例、Agent 退回工具或问答卡。"""
+    vector = {a.retrieval.vector_status for a in answers if a.retrieval is not None}
+    # 服务出错与“段落向量还在计算”分开记：后者服务是好的，不能记成故障
+    out = [f"vector:{s}" for s in ("unavailable", "warming") if s in vector][:1]
     if not has_model:
         return ["model_unavailable", *out]
     out += [

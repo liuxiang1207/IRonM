@@ -213,9 +213,115 @@ def test_passage_vectors_do_not_block_other_requests() -> None:
     t.start()
     assert started.wait(5)
     other = r.retrieve(["肌酸要怎么吃"], _A.NUTRITIONIST)  # 不被阻塞
-    assert other.vector_status == "unavailable" and other.passages
+    # 服务是好的，只是还在算：记为“预热中”，不是“不可用”（复核）
+    assert other.vector_status == "warming" and other.passages
     release.set()
     t.join(5)
+
+
+# ---- 复核后：向量预热 ----
+
+
+class _SlowPassages:
+    """段落向量要等 release 才算完；查询向量立即返回。"""
+
+    def __init__(self) -> None:
+        self.started, self.release = threading.Event(), threading.Event()
+        self.passage_calls = 0
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        if len(texts) > 10:
+            self.passage_calls += 1
+            self.started.set()
+            self.release.wait(5)
+        return [[0.0, 1.0] for _ in texts]
+
+
+def test_warming_recorded_as_warming_not_unavailable() -> None:
+    emb = _SlowPassages()
+    retriever = Retriever(KB, embedder=emb)
+    t = threading.Thread(target=retriever.warm)
+    t.start()
+    assert emb.started.wait(5)
+    result = _ask(
+        "肌酸要怎么吃", _intent(Intent.SUPPLEMENTS_DRUGS), retriever=retriever, embedder=emb
+    )
+    assert "vector:warming" in result.record.degraded_steps
+    assert "vector:unavailable" not in result.record.degraded_steps
+    assert {t.vector_status for t in result.record.retrieval} == {"warming"}
+    emb.release.set()
+    t.join(5)
+    after = _ask(
+        "肌酸要怎么吃", _intent(Intent.SUPPLEMENTS_DRUGS), retriever=retriever, embedder=emb
+    )
+    assert not [s for s in after.record.degraded_steps if s.startswith("vector:")]
+    assert emb.passage_calls == 1  # 预热算过一次，之后直接用缓存
+
+
+def test_warm_failure_is_unavailable_with_cooldown() -> None:
+    class _Down:
+        calls = 0
+
+        def embed(self, texts: Sequence[str]) -> list[list[float]]:
+            _Down.calls += 1
+            raise TimeoutError
+
+    retriever = Retriever(KB, embedder=_Down())
+    assert retriever.warm() is False
+    got = retriever.retrieve(["肌酸要怎么吃"], _A.NUTRITIONIST)
+    assert got.vector_status == "unavailable" and _Down.calls == 1  # 冷却期内不再调用
+
+
+def test_warm_without_vector_service_is_noop() -> None:
+    retriever = Retriever(KB)
+    assert retriever.warm() is False
+    assert retriever.retrieve(["肌酸要怎么吃"], _A.NUTRITIONIST).vector_status == "off"
+
+
+def test_passage_vectors_include_spoken_keywords() -> None:
+    """段落的口语关键词参与关键词检索，也要参与向量（两路一致）。"""
+    from ironm.knowledge.kb import Passage
+
+    seen: list[str] = []
+
+    class _Record:
+        def embed(self, texts: Sequence[str]) -> list[list[float]]:
+            seen.extend(texts)
+            return [[1.0, 0.0] for _ in texts]
+
+    note = Passage(
+        passage_id="g:wake", domain=_A.RECOVERY, title="作息", text="固定起床时间。",
+        source="某指南", level="guideline", review="approved", keywords=("夜里老醒",),
+    )  # fmt: skip
+    Retriever(KnowledgeBase([*KB.passages, note]), embedder=_Record()).warm()
+    assert any("固定起床时间" in t and "夜里老醒" in t for t in seen)
+
+
+@pytest.mark.parametrize(("key", "expected"), [("k", True), (None, False)])
+def test_app_warms_passage_vectors_in_background(
+    key: str | None, expected: bool, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    """配置了向量服务时，服务启动后在后台预先计算段落向量；没配置时不做。"""
+    from datetime import UTC, datetime
+
+    from fastapi.testclient import TestClient
+
+    from ironm.api.app import create_app
+    from ironm.core.clock import FixedClock
+    from ironm.core.config import load_settings
+
+    warmed = threading.Event()
+
+    def fake_warm(self: Retriever) -> bool:
+        warmed.set()
+        return True
+
+    monkeypatch.setattr(Retriever, "warm", fake_warm)
+    settings = load_settings({"IRONM_DB_PATH": str(tmp_path / "db.sqlite")})
+    environ = {"SILICONFLOW_API_KEY": key} if key else {}
+    app = create_app(settings, FixedClock(datetime(2026, 10, 21, 9, tzinfo=UTC)), environ=environ)
+    with TestClient(app):
+        assert warmed.wait(2 if expected else 0.3) is expected
 
 
 # ---- 小问题 ----

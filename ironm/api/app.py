@@ -5,6 +5,7 @@ import os
 import re
 import sqlite3
 import sys
+import threading
 import time
 from collections.abc import AsyncIterator, Iterator, Mapping
 from contextlib import asynccontextmanager, closing
@@ -221,6 +222,9 @@ def create_app(
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         with closing(connect(settings.db_path)) as conn:
             migrate(conn, migrations_dir, clock)
+        if vectors:
+            # 启动后在后台预先计算知识段落的向量：不拖慢启动，第一个提问也不用等（spec §13）
+            threading.Thread(target=retriever.warm, name="kb-warm", daemon=True).start()
         yield
 
     app = FastAPI(title="IronM", version=__version__, lifespan=lifespan)

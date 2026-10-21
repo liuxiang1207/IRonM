@@ -255,6 +255,9 @@ def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
     return 0.0 if na == 0 or nb == 0 else sum(x * y for x, y in zip(a, b, strict=True)) / (na * nb)
 
 
+type VectorStatus = Literal["ok", "off", "warming", "unavailable"]
+
+
 @dataclass(frozen=True)
 class Retrieval:
     """一次检索的结果与过程（过程写进运行记录，只有段落编号与分数，不含查询原文）。"""
@@ -263,7 +266,8 @@ class Retrieval:
     keyword: tuple[str, ...] = ()  # 关键词一路召回的段落编号（各查询合并）
     vector: tuple[str, ...] = ()  # 向量一路召回的段落编号；没有向量模型或不可用时为空
     reranked_by: Literal["model", "coverage", "none"] = "none"
-    vector_status: Literal["ok", "off", "unavailable"] = "off"  # off：没有配置向量服务
+    # off：没有配置向量服务；warming：段落向量还在计算（服务正常）；unavailable：服务出错或在冷却
+    vector_status: VectorStatus = "off"
 
 
 class OncePerRequestEmbedder:
@@ -329,20 +333,28 @@ class Retriever:
         with self._lock:
             self._failed_at = self._timer()
 
-    def _passage_vectors(self) -> list[list[float]] | None:
-        """段落向量：第一次用到时计算并缓存；正在计算时其他请求不等待，先只用关键词一路；
-        失败后隔一段时间再试。"""
+    def warm(self) -> bool:
+        """预先计算段落向量（服务启动后在后台调用）；返回是否已可用。"""
+        vectors, _ = self._passage_vectors()
+        return vectors is not None
+
+    def _passage_vectors(self) -> tuple[list[list[float]] | None, VectorStatus]:
+        """段落向量：第一次用到时计算并缓存；正在计算时其他请求不等待，先只用关键词一路
+        （记为预热中，不算服务出错）；失败后隔一段时间再试。"""
         if self._embedder is None:
-            return None
+            return None, "off"
         with self._lock:
-            if self._cooling() or self._computing:
-                return None
+            if self._cooling():
+                return None, "unavailable"
+            if self._computing:
+                return None, "warming"
             if self._vectors is not None:
-                return self._vectors
+                return self._vectors, "ok"
             self._computing = True
         vectors: list[list[float]] | None = None
         try:
-            got = self._embedder.embed([p.title + p.text for p in self._kb.passages])
+            # 与关键词一路用同样的文本：标题 + 正文 + 口语关键词
+            got = self._embedder.embed([_indexable(p) for p in self._kb.passages])
             dims = {len(v) for v in got}
             if len(got) == len(self._kb.passages) and len(dims) == 1 and 0 not in dims:
                 vectors = got
@@ -354,18 +366,17 @@ class Retriever:
                 self._failed_at = self._timer()
             else:
                 self._vectors = vectors
-        return vectors
+        return vectors, "ok" if vectors is not None else "unavailable"
 
     def _vector_lists(
         self, queries: Sequence[str], allowed: frozenset[int], embedder: Embedder | None
-    ) -> tuple[list[list[int]], Literal["ok", "off", "unavailable"]]:
-        if self._embedder is None:
-            return [], "off"
-        vectors = self._passage_vectors()
-        if vectors is None:
-            return [], "unavailable"
+    ) -> tuple[list[list[int]], VectorStatus]:
+        vectors, status = self._passage_vectors()
+        source = embedder or self._embedder
+        if vectors is None or source is None:
+            return [], status
         try:
-            qvs = (embedder or self._embedder).embed(list(queries))
+            qvs = source.embed(list(queries))
             if len(qvs) != len(queries) or any(len(qv) != len(vectors[0]) for qv in qvs):
                 raise ValueError("向量维度不一致")
         except Exception:  # 查询向量失败（含维度对不上）：这一路跳过，并进入冷却
