@@ -38,7 +38,7 @@ from ironm.engine.precision import (
 from ironm.engine.trend import WEIGHT_TREND, TrendParams
 from ironm.engine.window import JUDGEMENT_WINDOW, WindowParams
 from ironm.rules.loader import RuleBook
-from ironm.safety.tiers import TIER_RULE, TierParams
+from ironm.safety.tiers import TIER_LIMITS_RULE, TIER_RULE, TierLimitsParams, TierParams
 
 RULE_PARAMS: dict[str, type[BaseModel]] = {
     WEIGHT_JUMP: WeightJumpParams,
@@ -52,6 +52,7 @@ RULE_PARAMS: dict[str, type[BaseModel]] = {
     RECOVERY: RecoveryParams,
     JUDGEMENT_WINDOW: WindowParams,
     TIER_RULE: TierParams,
+    TIER_LIMITS_RULE: TierLimitsParams,
     REE: ReeParams,
     PAL: PalParams,
     DEFICIT: DeficitParams,

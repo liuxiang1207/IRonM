@@ -1,26 +1,30 @@
 """Skill 加载与选择（spec §28）。
 
-目录结构：<根目录>/<所属 Agent>/<Skill 编号>/SKILL.md。
-SKILL.md 以 YAML 头信息开头（两行 --- 之间），其后是说明正文。
+目录结构：<根目录>/<所属 Agent>/<Skill 编号>/SKILL.md 与 skill.py。
+SKILL.md 以 YAML 头信息开头（两行 --- 之间），其后是说明正文；skill.py 提供 run(view, context)。
 选择只看头信息：所属 Agent、意图、场景包、人群分层同时匹配才加载；
 处方类 Skill 在不可给计划的分层一律不加载。
 """
 
+import importlib.util
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 from pydantic import ValidationError
 
+from ironm.contracts.agents import AgentOutput
 from ironm.contracts.plan import PlanField
 from ironm.contracts.roles import AgentId
 from ironm.contracts.screening import TierResult
 from ironm.contracts.skills import ScenePack, SkillManifest
 from ironm.contracts.unknown import is_known
 from ironm.core.yamlfile import load_yaml_text
+from ironm.rules.loader import RuleBook
 from ironm.safety.decision import plan_allowed
+from ironm.skills.view import SnapshotView
 
 __all__ = ["SKILLS_DIR", "LoadedSkill", "Selection", "SkillLoadError", "load_skills", "select"]
 
@@ -33,10 +37,22 @@ class SkillLoadError(ValueError):
 
 
 @dataclass(frozen=True)
+class SkillContext:
+    """运行一个 Skill 时除快照外能用的东西：Skill 自身与规则簿。"""
+
+    skill: "LoadedSkill"
+    rulebook: RuleBook
+
+
+type SkillRun = Callable[[SnapshotView, SkillContext], AgentOutput]
+
+
+@dataclass(frozen=True)
 class LoadedSkill:
     manifest: SkillManifest
     body: str  # 说明正文
     path: Path
+    run: SkillRun
 
 
 @dataclass(frozen=True)
@@ -73,7 +89,25 @@ def parse_skill_md(path: Path) -> LoadedSkill:
     body = "\n".join(lines[end + 1 :]).strip()
     if not body:
         raise SkillLoadError(f"{path}：缺少说明正文")
-    return LoadedSkill(manifest=manifest, body=body, path=path)
+    return LoadedSkill(manifest=manifest, body=body, path=path, run=_load_run(path.parent))
+
+
+def _load_run(folder: Path) -> SkillRun:
+    """读取 Skill 目录下 skill.py 的 run 函数。"""
+    source = folder / "skill.py"
+    if not source.is_file():
+        raise SkillLoadError(f"{folder}：缺少 skill.py")
+    name = f"ironm_skill_{folder.parent.name}_{folder.name}"
+    spec = importlib.util.spec_from_file_location(name, source)
+    if spec is None or spec.loader is None:
+        raise SkillLoadError(f"{source}：无法加载")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    run = getattr(module, "run", None)
+    if not callable(run):
+        raise SkillLoadError(f"{source}：缺少 run(view, context) 函数")
+    skill_run: SkillRun = run
+    return skill_run
 
 
 def load_skills(root: Path = SKILLS_DIR) -> tuple[LoadedSkill, ...]:

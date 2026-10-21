@@ -476,7 +476,15 @@
       "type": "string"
     },
     "tier": {
-      "$ref": "#/$defs/Tier"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Tier"
+        },
+        {
+          "$ref": "#/$defs/Unknown"
+        }
+      ],
+      "title": "Tier"
     },
     "user_id": {
       "minLength": 1,

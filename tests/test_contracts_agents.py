@@ -197,3 +197,35 @@ def test_proposal_values_read_only() -> None:
 
 def test_number_and_bool_are_different_values() -> None:
     _parse(_output("nutritionist", "proposal", [_proposal(from_value=1, to_value=True)]))
+
+
+# ---- 追问（spec §29） ----
+
+
+def _questions(agent: str, n: int, dup: bool = False) -> dict[str, Any]:
+    items = [
+        {
+            "item": f"profile.f{i}",
+            "reason_code": "needed_for_tier",
+            "fallback": "no_plan_until_answered",
+        }
+        for i in range(n)
+    ]
+    if dup:
+        items.append(dict(items[0]))
+    return {"agent": agent, "skill": "intake_questions@1.0.0", "kind": "questions", "items": items}
+
+
+def test_only_assessor_asks_questions() -> None:
+    AGENT_OUTPUT_ADAPTER.validate_json(json.dumps(_questions("assessor", 3)))
+    assert {a for a, kinds in AGENT_OUTPUT_KINDS.items() if OutputKind.QUESTIONS in kinds} == {
+        AgentId.ASSESSOR
+    }
+    with pytest.raises(ValidationError, match="不能产出"):
+        AGENT_OUTPUT_ADAPTER.validate_json(json.dumps(_questions("nutritionist", 1)))
+
+
+@pytest.mark.parametrize(("n", "dup"), [(4, False), (0, False), (2, True)])
+def test_questions_limits(n: int, dup: bool) -> None:
+    with pytest.raises(ValidationError):
+        AGENT_OUTPUT_ADAPTER.validate_json(json.dumps(_questions("assessor", n, dup)))

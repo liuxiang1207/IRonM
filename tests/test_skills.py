@@ -1,7 +1,6 @@
 """Agent 基类与 Skill 加载器（spec [2026-10-20] §28）。"""
 
 import io
-import json
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +9,6 @@ import yaml
 
 from ironm.agents.base import NO_SKILL, Agent, AgentContractError
 from ironm.api.app import create_app
-from ironm.contracts.agents import AgentOutput, NoOpinionOutput
 from ironm.contracts.roles import AgentId, OutputKind
 from ironm.contracts.screening import Tier, TierResult
 from ironm.contracts.skills import ScenePack
@@ -18,6 +16,7 @@ from ironm.contracts.snapshot import Snapshot
 from ironm.contracts.unknown import Unknown, UnknownReason
 from ironm.core.clock import FixedClock
 from ironm.core.config import load_settings
+from ironm.rules.loader import RULES_DIR, load_rules
 from ironm.skills.loader import LoadedSkill, SkillLoadError, load_skills, select
 from ironm.skills.view import SnapshotView, UndeclaredDataError
 from tests.test_api_events import NOW
@@ -40,17 +39,51 @@ def _manifest(skill_id: str, **overrides: Any) -> dict[str, Any]:
         "prescriptive": True,
         "review": "approved",
         "reviewed_by": "测试",
+        "tests": "tests/test_skills.py",
     }
     data.update(overrides)
     return data
 
 
-def _write(root: Path, manifest: dict[str, Any], body: str = "说明正文。") -> Path:
+# 测试用 Skill 的实现：返回“本次无意见”，读一项数据；SKILL_AGENT / SKILL_NAME 可替换成别的值来测校验
+RUN_SOURCE = """
+from ironm.contracts.agents import NoOpinionOutput
+from ironm.contracts.roles import AgentId, OutputKind
+
+READ = {read!r}
+SKILL_AGENT = {agent!r}
+SKILL_NAME = {name!r}
+
+
+def run(view, context):
+    for key in READ:
+        view.get(key)
+    m = context.skill.manifest
+    return NoOpinionOutput(
+        agent=AgentId(SKILL_AGENT) if SKILL_AGENT else m.owner_agent,
+        skill=SKILL_NAME or m.versioned,
+        kind=OutputKind.NO_OPINION,
+        reason_code="test",
+    )
+"""
+
+
+def _write(
+    root: Path,
+    manifest: dict[str, Any],
+    body: str = "说明正文。",
+    *,
+    read: tuple[str, ...] = (),
+    agent: str = "",
+    name: str = "",
+) -> Path:
     folder: Path = root / str(manifest["owner_agent"]) / str(manifest["id"])
     folder.mkdir(parents=True, exist_ok=True)
     head = yaml.safe_dump(manifest, allow_unicode=True)
     path = folder / "SKILL.md"
     path.write_text(f"---\n{head}---\n\n{body}\n", encoding="utf-8")
+    source = RUN_SOURCE.format(read=read, agent=agent, name=name)
+    (folder / "skill.py").write_text(source, encoding="utf-8")
     return path
 
 
@@ -166,59 +199,55 @@ def test_view_reads_only_declared() -> None:
             view.get(key)
 
 
-# ---- Agent 基类 ----
+# ---- Agent ----
+
+BOOK = load_rules(RULES_DIR)
 
 
-class _Nutri(Agent):
-    agent_id = NUTRI
-
-    def __init__(self, output: dict[str, Any] | None = None) -> None:
-        self.calls: list[frozenset[str]] = []
-        self.output = output
-
-    def run(self, view: SnapshotView, skills: tuple[LoadedSkill, ...]) -> AgentOutput:
-        self.calls.append(view.declared)
-        view.get("metric.weight_trend")
-        data = self.output or {
-            "agent": "nutritionist",
-            "skill": skills[0].manifest.versioned,
-            "kind": "no_opinion",
-            "reason_code": "data_insufficient",
-        }
-        return NoOpinionOutput.model_validate_json(json.dumps(data))
-
-
-def test_agent_no_skill_returns_no_opinion(library: tuple[LoadedSkill, ...]) -> None:
-    agent = _Nutri()
-    out = agent.execute(_snapshot_obj(), _select(library, Tier.A, intent="goal.create"))
+def test_agent_no_skill_returns_single_no_opinion(library: tuple[LoadedSkill, ...]) -> None:
+    [out] = Agent(NUTRI).execute(
+        _snapshot_obj(), _select(library, Tier.A, intent="goal.create"), BOOK
+    )
     assert out.kind is OutputKind.NO_OPINION and out.skill == NO_SKILL
-    assert agent.calls == []  # 不调用具体实现
+    assert out.reason_code == "no_matching_skill"
 
 
-def test_agent_runs_with_trimmed_view(library: tuple[LoadedSkill, ...]) -> None:
-    agent = _Nutri()
-    out = agent.execute(_snapshot_obj(), _select(library, Tier.A))
-    assert out.skill == "food_log_summary@0.1.0"
-    assert agent.calls == [frozenset({"metric.weight_trend"})]
+def test_one_output_per_skill_each_with_own_view(tmp_path: Path) -> None:
+    _write(tmp_path, _manifest("first", requires_data=["tier"]), read=("tier",))
+    _write(
+        tmp_path,
+        _manifest("second", requires_data=["metric.weight_trend"]),
+        read=("metric.weight_trend",),
+    )
+    outputs = Agent(NUTRI).execute(_snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK)
+    assert [o.skill for o in outputs] == ["first@0.1.0", "second@0.1.0"]
+
+
+def test_skill_cannot_read_other_skills_data(tmp_path: Path) -> None:
+    """每个 Skill 只能读自己声明的数据，即使同一 Agent 的另一个 Skill 声明了。"""
+    _write(tmp_path, _manifest("first", requires_data=["tier"]), read=("metric.weight_trend",))
+    _write(tmp_path, _manifest("second", requires_data=["metric.weight_trend"]))
+    with pytest.raises(UndeclaredDataError):
+        Agent(NUTRI).execute(_snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK)
 
 
 @pytest.mark.parametrize(
-    "output",
-    [
-        {"agent": "nutritionist", "skill": "other_skill@0.1.0", "kind": "no_opinion"},
-        {"agent": "nutritionist", "skill": "plateau_adjust@9.9.9", "kind": "no_opinion"},
-    ],
+    ("agent", "name", "message"),
+    [("assessor", "", "标成了 assessor"), ("", "first@9.9.9", "别的 Skill 版本")],
 )
-def test_agent_output_must_come_from_loaded_skill(
-    library: tuple[LoadedSkill, ...], output: dict[str, Any]
+def test_output_must_match_running_skill(
+    tmp_path: Path, agent: str, name: str, message: str
 ) -> None:
-    with pytest.raises(AgentContractError, match="未加载"):
-        _Nutri(output).execute(_snapshot_obj(), _select(library, Tier.A))
+    _write(tmp_path, _manifest("first"), agent=agent, name=name)
+    with pytest.raises(AgentContractError, match=message):
+        Agent(NUTRI).execute(_snapshot_obj(), _select(load_skills(tmp_path), Tier.A), BOOK)
 
 
 def test_selection_for_other_agent_rejected(library: tuple[LoadedSkill, ...]) -> None:
     with pytest.raises(AgentContractError):
-        _Nutri().execute(_snapshot_obj(), _select(library, Tier.A, agent=AgentId.ASSESSOR))
+        Agent(NUTRI).execute(
+            _snapshot_obj(), _select(library, Tier.A, agent=AgentId.ASSESSOR), BOOK
+        )
 
 
 # ---- 头信息校验 ----
@@ -256,7 +285,20 @@ def test_bad_manifest_rejected(tmp_path: Path, manifest: dict[str, Any], message
     folder.mkdir(parents=True)
     head = yaml.safe_dump(manifest, allow_unicode=True)
     (folder / "SKILL.md").write_text(f"---\n{head}---\n\n正文\n", encoding="utf-8")
+    (folder / "skill.py").write_text(
+        RUN_SOURCE.format(read=(), agent="", name=""), encoding="utf-8"
+    )
     with pytest.raises(SkillLoadError, match=message):
+        load_skills(tmp_path)
+
+
+def test_skill_py_required(tmp_path: Path) -> None:
+    path = _write(tmp_path, _manifest("x"))
+    (path.parent / "skill.py").write_text("x = 1\n", encoding="utf-8")
+    with pytest.raises(SkillLoadError, match="run"):
+        load_skills(tmp_path)
+    (path.parent / "skill.py").unlink()
+    with pytest.raises(SkillLoadError, match=r"缺少 skill\.py"):
         load_skills(tmp_path)
 
 
@@ -278,6 +320,7 @@ def test_folder_must_match_manifest(tmp_path: Path) -> None:
     wrong = tmp_path / "assessor" / "x"
     wrong.mkdir(parents=True)
     (wrong / "SKILL.md").write_text(path.read_text("utf-8"), encoding="utf-8")
+    (wrong / "skill.py").write_text((path.parent / "skill.py").read_text("utf-8"), encoding="utf-8")
     with pytest.raises(SkillLoadError, match="目录应为"):
         load_skills(tmp_path)
 
@@ -291,5 +334,16 @@ def test_startup_fails_on_bad_skill(tmp_path: Path) -> None:
         )
 
 
-def test_bundled_skills_load() -> None:
-    load_skills()  # 内置目录可加载（首批 Skill 随 D28、D29 加入）
+def test_bundled_skills_reviewed_and_tested() -> None:
+    """内置 Skill 全部可加载、已审定、各自的测试文件存在。"""
+    root = Path(__file__).resolve().parents[1]
+    skills = load_skills()
+    assert {s.manifest.id for s in skills} >= {
+        "intake_questions",
+        "tier_limits",
+        "kcal_floor",
+        "eating_relationship",
+    }
+    for s in skills:
+        assert s.manifest.review == "approved", s.manifest.id
+        assert (root / s.manifest.tests).is_file(), s.manifest.tests

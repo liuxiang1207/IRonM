@@ -240,6 +240,63 @@
       "title": "ProposalOutput",
       "type": "object"
     },
+    "Question": {
+      "additionalProperties": false,
+      "description": "要用户补充的一项信息。",
+      "properties": {
+        "fallback": {
+          "$ref": "#/$defs/Text"
+        },
+        "item": {
+          "pattern": "^profile\\.[a-z][a-z0-9_]*$",
+          "title": "Item",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/Text"
+        }
+      },
+      "required": [
+        "item",
+        "reason_code",
+        "fallback"
+      ],
+      "title": "Question",
+      "type": "object"
+    },
+    "QuestionsOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "$ref": "#/$defs/AgentId"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/Question"
+          },
+          "maxItems": 3,
+          "minItems": 1,
+          "title": "Items",
+          "type": "array"
+        },
+        "kind": {
+          "const": "questions",
+          "title": "Kind",
+          "type": "string"
+        },
+        "skill": {
+          "$ref": "#/$defs/VersionedName"
+        }
+      },
+      "required": [
+        "agent",
+        "skill",
+        "kind",
+        "items"
+      ],
+      "title": "QuestionsOutput",
+      "type": "object"
+    },
     "Text": {
       "minLength": 1,
       "type": "string"
@@ -320,6 +377,7 @@
       "constraint": "#/$defs/ConstraintOutput",
       "no_opinion": "#/$defs/NoOpinionOutput",
       "proposal": "#/$defs/ProposalOutput",
+      "questions": "#/$defs/QuestionsOutput",
       "verdict": "#/$defs/VerdictOutput"
     },
     "propertyName": "kind"
@@ -333,6 +391,9 @@
     },
     {
       "$ref": "#/$defs/VerdictOutput"
+    },
+    {
+      "$ref": "#/$defs/QuestionsOutput"
     },
     {
       "$ref": "#/$defs/NoOpinionOutput"

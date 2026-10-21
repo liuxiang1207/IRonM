@@ -28,8 +28,10 @@ from ironm.core.clock import age_on
 from ironm.safety.emergency import Assessment
 
 __all__ = [
+    "TIER_LIMITS_RULE",
     "TIER_RULE",
     "RuleLookup",
+    "TierLimitsParams",
     "TierParams",
     "classify",
     "note_message",
@@ -37,6 +39,7 @@ __all__ = [
 ]
 
 TIER_RULE = "R-SF-TIER"
+TIER_LIMITS_RULE = "R-SF-TIER-LIMITS"
 EATING_DISORDER_CATEGORY = "eating_disorder"  # 急症词表中的类别：命中即记为进食障碍信号
 
 
@@ -80,6 +83,28 @@ class TierParams(BaseModel):
         absent = set(Condition) - set(groups)
         if absent:
             raise ValueError(f"健康状况没有归入任何一层：{sorted(absent)}")
+        return self
+
+
+class TierLimitsParams(BaseModel):
+    """各分层的训练限制（安全官“分层限制”Skill 使用）。B 与协作层用 b_ 开头的参数。"""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    a_max_rpe: int
+    b_max_rpe: int
+    a_cardio_step_min: int
+    b_cardio_step_min: int
+    b_cardio_cap_min: int
+
+    @model_validator(mode="after")
+    def _check(self) -> Self:
+        if not 1 <= self.b_max_rpe <= self.a_max_rpe <= 10:
+            raise ValueError("RPE 上限应在 1–10 之间，且 B 层不高于 A 层")
+        if not 0 < self.b_cardio_step_min <= self.a_cardio_step_min:
+            raise ValueError("有氧每周增量应为正数，且 B 层不高于 A 层")
+        if self.b_cardio_cap_min <= 0:
+            raise ValueError("B 层每周有氧上限应为正数")
         return self
 
 

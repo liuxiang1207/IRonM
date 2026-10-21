@@ -53,6 +53,7 @@ class SkillManifest(ContractModel):
     prescriptive: bool  # 处方类：会给出训练或饮食的具体安排
     review: Literal["pending_review", "approved"]
     reviewed_by: Text
+    tests: Annotated[str, Field(pattern=r"^tests/[A-Za-z0-9_./-]+\.py$")]  # 该 Skill 自带的测试文件
 
     @property
     def versioned(self) -> str:

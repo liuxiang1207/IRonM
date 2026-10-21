@@ -23,3 +23,16 @@ rules:
       collaborative_conditions: [weight_loss_drug_supervised]
       b_conditions: [hypertension, recent_injury, diabetes_no_medication]
     note: BMI 按一位小数四舍五入后比较；年龄按用户时区的当地日期（生日当天算满岁）。协作层准入条件待医学顾问审定。每种健康状况必须且只能归入一层。
+
+  - id: R-SF-TIER-LIMITS
+    title: 各分层的训练限制（安全官约束）
+    status: approved
+    source:
+      kind: design
+    params:
+      a_max_rpe: 8
+      b_max_rpe: 7  # B 与协作层更保守
+      a_cardio_step_min: 30  # 每周有氧分钟数每周最多增加
+      b_cardio_step_min: 20
+      b_cardio_cap_min: 150  # B 与协作层每周有氧上限
+    note: 取自 IronM 方案 v3.0 §6.2“起点与递增”（B 层每周 +20、上限 150）；RPE 上限为设计。2026-10-21 由 Claude 受委托审定，见 spec/review_log.md。

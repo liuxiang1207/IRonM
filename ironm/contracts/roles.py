@@ -21,12 +21,13 @@ class OutputKind(StrEnum):
     PROPOSAL = "proposal"
     VERDICT = "verdict"
     NO_OPINION = "no_opinion"
+    QUESTIONS = "questions"  # 追问：只有评估师可以产出
 
 
-_C, _P, _V, _N = OutputKind
+_C, _P, _V, _N, _Q = OutputKind
 
 AGENT_OUTPUT_KINDS: dict[AgentId, frozenset[OutputKind]] = {
-    AgentId.ASSESSOR: frozenset({_C, _N}),
+    AgentId.ASSESSOR: frozenset({_C, _N, _Q}),
     AgentId.SAFETY_OFFICER: frozenset({_C, _V, _N}),
     AgentId.DATA_ANALYST: frozenset({_C, _N}),
     AgentId.RECOVERY: frozenset({_C, _N}),

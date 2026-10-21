@@ -1,4 +1,4 @@
-"""Agent 输出：约束、提案、判定、无意见。越权与输出类型在契约层校验。"""
+"""Agent 输出：约束、提案、判定、追问、无意见。越权与输出类型在契约层校验。"""
 
 from datetime import date
 from typing import Annotated, Literal, Self
@@ -101,13 +101,36 @@ class VerdictOutput(_OutputBase):
     items: tuple[Verdict, ...] = Field(min_length=1)
 
 
+MAX_QUESTIONS = 3  # 每次最多追问几项（spec §29）
+
+
+class Question(ContractModel):
+    """要用户补充的一项信息。"""
+
+    item: Annotated[str, Field(pattern=r"^profile\.[a-z][a-z0-9_]*$")]  # 如 profile.birth_date
+    reason_code: Text  # 为什么需要，如 needed_for_tier
+    fallback: Text  # 没回答时怎么办，如 no_plan_until_answered、assume_a_prime
+
+
+class QuestionsOutput(_OutputBase):
+    kind: Literal[OutputKind.QUESTIONS]
+    items: tuple[Question, ...] = Field(min_length=1, max_length=MAX_QUESTIONS)
+
+    @model_validator(mode="after")
+    def _check_unique(self) -> Self:
+        names = [q.item for q in self.items]
+        if len(names) != len(set(names)):
+            raise ValueError("同一项信息被追问多次")
+        return self
+
+
 class NoOpinionOutput(_OutputBase):
     kind: Literal[OutputKind.NO_OPINION]
     reason_code: Text | None = None
 
 
 type AgentOutput = Annotated[
-    ConstraintOutput | ProposalOutput | VerdictOutput | NoOpinionOutput,
+    ConstraintOutput | ProposalOutput | VerdictOutput | QuestionsOutput | NoOpinionOutput,
     Field(discriminator="kind"),
 ]
 

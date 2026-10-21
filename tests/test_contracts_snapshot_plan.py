@@ -191,3 +191,9 @@ def test_frozen_values_can_be_reused() -> None:
         review_date=date(2026, 11, 3),
         evidence_ids=(),
     )
+
+
+def test_snapshot_tier_may_be_unknown() -> None:
+    """还没建档时分层为“未知”（spec §29）。"""
+    snap = _snap(_snapshot(tier={"unknown": "insufficient_data"}))
+    assert Snapshot.model_validate_json(snap.model_dump_json()) == snap

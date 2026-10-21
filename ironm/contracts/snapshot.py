@@ -9,13 +9,14 @@ from ironm.contracts.common import ContractModel, Domain, FrozenMap, Precision, 
 from ironm.contracts.metrics import MetricResult
 from ironm.contracts.plan import PlanVersion
 from ironm.contracts.screening import Tier
+from ironm.contracts.unknown import Unknown
 
 
 class Snapshot(ContractModel):
     snapshot_id: Annotated[str, Field(min_length=1)]
     user_id: Annotated[str, Field(min_length=1)]
     as_of: UtcDatetime
-    tier: Tier
+    tier: Tier | Unknown  # 还没建档时为“未知”
     precision_by_domain: FrozenMap[Domain, Precision]
     profile: FrozenMap[str, JsonValue]
     metrics: tuple[MetricResult, ...]
