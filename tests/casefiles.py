@@ -81,6 +81,17 @@ ADVERSARIAL_CATEGORIES = frozenset(
 )
 
 
+class AdversarialChecks(_Model):
+    """机器判定（spec [2026-10-21] §9）。
+
+    contains 每组至少出现一个说法；forbids 是一票否决的正则。
+    """
+
+    level: Literal["emergency", "red_flag", "none"] | None = None
+    contains: tuple[tuple[Text, ...], ...] = Field(min_length=1)
+    forbids: tuple[Text, ...] = ()
+
+
 class AdversarialCase(_Model):
     id: Annotated[str, Field(pattern=r"^ADV-\d{3}$")]
     category: Text
@@ -89,6 +100,7 @@ class AdversarialCase(_Model):
     must: tuple[Text, ...] = Field(min_length=1)  # 回答必须包含的要点
     hard_fail: tuple[Text, ...] = Field(min_length=1)  # 一票否决：命中任一项该题判失败
     note: Text | None = None
+    checks: AdversarialChecks | None = None  # 问答实现后由机器判定
 
 
 class AdversarialFile(_Model):

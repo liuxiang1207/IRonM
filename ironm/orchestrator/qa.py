@@ -8,11 +8,13 @@
   - L1：需要把安全提示融进回答时，由模型按统一结构表达，数字必须有登记来源，
     不合规时重写 1 次，仍不合规则退到 L0；
   - 一般：没有审定知识时，不给具体建议。降级都告诉用户，且不跳过安全检查。
-- 计划相关的问题只作说明、标为“需进入计划调整”，不改计划。
+- 计划相关的问题只作说明、标为“需进入计划调整”，不改计划；
+  但命中安全官的卡时（如“帮我安排 7 天断食”），先按卡回答。
 运行记录（RunRecord）不含用户原话，可按请求编号回放。
 """
 
 import json
+import re
 import time
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
@@ -25,12 +27,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from ironm.contracts.common import ContractModel
 from ironm.contracts.model_call import ModelStage
 from ironm.contracts.roles import AgentId
+from ironm.core.body import bmi
 from ironm.core.log import get_logger
 from ironm.knowledge.qa_cards import CardBook, PartKind, QACard
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
 from ironm.orchestrator.intent import Concern, Intent, IntentResult
 from ironm.orchestrator.numbers import numbers_in, unregistered
+from ironm.safety.matching import clauses
 
 __all__ = [
     "MAX_ASSISTANTS",
@@ -72,7 +76,7 @@ TOOLS: dict[AgentId, frozenset[str]] = {
     _A.RECOVERY: frozenset({"search_cards"}),
     _A.BEHAVIOR_COACH: frozenset({"search_cards"}),
     _A.DATA_ANALYST: frozenset({"search_cards"}),
-    _A.SAFETY_OFFICER: frozenset(),
+    _A.SAFETY_OFFICER: frozenset({"search_cards"}),
     _A.ASSESSOR: frozenset(),
 }
 
@@ -84,10 +88,14 @@ class ToolDenied(Exception):
 
 
 class Fact(ContractModel):
-    """Agent 拿出的一条依据：问答卡或安全提示。"""
+    """Agent 拿出的一条依据：问答卡、安全提示，或用户自己说的数字算出的结果（personal）。
 
-    kind: Literal["card", "caution"]
+    values 只在本次组织回答时使用，不写入运行记录（可能是健康数据）。
+    """
+
+    kind: Literal["card", "caution", "personal"]
     source_id: Annotated[str, Field(min_length=1)]
+    values: tuple[tuple[str, str], ...] = ()
 
 
 class Step(ContractModel):
@@ -136,6 +144,8 @@ class _Texts(BaseModel):
     plan_change: str
     caution_discomfort: str
     caution_special: str
+    bmi_measured: str
+    bmi_stated: str
 
 
 @dataclass(frozen=True)
@@ -181,8 +191,36 @@ def _domain_agent(agent: AgentId, ask: _Ask, tools: _Toolbox) -> tuple[Fact, ...
     return tuple(Fact(kind="card", source_id=c.id) for c, _ in tools.call("search_cards", ask)[:2])
 
 
+_HEIGHT_RE = re.compile(r"身高(1\d{2}(?:\.\d)?)|(1\d{2}(?:\.\d)?)(?:cm|厘米|公分)")
+_WEIGHT_RE = re.compile(r"(\d{2,3}(?:\.\d)?)(公斤|kg|千克|斤)")
+_BMI_RE = re.compile(r"bmi(?:是|为|只有)?(\d{1,2}(?:\.\d)?)")
+
+
+def _fmt(x: float) -> str:
+    return str(int(x)) if float(x).is_integer() else str(x)
+
+
+def _bmi_fact(text: str) -> Fact | None:
+    """用户在这句话里说的身高体重（算出 BMI）或 BMI。"""
+    joined = "".join(clauses(text))
+    height, weight = _HEIGHT_RE.search(joined), _WEIGHT_RE.search(joined)
+    if height and weight:
+        cm = float(height.group(1) or height.group(2))
+        kg = float(weight.group(1)) / (2 if weight.group(2) == "斤" else 1)
+        if 120 <= cm <= 230 and 25 <= kg <= 300:
+            values = (("height", _fmt(cm)), ("weight", _fmt(kg)), ("bmi", _fmt(bmi(cm, kg))))
+            return Fact(kind="personal", source_id="bmi_measured", values=values)
+    stated = _BMI_RE.search(joined)
+    if stated and 10 <= float(stated.group(1)) <= 60:
+        return Fact(kind="personal", source_id="bmi_stated", values=(("bmi", stated.group(1)),))
+    return None
+
+
 def _safety_officer(agent: AgentId, ask: _Ask, tools: _Toolbox) -> tuple[Fact, ...]:
-    out = []
+    out = [Fact(kind="card", source_id=c.id) for c, _ in tools.call("search_cards", ask)[:2]]
+    personal = _bmi_fact(ask.text)
+    if personal is not None:
+        out.append(personal)
     if "discomfort" in ask.concerns:
         out.append(Fact(kind="caution", source_id="caution_discomfort"))
     if "special_population" in ask.concerns:
@@ -204,7 +242,8 @@ AGENTS: dict[AgentId, AgentFn] = {
 
 def _run_agent(
     agent: AgentId, ask: _Ask, cards: CardBook, agents: Mapping[AgentId, AgentFn]
-) -> Step:
+) -> tuple[Step, tuple[Fact, ...]]:
+    """(运行记录中的一步, 本次组织回答用的依据)。"""
     start = time.perf_counter()
     tools = _Toolbox(agent, cards)
     try:
@@ -214,15 +253,16 @@ def _run_agent(
         facts, status, reason = (), "no_opinion", "tool_denied"
     except Exception as e:  # 单个 Agent 出错不影响其他
         facts, status, reason = (), "no_opinion", f"agent_error:{type(e).__name__}"
-    return Step(
+    step = Step(
         agent=agent,
         stage="gather",
         status=status,  # type: ignore[arg-type]
         reason_code=reason,
         tools=tuple(tools.used),
-        facts=facts,
+        facts=tuple(Fact(kind=f.kind, source_id=f.source_id) for f in facts),
         duration_ms=round((time.perf_counter() - start) * 1000, 1),
     )
+    return step, facts
 
 
 class _L1Answer(BaseModel):
@@ -247,12 +287,14 @@ def _l1(
     cautions: list[str],
     gateway: Gateway,
     request_id: str,
+    extra_numbers: set[str],
 ) -> tuple[list[AnswerPart] | None, int]:
     """用模型表达；返回 (各部分, 数字重写次数)。数字两次都不合规时返回 None。"""
     knowledge = [
         {"id": c.id, **{k: v for k, v in c.parts()}, "sources": list(c.sources)} for c in cards
     ]
     registered = set().union(*(numbers_in(" ".join(v for _, v in c.parts())) for c in cards))
+    registered |= extra_numbers
     payload = {"question": ask.text, "knowledge": knowledge, "cautions": cautions}
     system = PROMPT_PATH.read_text(encoding="utf-8")
     rewrites = 0
@@ -307,36 +349,49 @@ def answer_question(
     order = (primary, *assistants)
     # 同一阶段并行；每个 Agent 只拿到 ask，彼此看不到输出，全部结束后再汇总
     with ThreadPoolExecutor(max_workers=len(order)) as pool:
-        steps = list(pool.map(lambda a: _run_agent(a, ask, cards, agents), order))
-    facts = [f for s in steps for f in s.facts]
+        results = list(pool.map(lambda a: _run_agent(a, ask, cards, agents), order))
+    steps = [step for step, _ in results]
+    facts = [f for _, fs in results for f in fs]
     card_ids = list(dict.fromkeys(f.source_id for f in facts if f.kind == "card"))
     cautions = [getattr(fixed, f.source_id) for f in facts if f.kind == "caution"]
-    primary_cards = [cid for cid in card_ids if cards.get(cid).agent == primary]
     caution_parts = [AnswerPart(kind="caution", text=c) for c in cautions]
+    # 针对你：用户自己说的数字算出的结果（数字视为登记过）
+    for_you = [
+        AnswerPart(kind="for_you", text=getattr(fixed, f.source_id).format(**dict(f.values)))
+        for f in facts
+        if f.kind == "personal"
+    ]
+    # 选卡：安全官的卡优先（安全类问题），其次主 Agent 的卡
+    owner = {cid: cards.get(cid).agent for cid in card_ids}
+    ranked = sorted(card_ids, key=lambda c: (owner[c] != _A.SAFETY_OFFICER, owner[c] != primary))
 
     parts: list[AnswerPart]
     degraded, rewrites, used = False, 0, []
-    if intent.intent is Intent.PLAN:
+    safety_first = bool(ranked) and owner[ranked[0]] == _A.SAFETY_OFFICER
+    if intent.intent is Intent.PLAN and not safety_first:
         layer = "plan_note"
         parts = [AnswerPart(kind="answer", text=fixed.plan_change), *caution_parts]
     elif not card_ids:
         layer, degraded = "general", True
         parts = [AnswerPart(kind="answer", text=fixed.general), *caution_parts]
     else:
-        best = cards.get((primary_cards or card_ids)[0])
-        direct = not cautions
+        best = cards.get(ranked[0])
+        # 安全官的卡就是为这类情况审定的：直接用，安全提示附在后面
+        direct = not cautions or safety_first
         l1_parts: list[AnswerPart] | None = None
         if not direct and gateway is not None:
-            chosen = [cards.get(c) for c in card_ids]
-            l1_parts, rewrites = _l1(ask, chosen, cautions, gateway, request_id)
+            chosen = [cards.get(c) for c in ranked]
+            extra = {n for p in for_you for n in numbers_in(p.text)}
+            l1_parts, rewrites = _l1(ask, chosen, cautions, gateway, request_id, extra)
         if l1_parts is not None:
-            layer, parts, used = "l1", l1_parts, card_ids
+            layer, parts, used = "l1", [*l1_parts[:1], *for_you, *l1_parts[1:]], ranked
         else:
             # L0：直接用最具体的卡；本应走 L1 却失败时要告诉用户
             degraded = not direct
             layer, used = "l0", [best.id]
             notice = [AnswerPart(kind="notice", text=fixed.degraded)] if degraded else []
-            parts = [*notice, *_card_parts(best), *caution_parts]
+            card = _card_parts(best)
+            parts = [*notice, *card[:1], *for_you, *card[1:], *caution_parts]
 
     record = RunRecord(
         request_id=request_id,

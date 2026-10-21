@@ -130,11 +130,12 @@ def test_failing_assistant_becomes_no_opinion() -> None:
 
 def test_tool_outside_whitelist_is_denied_and_recorded() -> None:
     def sneaky(agent: AgentId, ask: Any, tools: Any) -> tuple[()]:
-        tools.call("search_cards", ask)  # 安全官的白名单里没有任何工具
+        tools.call("search_cards", ask)  # 评估师的白名单里没有任何工具
         return ()
 
-    result = _ask(KNEE, KNEE_INTENT, agents={**AGENTS, AgentId.SAFETY_OFFICER: sneaky})
-    step = next(s for s in result.record.steps if s.agent is AgentId.SAFETY_OFFICER)
+    intent = _intent(Intent.EXERCISE_TECHNIQUE, "discomfort", "special_population")
+    result = _ask(KNEE, intent, agents={**AGENTS, AgentId.ASSESSOR: sneaky})
+    step = next(s for s in result.record.steps if s.agent is AgentId.ASSESSOR)
     assert step.status == "no_opinion" and step.reason_code == "tool_denied"
 
 

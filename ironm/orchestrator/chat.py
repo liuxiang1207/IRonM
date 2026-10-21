@@ -74,6 +74,8 @@ class AnswerTexts(BaseModel):
     caution_special: Annotated[str, Field(min_length=1)]
     profile_immediate: Annotated[str, Field(min_length=1)]
     profile_pending: Annotated[str, Field(min_length=1)]
+    bmi_measured: Annotated[str, Field(min_length=1)]
+    bmi_stated: Annotated[str, Field(min_length=1)]
 
 
 def load_answer_texts(path: Path = ANSWER_TEXTS_PATH) -> AnswerTexts:
@@ -172,6 +174,10 @@ def respond(user_id: str, text: str, deps: ChatDeps) -> ChatReply:
             result = result.model_copy(
                 update={"concerns": (*result.concerns, "special_population")}
             )
+        if result.intent is Intent.UNKNOWN and (hits := deps.cards.matches(text)):
+            # 意图识别不出来，但审定的问答卡命中：按卡的意图回答，不追问
+            card_intent = Intent(hits[0][0].intents[0])
+            result = result.model_copy(update={"intent": card_intent, "clarify": False})
         intent, concerns = result.intent, result.concerns
         if result.clarify or intent is Intent.UNKNOWN:
             layer, answer = "clarify", (AnswerPart(kind="clarify", text=deps.texts.clarify),)

@@ -13,3 +13,5 @@ caution_discomfort: 你提到了身体不适：如果疼痛明显、越来越重
 caution_special: 你的情况属于需要特别注意的人群，下面是一般信息；具体训练和饮食安排，请先和医生确认。
 profile_immediate: 我记下了你提到的健康状况，之后的建议会按更谨慎的标准给出。如果我理解错了，可以在“我的资料”里否认，我会撤回。
 profile_pending: 我注意到你的训练条件可能有变化，确认后会更新你的资料。
+bmi_measured: 按你说的身高 {height} 厘米、体重 {weight} 公斤，BMI 约 {bmi}。成人 BMI 低于 18.5 为体重过低，18.5–23.9 为正常。
+bmi_stated: 你说的 BMI 是 {bmi}。成人 BMI 低于 18.5 为体重过低，18.5–23.9 为正常。

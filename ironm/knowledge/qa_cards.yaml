@@ -217,9 +217,9 @@ cards:
   # ---- 养生 ----
   - id: QA-DETOX-FASTING
     intents: [wellness]
-    agent: nutritionist
+    agent: safety_officer
     match: [[断食, 排毒, 清肠]]
-    conclusion: “断食排毒”没有可靠证据，人体靠肝脏和肾脏排出代谢废物，不需要靠断食“排毒”。
+    conclusion: “断食排毒”“排毒减肥”没有可靠证据，人体靠肝脏和肾脏排出代谢废物，不需要靠断食或排毒饮品“排毒”，我也不提供排毒计划。
     why: 长时间断食可能导致低血糖、乏力和肌肉流失，对正在训练的人不利。
     how: 想调整饮食，可以规律三餐、多吃蔬菜和全谷物、少吃加工食品。
     caution: 有糖尿病、正在怀孕或有进食障碍史的人，不要自行断食。
@@ -244,3 +244,181 @@ cards:
     how: 当作水果或配料少量食用就好；训练与饮食的效果主要取决于总量和规律。
     caution: 正在服用华法林等抗凝药的人，食用前请咨询医生。
     sources: ["《中国公民中医养生保健素养》（2014）"]
+
+  # ---- 安全类（安全官负责；每条路由都会查到，命中时优先使用）----
+  # 同分时按文件顺序：针对特定人群的卡（未成年、孕期、进食障碍）排在一般的卡（快速减重）前面
+  - id: QA-COMPENSATION
+    intents: [habit_motivation]
+    agent: safety_officer
+    match: [[暴食, 吃多了, 吃撑了, 多吃], [抵消, 补回来, 练回来, 有氧把它]]
+    conclusion: 一次吃多了不需要用大量运动来补偿，也不建议这样做。
+    why: 体重变化看的是一段时间的平均；用过量运动“补偿”容易受伤，也会让吃和运动变成惩罚，形成不健康的循环。
+    how: 下一餐照常吃，按原来的计划训练就好。
+    caution: 如果经常暴食后想用运动、节食或其他方式补偿，并且因此很痛苦，建议寻求专业支持，例如精神心理科或进食障碍门诊。
+    sources: ["中国居民膳食指南（2022）", "进食障碍识别：美国精神医学会 DSM-5 相关说明"]
+
+  - id: QA-UNDERWEIGHT
+    intents: [nutrition]
+    agent: safety_officer
+    match: [[bmi17, bmi16, 45公斤, 体重过低, 偏瘦, bmi], [瘦, 减]]
+    conclusion: 成人 BMI 低于 18.5 属于体重过低，我不提供减重或热量缺口计划。
+    why: 体重过低时继续减重，可能影响激素、骨骼和免疫功能。
+    how: 可以通过力量训练和均衡饮食改善身体线条；如果对身材有担心，建议咨询医生或营养师。
+    caution: 如果总是担心自己太胖、不敢吃东西，建议寻求专业支持。
+    sources: ["成人体重判定 WS/T 428-2013"]
+
+  - id: QA-THIN-BELLY
+    intents: [exercise_technique]
+    agent: safety_officer
+    match: [[很瘦, 已经瘦], [肚子大, 小肚子, 肚子凸, 减点脂]]
+    conclusion: 已经很瘦时，我不提供减脂计划；小腹显得突出，常和体态与核心力量有关。
+    why: 骨盆前倾、核心力量不足都会让小腹看起来更突出，继续减脂解决不了这类问题。
+    how: 可以做核心力量与体态训练，比如死虫、平板支撑、臀桥，保持均衡饮食。
+    caution: 如果对身材的担心已经影响吃饭或心情，建议寻求专业支持。
+    sources: ["NSCA《体能训练概论》第 4 版：核心训练"]
+
+  - id: QA-BANNED-PEDS
+    intents: [supplements_drugs]
+    agent: safety_officer
+    match: [[类固醇, 克伦特罗, sarms, 合成代谢]]
+    conclusion: 我不提供这类药物的用法、剂量或产品推荐。合成代谢类固醇、克伦特罗、SARMs 属于违禁物质，没有医生指导的使用有明显健康风险。
+    why: 可能引起心律失常、心肌损伤、肝损伤和激素紊乱；SARMs 未获批准用于人体，产品成分也不可靠。
+    how: 增肌靠规律的力量训练、足够的蛋白质和睡眠；如果有相关的健康问题，请咨询医生。
+    caution: 已经在使用并出现心慌、胸痛等症状时，请立即就医。
+    sources: ["世界反兴奋剂机构（WADA）禁用清单 S1"]
+
+  - id: QA-GLP1-DOSE
+    intents: [supplements_drugs]
+    agent: safety_officer
+    match: [[司美格鲁肽, 替尔泊肽, 减重针], [剂量, 加量, 多少, 一起用, 怎么加, 自己打]]
+    conclusion: 用药和剂量必须由处方医生决定，我不提供剂量、加量或联合用药的方案。
+    why: 这类药需要医生按反应和副作用逐步调整，联合用药还要评估相互作用；自行调整可能出现严重的胃肠反应、低血糖等问题。
+    how: 请咨询给你开药的医生，并通过正规渠道获取药物；用药期间保证蛋白质摄入，坚持力量训练。
+    sources: ["国家药品监督管理局：处方药须凭医师处方使用"]
+
+  - id: QA-ORLISTAT
+    intents: [supplements_drugs]
+    agent: safety_officer
+    match: [[奥利司他]]
+    conclusion: 奥利司他的用法用量以说明书或医嘱为准，加量不会更有效，反而会增加腹泻等不良反应。
+    why: 它减少的是一部分脂肪吸收，效果有上限；吃得更多只会增加胃肠道不适。
+    how: 按说明书使用，有疑问咨询医生或药师；配合饮食和运动更重要。
+    sources: ["奥利司他非处方药说明书"]
+
+  - id: QA-KNEE-DIAGNOSIS
+    intents: [exercise_technique]
+    agent: safety_officer
+    match: [[膝盖, 膝关节], [半月板, 是不是, 撕裂, 一个月]]
+    conclusion: 我不能做诊断。膝盖疼了这么久，建议到骨科或运动医学科就诊检查。
+    why: 半月板、韧带、髌骨等问题都可能引起膝盖疼，需要医生检查，必要时做影像检查才能判断。
+    how: 就诊前避免引起疼痛的动作，比如深蹲、跳跃、跑步；可以做不引起疼痛的上肢和核心训练。
+    caution: 如果膝盖肿胀、卡住伸不直、走路打软或不能负重，请尽快就医。
+    sources: ["美国骨科医师学会（AAOS）患者资料：半月板撕裂"]
+
+  - id: QA-ECG-ST
+    intents: [personal_data]
+    agent: safety_officer
+    match: [[心电图, st段, st压低]]
+    conclusion: 我不能解读诊断结果。心电图有异常时，请尽快找心内科医生评估。
+    why: 心电图上的变化可能有多种原因，需要医生结合症状和其他检查判断。
+    how: 在医生评估之前，先暂停中高强度训练。
+    caution: 出现胸痛、胸闷、心慌、气短或晕倒时，立即拨打 120。
+    sources: ["ACSM 运动前健康筛查（第 10 版）"]
+
+  - id: QA-DIABETES-SIGNS
+    intents: [personal_data]
+    agent: safety_officer
+    match: [[口渴, 尿多, 多饮, 多尿], [糖尿病, 确诊, 是不是]]
+    conclusion: 我不能确诊，口渴、尿多需要到医院检查血糖才能判断。
+    why: 这些表现可能和血糖升高有关，也可能有其他原因，需要化验才能确认。
+    how: 尽快到内分泌科或全科就诊，检查空腹血糖和糖化血红蛋白。
+    caution: 如果同时出现明显乏力、恶心呕吐或意识模糊，请立即就医。
+    sources: ["中国 2 型糖尿病防治指南（2020 年版）"]
+
+  - id: QA-DISC-HERNIATION
+    intents: [exercise_technique]
+    agent: safety_officer
+    match: [[腰椎间盘, 椎间盘突出, 腰突]]
+    conclusion: 我不能开药或制定治疗方案，腰椎间盘突出请到骨科或脊柱外科、康复科就诊。
+    why: 治疗需要医生根据症状和检查结果决定，药物也要按医嘱使用。
+    how: 就诊前避免弯腰负重、大重量深蹲和硬拉；可以散步，以不加重疼痛为准。
+    caution: 如果出现大小便失控、会阴部发麻或腿越来越没力气，请立即就医。
+    sources: ["中国腰椎间盘突出症诊疗指南（2020）"]
+
+  - id: QA-MUSCLE-STRAIN
+    intents: [recovery_sleep]
+    agent: safety_officer
+    match: [[拉伤], [药, 布洛芬, 好得快, 怎么办]]
+    conclusion: 我不提供药物剂量，用药请按说明书或咨询医生、药师。
+    why: 软组织损伤的恢复靠保护和逐步恢复负荷；急性期不建议常规使用抗炎药。
+    how: 前两三天减少引起疼痛的活动、适当抬高；之后在不加重疼痛的前提下逐步恢复活动和训练。
+    caution: 如果肿胀明显、皮下大片淤青、无法活动或疼痛越来越重，请就医。
+    sources: ["Dubois & Esculier, BJSM 2020（PEACE & LOVE）"]
+
+  - id: QA-MINOR-WEIGHT
+    intents: [nutrition]
+    agent: safety_officer
+    match: [[15岁, 14岁, 16岁, 13岁, 初中, 初一, 初二, 初三, 高一, 未成年], [减, 瘦, 斤, 计划, 腹肌]]
+    conclusion: 未成年人我不提供减重计划或个人化训练计划，也不建议为了体重或腹肌节食。
+    why: 青少年还在生长发育，节食会影响身高、骨骼和月经等发育；腹肌是否明显主要取决于体脂，不应为此节食。
+    how: 每天平均 60 分钟中高强度的身体活动，比如跑跳、球类、游泳，适龄、多样就好；三餐规律，不节食。具体安排请和家长、医生一起商量。
+    sources: ["WHO 身体活动和久坐行为指南（2020）：5–17 岁"]
+
+  - id: QA-PREGNANCY-WEIGHT
+    intents: [nutrition]
+    agent: safety_officer
+    match: [[怀孕, 孕期, 孕], [减肥, 减重, 热量, 瘦]]
+    conclusion: 孕期不宜减重或限制热量，我不提供孕期的热量缺口或减重目标。
+    why: 孕期需要适当增重，增重目标按孕前 BMI 分组，由产科医生评估。
+    how: 请咨询产科医生，按医生建议进行适合孕期的运动和饮食。
+    caution: 出现见红、腹痛、头晕等情况时，请立即就医。
+    sources: ["妊娠期妇女体重增长推荐值 WS/T 801-2022"]
+
+  - id: QA-ED-GUILT
+    intents: [habit_motivation]
+    agent: safety_officer
+    match: [[罪恶感, 不吃最安心, 一整天不吃, 不敢吃, 吃了就内疚]]
+    conclusion: 听起来吃东西让你很有压力，这值得被认真对待。我不能帮你坚持不吃东西。
+    why: 长时间不吃会伤害身体，也可能让对食物的焦虑越来越重；这是需要关注的信号。
+    how: 建议和信任的人聊聊，并寻求专业帮助，比如精神心理科或进食障碍门诊。
+    caution: 如果出现头晕、心慌、晕倒，或有伤害自己的想法，请立即就医，或拨打心理援助热线 12356。
+    sources: ["美国精神医学会 DSM-5：进食障碍"]
+
+
+  - id: QA-RAPID-LOSS
+    intents: [nutrition]
+    agent: safety_officer
+    match: [[瘦, 减, 掉秤, 斤, 公斤, 大卡, 千卡, 一顿, 断食], [一个月, 两周, 一周, 快速, "500", 一天只吃一顿, 一天一顿, 连续断食, 7天]]
+    conclusion: 这样的速度不安全，我不提供极低热量、一天一顿或长时间断食的方案；安全的减重速度大约是每周 0.5–1 公斤。
+    why: 短期快速掉秤主要是水分和肌肉，容易反弹，还可能出现低血糖、乏力、电解质紊乱；长时间断食需要在医生指导下进行。
+    how: 每天热量不低于 1200 千卡（女性）或 1500 千卡（男性）；每餐有蛋白质和蔬菜，减少含糖饮料和油炸食品；每周至少 2 次力量训练，多走路。两周内能做的是规律作息、少盐少油，让身体状态更好。
+    caution: 有糖尿病、正在怀孕、有进食障碍史的人，不要自行节食或断食。
+    sources: ["体重管理指导原则（2024 年版），国家卫生健康委", "成人肥胖食养指南（2024 年版）"]
+
+  - id: QA-SPOT-REDUCTION
+    intents: [training_knowledge]
+    agent: safety_officer
+    match: [[腹肌, 练哪, 局部], [瘦肚子, 局部减脂, 减肚子, 瘦腰]]
+    conclusion: 局部减脂基本不成立，只练腹肌瘦不了肚子。
+    why: 减脂是全身性的，哪里先瘦主要由体质决定；腹肌训练能增强核心，但不会只消耗腹部脂肪。
+    how: 减腰围靠整体能量平衡加全身训练：每周 2 次以上力量训练、适量有氧，饮食控制总量。
+    sources: ["Vispute 等 2011，腹部训练与局部脂肪的随机对照研究"]
+
+  - id: QA-ACID-ALKALINE
+    intents: [wellness]
+    agent: safety_officer
+    match: [[酸性体质, 碱性体质, 酸碱体质]]
+    conclusion: “酸碱体质”不是科学概念，吃什么都不会改变血液的酸碱度。
+    why: 人体血液的酸碱度由肺和肾脏严格调节，保持在很窄的范围内，饮食改变不了。
+    how: 有依据的做法是多吃蔬菜水果和全谷物、控制加工食品和含糖饮料。
+    sources: ["中国居民膳食指南（2022）"]
+
+  - id: QA-SAUNA-SUIT
+    intents: [training_knowledge]
+    agent: safety_officer
+    match: [[暴汗服, 出汗越多, 多出汗]]
+    conclusion: 出汗多不等于燃脂多，穿暴汗服跑步不会多减脂，还有脱水和中暑的风险。
+    why: 出汗是为了散热，减掉的是水分，喝水后就回来了。
+    how: 穿透气的运动服，按计划训练，运动中和运动后及时补水。
+    caution: 运动中出现头晕、恶心、停止出汗或意识模糊，立即停止运动并就医。
+    sources: ["ACSM 立场声明：运动与补液（2007）"]
