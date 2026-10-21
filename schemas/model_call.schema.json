@@ -7,7 +7,7 @@
         "answer",
         "review_semantic",
         "reflect",
-        "dispatch"
+        "safety_review"
       ],
       "title": "ModelStage",
       "type": "string"

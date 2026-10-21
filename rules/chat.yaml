@@ -25,10 +25,11 @@ rules:
       keep_recent: 6  # 压缩时保留原文的最近消息条数
     note: 摘要由模型生成，模型不可用时按话题汇总；摘要不展示给用户，只作为后续回答的上下文。
 
-  - id: R-QA-DISPATCH
-    title: 快速通道与管家调度
+  - id: R-QA-DOMAINS
+    title: 查知识的领域打分
     status: approved
     source: {kind: design}
     params:
-      fast_lane_min_confidence: 0.7  # 只涉及单一领域、且置信度不低于此值时走快速通道
-    note: 其余问题由管家调度，调度结果须通过规则校验（spec [2026-10-21] §5）；模型不可用时一律按规则路由表。
+      related_min_score: 0.45  # 相关领域的最低得分
+      related_min_ratio: 0.55  # 相关领域不低于主领域得分的比例
+    note: 分数 = 意图的固有分 × 置信度；主领域 1 个、相关领域最多 2 个；安全类的卡不参与打分、每次都查（spec [2026-10-21] §12）。

@@ -37,13 +37,13 @@ routes:
     timeout_s: 60
     max_tokens: 4000
     extra_body: {thinking: {type: enabled}}
-  dispatch:  # 管家调度：决定调用哪些专业 Agent（结果再经规则校验）
+  safety_review:  # 急症判定的模型复核：只能提高级别（词表之后、回答之前）
     provider: deepseek
     base_url: https://api.deepseek.com
     model: deepseek-flash
     api_key_env: DEEPSEEK_API_KEY
-    timeout_s: 8
-    max_tokens: 400
+    timeout_s: 6
+    max_tokens: 200
     extra_body: {thinking: {type: disabled}}
   reflect:  # 对话摘要、画像候选提取
     provider: deepseek

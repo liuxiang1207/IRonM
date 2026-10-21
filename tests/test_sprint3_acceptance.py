@@ -57,8 +57,8 @@ def test_every_answer_can_be_replayed(client: TestClient) -> None:
     ]
     for request_id in ids:
         record = client.get(f"/chat/runs/{request_id}").json()
-        assert record["request_id"] == request_id and record["steps"]
-        assert "safety_officer" in record["assistants"]
+        assert record["request_id"] == request_id and record["primary_domain"]
+        assert record["layer"] in ("l0", "l1") and record["matched_cards"]
 
 
 def test_fitness_default_has_no_calorie_deficit(client: TestClient) -> None:

@@ -65,8 +65,10 @@ def test_model_unavailable_still_answers_and_is_recorded(client: tuple[TestClien
     body = _chat(c, "增肌一周练几次比较好").json()
     assert body["intent"] == "training_knowledge"
     with closing(connect(db)) as conn:
-        [call] = ModelCallStore(conn).for_request(body["request_id"])
-    assert call.status == "error" and call.error_type == "MissingApiKey" and call.fallback_used
+        calls = ModelCallStore(conn).for_request(body["request_id"])
+    # 安全复核与意图识别各一次，都因没有密钥而用了兜底
+    assert [c.stage.value for c in calls] == ["safety_review", "intent_l3"]
+    assert all(c.error_type == "MissingApiKey" and c.fallback_used for c in calls)
 
 
 def test_emergency_makes_no_model_call(client: tuple[TestClient, Path]) -> None:

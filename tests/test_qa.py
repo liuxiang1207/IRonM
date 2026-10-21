@@ -1,7 +1,6 @@
-"""问答编排与回答（spec [2026-10-21] §5–§7）。"""
+"""问答：查知识与回答（spec [2026-10-21] §6、§7、§12）。"""
 
 import json
-import threading
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,7 +20,7 @@ from ironm.llm.config import MODELS_PATH, load_models
 from ironm.llm.gateway import Gateway
 from ironm.orchestrator.chat import load_answer_texts
 from ironm.orchestrator.intent import Intent, IntentResult
-from ironm.orchestrator.qa import AGENTS, MAX_ASSISTANTS, answer_question, route
+from ironm.orchestrator.qa import answer_question
 from tests.llm.test_gateway import ENV, FakeTransport, _reply
 
 CARDS = default_cards()
@@ -74,70 +73,54 @@ KNEE = "深蹲时膝盖疼怎么办"
 KNEE_INTENT = _intent(Intent.EXERCISE_TECHNIQUE, "discomfort")
 
 
-# ---- 路由 ----
+# ---- 查知识（spec [2026-10-21] §12）----
 
 
-def test_knee_pain_routes_to_coach_with_safety_officer() -> None:
-    primary, assistants = route(KNEE_INTENT)
-    assert primary is AgentId.EXERCISE_COACH
-    assert AgentId.SAFETY_OFFICER in assistants
+def test_knee_pain_looks_up_technique_cards_and_adds_caution() -> None:
+    record = _ask(KNEE, KNEE_INTENT).record
+    assert record.primary_domain is AgentId.EXERCISE_COACH
+    assert record.matched_cards[0] == "QA-SQUAT-KNEE-PAIN"
+    assert record.concerns == ("discomfort",)
 
 
-def test_special_population_adds_assessor_within_limit() -> None:
-    primary, assistants = route(_intent(Intent.WELLNESS, "special_population"))
-    assert AgentId.SAFETY_OFFICER in assistants and AgentId.ASSESSOR in assistants
-    assert len(assistants) <= MAX_ASSISTANTS and primary not in assistants
+def test_safety_cards_always_looked_up_and_first() -> None:
+    """意图是训练知识，但“两周后婚礼一天只吃一顿”命中安全类的卡：安全卡排在最前并直接使用。"""
+    record = _ask("两周后婚礼，怎么一天只吃一顿快速掉秤", _intent(Intent.TRAINING_KNOWLEDGE)).record
+    assert record.matched_cards[0] == "QA-RAPID-LOSS" and record.card_ids == ("QA-RAPID-LOSS",)
+    assert record.layer == "l0" and not record.degraded
 
 
-@pytest.mark.parametrize(
-    "intent", [i for i in Intent if i not in (Intent.UNKNOWN, Intent.CHITCHAT, Intent.OUT_OF_SCOPE)]
-)
-def test_safety_officer_on_every_route(intent: Intent) -> None:
-    assert AgentId.SAFETY_OFFICER in route(_intent(intent))[1]
-
-
-# ---- 收集：并行、互不可见、出错与越权 ----
-
-
-def test_agents_run_in_parallel_and_see_only_the_question() -> None:
-    barrier = threading.Barrier(2, timeout=5)  # 串行运行时第一个会等到超时
-    seen: list[set[str]] = []
-
-    def waiting(agent: AgentId, ask: Any, tools: Any) -> tuple[()]:
-        seen.append(set(vars(ask)))
-        barrier.wait()
-        return ()
-
-    agents = {**AGENTS, AgentId.EXERCISE_COACH: waiting, AgentId.SAFETY_OFFICER: waiting}
-    result = _ask(KNEE, KNEE_INTENT, agents=agents)
-    assert [s.status for s in result.record.steps] == ["ok", "ok"]
-    assert seen == [{"text", "intent", "concerns", "prior"}] * 2
-
-
-def test_failing_assistant_becomes_no_opinion() -> None:
-    def broken(agent: AgentId, ask: Any, tools: Any) -> tuple[()]:
-        raise RuntimeError
-
-    result = _ask(
-        "肌酸要怎么吃",
-        _intent(Intent.SUPPLEMENTS_DRUGS),
-        agents={**AGENTS, AgentId.SAFETY_OFFICER: broken},
+def test_cross_domain_question_finds_both_domains() -> None:
+    intent = IntentResult.model_validate(
+        {
+            "intent": Intent.TRAINING_KNOWLEDGE,
+            "concerns": (),
+            "confidence": 0.85,
+            "source": "rule",
+            "clarify": False,
+            "domains": (Intent.TRAINING_KNOWLEDGE, Intent.NUTRITION),
+        }
     )
-    steps = {s.agent: s for s in result.record.steps}
-    assert steps[AgentId.SAFETY_OFFICER].status == "no_opinion"
-    assert steps[AgentId.SAFETY_OFFICER].reason_code == "agent_error:RuntimeError"
-    assert result.record.layer == "l0" and result.record.card_ids == ("QA-CREATINE",)
+    record = _ask("增肌一周练几次，蛋白质一天吃多少", intent).record
+    assert record.primary_domain is AgentId.TRAINING_PLANNER
+    assert AgentId.NUTRITIONIST in record.related_domains
+    assert {"QA-STRENGTH-FREQUENCY", "QA-PROTEIN"} <= set(record.matched_cards)
 
 
-def test_tool_outside_whitelist_is_denied_and_recorded() -> None:
-    def sneaky(agent: AgentId, ask: Any, tools: Any) -> tuple[()]:
-        tools.call("search_cards", ask)  # 评估师的白名单里没有任何工具
-        return ()
+def test_unrelated_domain_cards_not_used() -> None:
+    """问动作时不会查到饮食领域的卡（“蛋白”只在饮食卡里）。"""
+    record = _ask("俯卧撑标准吗，吃蛋白多少", _intent(Intent.EXERCISE_TECHNIQUE)).record
+    assert "QA-PROTEIN" not in record.matched_cards
 
-    intent = _intent(Intent.EXERCISE_TECHNIQUE, "discomfort", "special_population")
-    result = _ask(KNEE, intent, agents={**AGENTS, AgentId.ASSESSOR: sneaky})
-    step = next(s for s in result.record.steps if s.agent is AgentId.ASSESSOR)
-    assert step.status == "no_opinion" and step.reason_code == "tool_denied"
+
+def test_page_only_looks_up_its_domain_and_safety() -> None:
+    record = _ask(
+        "增肌一周练几次，蛋白质一天吃多少",
+        _intent(Intent.TRAINING_KNOWLEDGE),
+        page="training",
+        page_domain=AgentId.TRAINING_PLANNER,
+    ).record
+    assert record.matched_cards == ("QA-STRENGTH-FREQUENCY",) and record.related_domains == ()
 
 
 # ---- 回答分层 ----
@@ -211,7 +194,7 @@ def test_record_has_no_user_text() -> None:
 
 
 def test_unrouted_intent_rejected() -> None:
-    with pytest.raises(ValueError, match="不经过问答编排"):
+    with pytest.raises(ValueError, match="不经过问答"):
         _ask("你好", _intent(Intent.CHITCHAT))
 
 
@@ -233,7 +216,7 @@ def test_run_can_be_replayed_by_owner_only(client: TestClient) -> None:
     run = client.get(f"/chat/runs/{body['request_id']}", headers={"X-IronM-User": "u1"})
     assert run.status_code == 200
     record = run.json()
-    assert record["primary"] == "nutritionist" and record["card_ids"] == ["QA-CREATINE"]
+    assert record["primary_domain"] == "nutritionist" and record["card_ids"] == ["QA-CREATINE"]
     assert "肌酸" not in run.text
     other = client.get(f"/chat/runs/{body['request_id']}", headers={"X-IronM-User": "u2"})
     assert other.status_code == 404

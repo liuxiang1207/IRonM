@@ -44,6 +44,7 @@ from ironm.orchestrator.chat import (
     load_answer_texts,
     respond,
 )
+from ironm.orchestrator.domains import DOMAIN_RULE, DomainParams
 from ironm.orchestrator.intent import INTENT_RULE, IntentParams, load_intent_book
 from ironm.orchestrator.pages import PAGE_INTENTS, PageContext
 from ironm.orchestrator.qa import RunRecord
@@ -194,6 +195,7 @@ def create_app(
     models = load_models(settings.models_path)
     intents = load_intent_book()
     rulebook.get(INTENT_RULE).params_as(IntentParams)
+    rulebook.get(DOMAIN_RULE).params_as(DomainParams)
     texts = load_answer_texts()
     cards = load_cards()  # 问答卡（spec [2026-10-21] §6）
     profile_terms = load_profile_terms()  # 画像候选的说法（§8）

@@ -33,16 +33,16 @@ def test_vague_question_with_set_context_needs_no_clarify() -> None:
     reply = respond("u1", "这个动作我做得怎么样", deps, page="training", page_context=SET_CONTEXT)
     assert reply.layer != "clarify" and reply.page == "training"
     [record] = records
-    assert record.primary is AgentId.EXERCISE_COACH and record.dispatch == "page"
+    assert record.primary_domain is AgentId.EXERCISE_COACH and record.page == "training"
     assert record.context_item == "today.exercise:3.set:2"
 
 
-def test_page_question_only_uses_page_agent_and_safety_officer() -> None:
+def test_page_question_only_looks_up_page_domain() -> None:
     records, deps = _records()
     respond("u1", "增肌一周练几次比较好", deps, page="training")
     [record] = records
-    assert {s.agent for s in record.steps} == {AgentId.TRAINING_PLANNER, AgentId.SAFETY_OFFICER}
-    assert record.assistants == (AgentId.SAFETY_OFFICER,)
+    # 只查本功能的领域（训练）与安全类的卡
+    assert record.primary_domain is AgentId.TRAINING_PLANNER and record.related_domains == ()
 
 
 def test_chest_pain_with_training_context_still_safety() -> None:
@@ -67,7 +67,7 @@ def test_other_page_question_is_handed_off_without_other_agents() -> None:
 def test_plan_change_from_page_is_only_noted() -> None:
     records, deps = _records()
     reply = respond("u1", "帮我把每周改成5天训练计划", deps, page="training")
-    assert reply.layer == "plan_note" and records[0].dispatch == "page"
+    assert reply.layer == "plan_note" and records[0].page == "training"
 
 
 def test_same_question_same_safety_and_numbers_from_both_entries() -> None:

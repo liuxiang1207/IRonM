@@ -18,7 +18,7 @@ class ModelStage(StrEnum):
     ANSWER = "answer"
     REVIEW_SEMANTIC = "review_semantic"
     REFLECT = "reflect"
-    DISPATCH = "dispatch"  # 管家调度（spec [2026-10-21] §5）
+    SAFETY_REVIEW = "safety_review"  # 急症判定的模型复核，只升不降（spec [2026-10-21] §12）
 
 
 class ModelCall(ContractModel):

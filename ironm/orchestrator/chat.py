@@ -30,10 +30,10 @@ from ironm.llm.gateway import Gateway
 from ironm.memory.conversation import compress, context
 from ironm.memory.profile import ProfileService
 from ironm.memory.repo import MemoryRepo
-from ironm.orchestrator.dispatch import page_plan
 from ironm.orchestrator.intent import Concern, Intent, IntentBook, recognize
 from ironm.orchestrator.pages import PAGE_AGENTS, PAGE_DEFAULT, Page, PageContext
 from ironm.orchestrator.qa import AnswerPart, RunRecord, answer_question
+from ironm.orchestrator.safety_review import review_safety
 from ironm.rules.loader import RuleBook
 from ironm.safety.decision import SafetyKit
 from ironm.safety.emergency import escalate_during_training
@@ -145,6 +145,14 @@ def respond(
     assessment = deps.kit.terms.assess(text)
     if (page or (page_context.page if page_context else None)) == "training":
         assessment = escalate_during_training(assessment)
+    # 第二层：模型复核，只升不降；模型不可用时只用词表的结果
+    assessment = review_safety(
+        text,
+        assessment,
+        gateway=deps.gateway,
+        categories=frozenset(deps.kit.replies.categories),
+        request_id=request_id,
+    )
     refusals = deps.kit.refusals.detect(text)
     subject = subject_of(text)
     refusal_part = refusal_sections(deps.kit.replies, refusals.kinds)
@@ -206,12 +214,8 @@ def respond(
         templates = (Intent.CHITCHAT, Intent.OUT_OF_SCOPE)
         # 安全类问题（命中安全官的卡）在任何页面都就地回答：安全官本来就参与每个功能页
         safety_card = any(c.agent == AgentId.SAFETY_OFFICER for c, _ in deps.cards.matches(text))
-        page_agent = (
-            None
-            if page is None
-            else PAGE_AGENTS[page].get(intent, AgentId.SAFETY_OFFICER if safety_card else None)
-        )
-        if page is not None and page_agent is None and intent not in templates:
+        page_domain = None if page is None else PAGE_AGENTS[page].get(intent)
+        if page is not None and page_domain is None and not safety_card and intent not in templates:
             # 本功能以外的问题：转入管家对话并带上上下文，不调用其他功能的 Agent
             handoff = page_context or PageContext(page=page)
             layer, answer = "handoff", (AnswerPart(kind="notice", text=deps.texts.page_handoff),)
@@ -230,8 +234,8 @@ def respond(
                 gateway=deps.gateway,
                 request_id=request_id,
                 rulebook=deps.rulebook,
-                forced=None if page_agent is None else page_plan(page_agent),
                 page=page,
+                page_domain=page_domain,
                 context_item=page_context.item if page_context else None,
             )
             deps.record_run(user_id, qa.record)
