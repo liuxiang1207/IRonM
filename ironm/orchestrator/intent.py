@@ -30,6 +30,7 @@ __all__ = [
     "IntentBook",
     "IntentParams",
     "IntentResult",
+    "concerns_in",
     "load_intent_book",
     "recognize",
     "rule_intent",
@@ -127,7 +128,8 @@ def load_intent_book(path: Path = INTENT_TERMS_PATH) -> IntentBook:
         raise ValueError(f"{path}：意图词表有误：{e}") from e
 
 
-def _concerns(text: str, book: IntentBook) -> tuple[Concern, ...]:
+def concerns_in(text: str, book: IntentBook) -> tuple[Concern, ...]:
+    """这句话里按词表能认出的关注点（身体不适、特殊人群）。"""
     return tuple(c for c, words in book.concerns.items() if any(w in text for w in words))
 
 
@@ -146,7 +148,7 @@ def rule_intent(text: str, book: IntentBook, p: IntentParams) -> IntentResult:
         intent, conf = top, p.rule_conf_single
     return IntentResult(
         intent=intent,
-        concerns=_concerns(joined, book),
+        concerns=concerns_in(joined, book),
         confidence=conf,
         source="rule",
         clarify=False,

@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from ironm.agents import answering
+from ironm.agents import rerank as rerank_mod
 from ironm.agents.answering import AgentAnswer
 from ironm.agents.tools import ToolInput, calorie_tool
 from ironm.contracts.agents import Citation, Opinion
@@ -28,7 +29,9 @@ from ironm.llm.config import MODELS_PATH, load_models
 from ironm.llm.gateway import Gateway
 from ironm.orchestrator import compose as compose_mod
 from ironm.orchestrator import general as general_mod
+from ironm.orchestrator import intent as intent_mod
 from ironm.orchestrator import opinions
+from ironm.orchestrator import rewrite as rewrite_mod
 from ironm.orchestrator.chat import load_answer_texts, respond
 from ironm.orchestrator.compose import compose
 from ironm.orchestrator.general import general_answer
@@ -71,11 +74,16 @@ class Router:
                     ("agent", answering.PROMPT_PATH),
                     ("compose", compose_mod.PROMPT_PATH),
                     ("general", general_mod.PROMPT_PATH),
+                    ("rerank", rerank_mod.PROMPT_PATH),
+                    ("rewrite", rewrite_mod.PROMPT_PATH),
+                    ("intent", intent_mod.PROMPT_PATH),
                 )
-                if system.startswith(path.read_text(encoding="utf-8"))
+                if system.startswith(path.read_text(encoding="utf-8").split("{")[0])
             ),
             "other",
         )
+        if stage == "rerank" and stage not in self.by_stage:
+            return _reply("跳过重排")  # 没配置重排时：检索改用覆盖比例打分，不记入 stages
         with self._lock:
             self.stages.append(stage)
         if stage not in self.by_stage:
@@ -100,10 +108,18 @@ def _json(body: dict[str, object]) -> dict[str, object]:
     return _reply(json.dumps(body, ensure_ascii=False))
 
 
+SAFETY_TOPICS = ("掉秤", "一天只吃一顿")  # 测试里安全官“认为相关”的问题
+
+
 def _agent_reply(payload: dict[str, Any]) -> dict[str, object]:
     """各 Agent 按给它的第一条依据作答，结论带上自己的职责，便于检查整合结果。"""
     first = (payload["passages"] or payload["facts"])[0]
     role = payload["role"].split("：")[0]
+    if role == "安全官" and not any(t in payload["question"] for t in SAFETY_TOPICS):
+        # 模型判断：与安全无关的问题，安全官没有可说的
+        return _json(
+            {"conclusion": "没有找到可靠依据", "reasoning": "无关。", "cites": [first["id"]]}
+        )
     return _json({"conclusion": f"{role}的要点", "reasoning": "按依据。", "cites": [first["id"]]})
 
 
@@ -146,9 +162,9 @@ class SpyRetriever(Retriever):
         self.__dict__.update(base.__dict__)
         self.queries: list[tuple[str, AgentId]] = []
 
-    def search(self, query: str, domain: AgentId, *, pinned: Any = ()) -> Any:
-        self.queries.append((query, domain))
-        return super().search(query, domain, pinned=pinned)
+    def retrieve(self, queries: Any, domain: AgentId, **kw: Any) -> Any:
+        self.queries += [(q, domain) for q in queries]
+        return super().retrieve(queries, domain, **kw)
 
 
 # ---- 通用 Agent ----
@@ -185,7 +201,7 @@ def test_single_domain_answer_cites_knowledge_passage() -> None:
     router = Router(agent=_agent_reply)
     gw, _ = _gateway(router)
     result = _ask("肌酸要怎么吃", _intent(Intent.SUPPLEMENTS_DRUGS), gw)
-    assert result.record.agents == ((_A.NUTRITIONIST, "model"),)
+    assert _spoke(result.record) == ((_A.NUTRITIONIST, "model"),)
     assert [c["ref"] for c in result.citations] == ["card:QA-CREATINE"]
     assert result.record.card_ids == ("QA-CREATINE",) and result.record.layer == "l1"
     assert router.stages == ["agent"]  # 只有一个领域：不经管家整合
@@ -196,6 +212,15 @@ CROSS = "增肌一周练几次，蛋白质一天吃多少"
 CROSS_INTENT = _intent(
     Intent.TRAINING_KNOWLEDGE, domains=(Intent.TRAINING_KNOWLEDGE, Intent.NUTRITION)
 )
+# 改写把一句里的两件事拆开（spec §13）；原话放在最后
+CROSS_QUERIES = ("增肌一周练几次", "蛋白质一天吃多少", CROSS)
+
+
+def _spoke(record: Any) -> tuple[tuple[AgentId, str], ...]:
+    """作答的 Agent（安全官没话说时不列出：它每次都参与）。"""
+    return tuple(
+        (a, st) for a, st in record.agents if not (a is _A.SAFETY_OFFICER and st == "missing")
+    )
 
 
 def test_cross_domain_agents_answer_in_parallel_and_butler_merges() -> None:
@@ -206,9 +231,10 @@ def test_cross_domain_agents_answer_in_parallel_and_butler_merges() -> None:
         return _json({"conclusion": "训练规划师的要点；营养师的要点"})
 
     gw, _ = _gateway(Router(agent=_agent_reply, compose=merge))
-    result = _ask(CROSS, CROSS_INTENT, gw)
+    result = _ask(CROSS, CROSS_INTENT, gw, queries=CROSS_QUERIES)
     statuses = dict(result.record.agents)
     assert statuses[_A.TRAINING_PLANNER] == statuses[_A.NUTRITIONIST] == "model"
+    assert result.record.query_count == 3
     assert result.record.composed_by_model
     # 相关领域（动作教练）没检索到依据：不说话，也不算“部分建议”
     assert statuses.get(_A.EXERCISE_COACH, "missing") == "missing"
@@ -219,7 +245,7 @@ def test_cross_domain_agents_answer_in_parallel_and_butler_merges() -> None:
 
 
 def test_cross_domain_without_models_keeps_both_domains() -> None:
-    result = _ask(CROSS, CROSS_INTENT)
+    result = _ask(CROSS, CROSS_INTENT, queries=CROSS_QUERIES)
     statuses = dict(result.record.agents)
     assert statuses[_A.TRAINING_PLANNER] == statuses[_A.NUTRITIONIST] == "card"
     text = _text(result)
@@ -280,17 +306,30 @@ def test_safety_caution_always_in_merged_answer() -> None:
         "discomfort",
         domains=(Intent.TRAINING_KNOWLEDGE, Intent.NUTRITION),
     )
-    result = _ask(CROSS, intent, gw)
+    result = _ask(CROSS, intent, gw, queries=CROSS_QUERIES)
     assert result.record.composed_by_model
     assert any(p.kind == "caution" and p.text == TEXTS.caution_discomfort for p in result.parts)
 
 
-def test_safety_card_answers_directly_without_agents() -> None:
+RAPID = "两周后婚礼，怎么一天只吃一顿快速掉秤"
+
+
+def test_safety_card_is_answered_by_safety_officer_model() -> None:
+    """命中安全类卡：不再直接用卡，由安全官基于这张卡用模型作答，放在回答最前（spec §13）。"""
     router = Router(agent=_agent_reply)
     gw, _ = _gateway(router)
-    result = _ask("两周后婚礼，怎么一天只吃一顿快速掉秤", _intent(Intent.NUTRITION), gw)
-    assert result.record.card_ids == ("QA-RAPID-LOSS",) and result.record.agents == ()
-    assert router.stages == []
+    result = _ask(RAPID, _intent(Intent.NUTRITION), gw)
+    assert dict(result.record.agents)[_A.SAFETY_OFFICER] == "model"
+    assert result.parts[0].text == "安全官的要点"
+    assert "card:QA-RAPID-LOSS" in [c["ref"] for c in result.citations]
+
+
+def test_safety_card_used_directly_only_when_model_cannot_answer() -> None:
+    result = _ask(RAPID, _intent(Intent.NUTRITION))
+    assert dict(result.record.agents)[_A.SAFETY_OFFICER] == "card"
+    assert result.record.card_ids == ("QA-RAPID-LOSS",)
+    assert result.parts[0].text == CARDS.get("QA-RAPID-LOSS").conclusion
+    assert "model_unavailable" in result.record.degraded_steps
 
 
 # ---- 并行收集与整合 ----
@@ -445,7 +484,12 @@ def test_conversation_never_loads_skills(monkeypatch: pytest.MonkeyPatch) -> Non
 def test_lexicon_routes_cross_domain_question_to_both_agents() -> None:
     result = recognize(CROSS, book=load_intent_book(), rulebook=RULES, gateway=None, request_id="r")
     record = _ask(CROSS, result).record
-    assert [a for a, _ in record.agents] == [_A.TRAINING_PLANNER, _A.NUTRITIONIST]
+    # 主领域在前，安全官每次都参与、排在最后
+    assert [a for a, _ in record.agents] == [
+        _A.TRAINING_PLANNER,
+        _A.NUTRITIONIST,
+        _A.SAFETY_OFFICER,
+    ]
 
 
 def test_page_question_only_asks_that_pages_agent() -> None:
@@ -456,8 +500,9 @@ def test_page_question_only_asks_that_pages_agent() -> None:
         page="training",
         page_domain=_A.TRAINING_PLANNER,
         context_item="today.exercise:sq_goblet",
+        queries=CROSS_QUERIES,
     )
-    assert result.record.agents == ((_A.TRAINING_PLANNER, "card"),)
+    assert _spoke(result.record) == ((_A.TRAINING_PLANNER, "card"),)
     assert result.record.card_ids == ("QA-STRENGTH-FREQUENCY",)
 
 
@@ -470,7 +515,7 @@ def test_page_item_reaches_the_exercise_tool() -> None:
         page_domain=_A.EXERCISE_COACH,
         context_item="today.exercise:sq_box.set:2",
     )
-    assert result.record.agents == ((_A.EXERCISE_COACH, "tool"),)
+    assert _spoke(result.record) == ((_A.EXERCISE_COACH, "tool"),)
     assert "exercise:sq_box" in [c["ref"] for c in result.citations]
 
 
@@ -489,8 +534,14 @@ def test_parallel_agents_record_model_calls_one_at_a_time() -> None:
         with lock:
             active[0] -= 1
 
+    arrived = [0]
+
     def reply(payload: dict[str, Any]) -> dict[str, object]:
-        barrier.wait()  # 两个 Agent 同时拿到回复、同时写记录
+        with lock:
+            arrived[0] += 1
+            first_two = arrived[0] <= 2
+        if first_two:
+            barrier.wait()  # 前两个 Agent 同时拿到回复、同时写记录
         return _agent_reply(payload)
 
     gw = Gateway(
@@ -501,6 +552,6 @@ def test_parallel_agents_record_model_calls_one_at_a_time() -> None:
         transport=Router(agent=reply),
         record=record,
     )
-    result = _ask(CROSS, CROSS_INTENT, gw)
+    result = _ask(CROSS, CROSS_INTENT, gw, queries=CROSS_QUERIES)
     assert dict(result.record.agents)[_A.NUTRITIONIST] == "model"
     assert len(recorded) >= 2 and overlaps[0] == 0

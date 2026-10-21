@@ -8,7 +8,7 @@
 """
 
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -18,11 +18,12 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ironm.agents.knowledge import card_opinion
+from ironm.agents.rerank import ModelReranker
 from ironm.agents.tools import ToolInput, ToolResult, run_tools
 from ironm.contracts.agents import Citation, Opinion
 from ironm.contracts.model_call import ModelStage
 from ironm.contracts.roles import AgentId
-from ironm.knowledge.kb import Retrieved, Retriever
+from ironm.knowledge.kb import Embedder, Retrieval, Retrieved, Retriever
 from ironm.knowledge.qa_cards import CardBook
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
@@ -88,6 +89,13 @@ SPECS: dict[AgentId, AgentSpec] = {
         ("height_cm", "weight_kg", "goal"),
         ("bmi",),
     ),
+    _A.SAFETY_OFFICER: AgentSpec(
+        _A.SAFETY_OFFICER,
+        "安全官：运动与饮食里的安全风险、极端做法、特殊人群与身体不适时的注意事项；"
+        "只提醒和设限，不给训练或饮食方案",
+        ("conditions", "restrictions", "sex", "birth_date"),
+        (),
+    ),
     _A.BEHAVIOR_COACH: AgentSpec(
         _A.BEHAVIOR_COACH, "行为教练：坚持、动力、时间安排与习惯", ("available_days",), ()
     ),
@@ -106,6 +114,7 @@ class AgentAnswer:
     passages: tuple[str, ...]  # 检索到的段落编号
     tools: tuple[str, ...]  # 有结果的工具
     reason: str | None = None  # 缺失或兜底的原因
+    retrieval: Retrieval | None = None  # 检索过程：各路段落编号与重排方式（不含查询原文）
 
 
 class _Generated(BaseModel):
@@ -194,7 +203,8 @@ def _generate(
 
 
 def _from_tool(tools: list[ToolResult]) -> Opinion | None:
-    """工具给出了确定性内容（如动作库查询）时，直接按它作答。"""
+    """工具给出了确定性内容（如动作库查询）时，直接按它作答；只有计算结果（BMI、热量目标）时，
+    把算出的数字与算法说明作为意见。"""
     for t in tools:
         if t.conclusion:
             return Opinion(
@@ -204,6 +214,14 @@ def _from_tool(tools: list[ToolResult]) -> Opinion | None:
                 how="；".join(t.how) or None,
                 caution="；".join(t.caution) or None,
             )
+    facts = [c for t in tools for c in t.citations if c.kind in ("calculation", "record")]
+    if facts:
+        return Opinion(
+            conclusion="；".join(c.label for c in facts),
+            citations=tuple(facts),
+            reasoning="；".join(dict.fromkeys(c.detail for c in facts if c.detail))
+            or "按计算结果。",
+        )
     return None
 
 
@@ -220,12 +238,36 @@ def answer_as(
     request_id: str,
     as_of: datetime,
     tz: ZoneInfo,
+    queries: Sequence[str] = (),
+    embedder: Embedder | None = None,
 ) -> AgentAnswer:
+    """queries：改写后的多条查询（第一条为主查询）；为空时只用原话。"""
     spec = SPECS[agent]
     visible = {k: profile[k] for k in spec.data if k in profile}  # 只给声明能读的字段
-    # 问答卡的触发词命中时，卡作为人工精选的条目优先召回
-    pinned = [f"card:{c.id}" for c, _ in cards.matches(text) if c.agent == agent]
-    passages = retriever.search(text, agent, pinned=pinned)
+    # 多查询、两路召回、大模型重排（spec §13）；问答卡优先级最低。安全官的保证：
+    # 触发词命中的安全类卡一定进入它的依据，不会因为召回或重排漏掉
+    asked = " ".join([text, *queries])
+    matched = [f"card:{c.id}" for c, _ in cards.matches(asked) if c.agent == agent]
+    must = matched if agent is _A.SAFETY_OFFICER else []
+    reranker = (
+        ModelReranker(gateway, request_id=request_id, question=text, role=spec.role)
+        if gateway is not None
+        else None
+    )
+    retrieval = retriever.retrieve(
+        list(queries) or [text], agent, embedder=embedder, reranker=reranker, must=must
+    )
+    passages = list(retrieval.passages)
+    if not passages:
+        # 问答卡优先级最低：本领域没有其他依据时，触发词命中的卡参与作答；
+        # 大模型重排已判为无关的卡不再加回来
+        judged = (
+            set(retrieval.keyword) | set(retrieval.vector)
+            if retrieval.reranked_by == "model"
+            else set()
+        )
+        found = (retriever.passage(pid) for pid in matched if pid not in judged)
+        passages = [Retrieved(p, 0.0) for p in found if p is not None and p.domain == agent]
     tools = run_tools(
         spec.tools,
         ToolInput(
@@ -240,21 +282,26 @@ def answer_as(
     ids = tuple(r.passage.passage_id for r in passages)
     names = tuple(t.name for t in tools)
     if not passages and not tools:
-        return AgentAnswer(agent, "missing", None, ids, names, "no_basis")
+        return AgentAnswer(agent, "missing", None, ids, names, "no_basis", retrieval)
     reason = "no_model"
     if gateway is not None:
         opinion = _generate(spec, text, visible, passages, tools, gateway, request_id)
         if opinion is not None and opinion.conclusion.startswith(NO_BASIS):
             # 模型判断给它的依据答不了这个问题：这个领域不发言
-            return AgentAnswer(agent, "missing", None, ids, names, "no_basis")
+            return AgentAnswer(agent, "missing", None, ids, names, "no_basis", retrieval)
         if opinion is not None:
-            return AgentAnswer(agent, "model", opinion, ids, names)
+            return AgentAnswer(agent, "model", opinion, ids, names, None, retrieval)
         reason = "model_failed_or_invalid"
     tool_opinion = _from_tool(tools)
     if tool_opinion is not None:
-        return AgentAnswer(agent, "tool", tool_opinion, ids, names, reason)
-    card_ids = [pid.removeprefix("card:") for pid in ids if pid.startswith("card:")]
+        return AgentAnswer(agent, "tool", tool_opinion, ids, names, reason, retrieval)
+    # 降级到问答卡时，触发词命中的卡优先（人工写好的适用范围），其次是检索到的卡；
+    # 安全官只能用触发词命中的安全类卡：关键词勉强相关的卡不能替代一个普通问题的回答
+    retrieved = (
+        [] if agent is _A.SAFETY_OFFICER else [pid for pid in ids if pid.startswith("card:")]
+    )
+    card_ids = [pid.removeprefix("card:") for pid in dict.fromkeys([*matched, *retrieved])]
     card = card_opinion(agent, [cards.get(card_ids[0])]) if card_ids else None
     if card is not None:
-        return AgentAnswer(agent, "card", card, ids, names, reason)
-    return AgentAnswer(agent, "missing", None, ids, names, reason)
+        return AgentAnswer(agent, "card", card, ids, names, reason, retrieval)
+    return AgentAnswer(agent, "missing", None, ids, names, reason, retrieval)

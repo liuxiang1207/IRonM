@@ -21,13 +21,14 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ironm.agents.answering import AgentAnswer
 from ironm.contracts.common import ContractModel
 from ironm.contracts.model_call import ModelStage
 from ironm.contracts.roles import AgentId
 from ironm.core.body import bmi
 from ironm.core.log import get_logger
 from ironm.core.numbers import numbers_in, unregistered
-from ironm.knowledge.kb import Retriever
+from ironm.knowledge.kb import Embedder, Retriever
 from ironm.knowledge.qa_cards import CardBook, PartKind, QACard
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
@@ -72,6 +73,19 @@ class RunRecord(ContractModel):
     agents: tuple[tuple[AgentId, str], ...] = ()
     agent_basis: tuple[str, ...] = ()
     composed_by_model: bool = False
+    # 检索（spec [2026-10-21] §13）：查询条数、改写结果、各 Agent 的召回与重排；不含查询原文
+    query_count: int = 1
+    rewrite: str | None = None  # model / original / rejected:<原因>
+    retrieval: tuple["RetrievalTrace", ...] = ()
+    degraded_steps: tuple[str, ...] = ()  # 降级发生在哪些步骤，如 rerank:nutritionist
+
+
+class RetrievalTrace(ContractModel):
+    agent: AgentId
+    reranked_by: str  # model / coverage / none
+    keyword: tuple[str, ...]  # 关键词一路召回的段落编号
+    vector: tuple[str, ...]  # 向量一路召回的段落编号
+    kept: tuple[tuple[str, float], ...]  # 重排后留下的段落与分数
 
 
 class QAResult(ContractModel):
@@ -201,6 +215,31 @@ def _cards_cited(citations: Sequence[Mapping[str, Any]], cards: CardBook) -> tup
     return tuple(dict.fromkeys(r for r in refs if r in known))
 
 
+def _trace(a: AgentAnswer) -> RetrievalTrace:
+    r = a.retrieval
+    assert r is not None
+    return RetrievalTrace(
+        agent=a.agent,
+        reranked_by=r.reranked_by,
+        keyword=r.keyword,
+        vector=r.vector,
+        kept=tuple((x.passage.passage_id, round(x.score, 3)) for x in r.passages),
+    )
+
+
+def _degraded(answers: Sequence[AgentAnswer], has_model: bool) -> list[str]:
+    """模型可用却没用上的步骤：重排退回覆盖比例、Agent 退回工具或问答卡。"""
+    if not has_model:
+        return ["model_unavailable"]
+    out = [
+        f"rerank:{a.agent.value}"
+        for a in answers
+        if a.retrieval is not None and a.retrieval.reranked_by == "coverage"
+    ]
+    out += [f"answer:{a.agent.value}:{a.status}" for a in answers if a.status in ("tool", "card")]
+    return out  # fmt: skip
+
+
 def answer_question(
     text: str,
     intent: IntentResult,
@@ -217,11 +256,14 @@ def answer_question(
     profile: Mapping[str, Any] | None = None,
     as_of: datetime | None = None,
     tz: ZoneInfo | None = None,
+    queries: Sequence[str] = (),
+    embedder: Embedder | None = None,
+    rewrite: str | None = None,
 ) -> QAResult:
     """page 不为空时是功能页提问：只调用本功能的 Agent（page_domain），只查它与安全类的卡。
 
-    有 retriever 时，专业问题由选中的 Agent 并行作答、管家整合；命中安全类的卡时直接用卡；
-    Agent 都没有意见（或没有 retriever）时退回问答卡。
+    有 retriever 时，专业问题由选中的 Agent（含安全官）并行作答、管家整合（spec §12、§13）；
+    Agent 都没有意见（或没有 retriever）时才降级到问答卡：命中安全类的卡时直接用卡。
     """
     fixed = _Texts.model_validate(texts.model_dump())
     if intent.intent not in DOMAIN_WEIGHTS:
@@ -243,13 +285,17 @@ def answer_question(
         cautions.append(fixed.caution_discomfort)
     if "special_population" in intent.concerns:
         cautions.append(fixed.caution_special)
-    safety_card = bool(matched) and matched[0].agent == _SAFETY
     tried: tuple[tuple[AgentId, str], ...] = ()  # 作答过的 Agent（都没有意见时也记下）
     basis: tuple[str, ...] = ()
-    if retriever is not None and not safety_card and intent.intent is not Intent.PLAN:
+    traces: tuple[RetrievalTrace, ...] = ()
+    steps: list[str] = [f"rewrite:{rewrite.split(':', 1)[1]}"] if rewrite and ":" in rewrite else []
+    query_count = max(len(queries), 1)
+    if retriever is not None and intent.intent is not Intent.PLAN:
         agents = [page_domain] if page is not None else [domains.primary, *domains.related]
+        # 安全官每次都参与，排在最后：它的提醒写进回答，但它没话说时不算“部分建议”
+        answering = [*(a for a in agents if a is not None and a != _SAFETY), _SAFETY]
         collected = collect_opinions(
-            [a for a in agents if a is not None],
+            answering,
             text=text,
             profile=profile or {},
             context_item=context_item,
@@ -260,8 +306,12 @@ def answer_question(
             request_id=request_id,
             as_of=as_of or datetime.now(UTC),
             tz=tz or _DEFAULT_TZ,
+            queries=queries,
+            embedder=embedder,
         )
         tried = tuple((a.agent, a.status) for a in collected.answers)
+        traces = tuple(_trace(a) for a in collected.answers if a.retrieval is not None)
+        steps += _degraded(collected.answers, gateway is not None)
         basis = tuple(dict.fromkeys(b for a in collected.answers for b in (*a.passages, *a.tools)))
         if collected.with_opinion:
             composed = compose(
@@ -273,6 +323,12 @@ def answer_question(
                 request_id=request_id,
             )
             by_model = composed.by_model or any(a.status == "model" for a in collected.answers)
+            final = list(composed.parts)
+            said = _personal(text)
+            if said is not None and not any(p.kind == "for_you" for p in final):
+                # 这句话里给了身高体重（或 BMI），但作答的 Agent 里没有会算的：照样算给用户
+                mine = AnswerPart(kind="for_you", text=getattr(fixed, said[0]).format(**said[1]))
+                final.insert(1 if final and final[0].kind != "notice" else 2, mine)
             record = RunRecord(
                 request_id=request_id,
                 intent=intent.intent,
@@ -286,7 +342,10 @@ def answer_question(
                 card_ids=_cards_cited(composed.citations, cards),
                 personal=tuple(
                     dict.fromkeys(
-                        str(c["ref"]) for c in composed.citations if _is_personal(c["ref"])
+                        [
+                            *(str(c["ref"]) for c in composed.citations if _is_personal(c["ref"])),
+                            *([_PERSONAL_REF[said[0]]] if said is not None else []),
+                        ]
                     )
                 ),
                 layer="l1" if by_model else "l0",
@@ -295,11 +354,15 @@ def answer_question(
                 agents=tried,
                 agent_basis=basis,
                 composed_by_model=composed.by_model,
+                retrieval=traces,
+                degraded_steps=tuple([*steps, *(["compose"] if composed.fallback else [])]),
+                query_count=query_count,
+                rewrite=rewrite,
             )
             _log.info(
                 "qa.answered", request_id=request_id, status="agents", count=len(composed.parts)
             )
-            return QAResult(parts=composed.parts, record=record, citations=composed.citations)
+            return QAResult(parts=tuple(final), record=record, citations=composed.citations)
     caution_parts = [AnswerPart(kind="caution", text=c) for c in cautions]
     personal = _personal(text)
     for_you = (
@@ -356,6 +419,10 @@ def answer_question(
         number_rewrites=rewrites,
         agents=tried,
         agent_basis=basis,
+        retrieval=traces,
+        degraded_steps=tuple([*steps, *([f"fallback:{layer}"] if tried else [])]),
+        query_count=query_count,
+        rewrite=rewrite,
     )
     _log.info("qa.answered", request_id=request_id, status=layer, count=len(parts))
     return QAResult(parts=tuple(parts), record=record)

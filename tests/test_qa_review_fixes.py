@@ -26,6 +26,7 @@ from tests.test_chat_safety import _deps
 from tests.test_qa_chain import (
     CROSS,
     CROSS_INTENT,
+    CROSS_QUERIES,
     NOW,
     RULES,
     TEXTS,
@@ -144,7 +145,8 @@ def test_concern_from_profile_does_not_reroute_greeting() -> None:
 def test_unrelated_tools_are_not_basis() -> None:
     gw, calls, _ = _agent_gateway()
     result = _agent(_A.NUTRITIONIST, "增肌一周练几次", gw, profile=FULL_PROFILE)
-    assert result.status == "missing" and result.reason == "no_basis" and calls == []
+    assert result.status == "missing" and result.reason == "no_basis"
+    assert not [c for c in calls if c.stage.value == "answer"]  # 没有依据就不让模型作答
     assert result.tools == ()
 
 
@@ -187,7 +189,7 @@ def test_for_you_kept_after_model_merge_and_recorded() -> None:
         return _agent_reply(payload)
 
     gw, _ = _gateway(Router(agent=agent, compose=lambda _: _json({"conclusion": "两边的要点。"})))
-    result = _ask(CROSS, CROSS_INTENT, gw, profile=FULL_PROFILE)
+    result = _ask(CROSS, CROSS_INTENT, gw, profile=FULL_PROFILE, queries=CROSS_QUERIES)
     assert result.record.composed_by_model
     for_you = [p.text for p in result.parts if p.kind == "for_you"]
     assert any("每日蛋白质" in t or "每日热量" in t for t in for_you)

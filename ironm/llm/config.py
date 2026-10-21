@@ -28,7 +28,9 @@ class ModelRoute(_Strict):
 
     provider: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]*$")]
     base_url: Annotated[str, Field(pattern=_HTTPS_URL)]
-    model: Annotated[str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._\-]*$")]
+    model: Annotated[
+        str, Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9._\-/]*$")
+    ]  # 可带组织名，如 BAAI/bge-m3
     api_key_env: Annotated[str, Field(pattern=r"^[A-Z][A-Z0-9_]*$")]
     timeout_s: Annotated[float, Field(gt=0, le=120)]
     max_tokens: Annotated[int, Field(gt=0, le=32000)]

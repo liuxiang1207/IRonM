@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
+from ironm.agents import rerank
 from ironm.agents.answering import SPECS, answer_as
 from ironm.agents.tools import ToolInput, bmi_tool, calorie_tool, exercise_tool
 from ironm.contracts.model_call import ModelCall
@@ -79,9 +80,27 @@ def test_exercise_tool_adds_restriction_caution_and_easier_step() -> None:
 # ---- 作答 ----
 
 
+class AnswerTransport(FakeTransport):
+    """重排的请求一律回不合规的内容（检索改用覆盖比例打分），其余按顺序回预设结果。
+    requests 只记作答的请求。"""
+
+    def __call__(
+        self, url: str, headers: dict[str, str], body: dict[str, Any], timeout_s: float
+    ) -> dict[str, object]:
+        if body["messages"][0]["content"] == RERANK_PROMPT:
+            self.reranks += 1
+            return _reply("跳过重排")
+        return super().__call__(url, headers, body, timeout_s)
+
+    reranks = 0
+
+
+RERANK_PROMPT = rerank.PROMPT_PATH.read_text(encoding="utf-8")
+
+
 def _gateway(*results: object) -> tuple[Gateway, list[ModelCall], FakeTransport]:
     calls: list[ModelCall] = []
-    transport = FakeTransport(*results)
+    transport = AnswerTransport(*results)
     gw = Gateway(
         load_models(MODELS_PATH),
         environ=ENV,
@@ -121,7 +140,7 @@ def test_model_answer_grounded_in_retrieved_passage() -> None:
     result = _ask(_A.NUTRITIONIST, "肌酸要怎么吃", gw)
     assert result.status == "model" and result.passages[0] == "card:QA-CREATINE"
     assert result.opinion.citations[0].ref == "card:QA-CREATINE"
-    assert len(calls) == 1
+    assert [c.stage.value for c in calls] == ["rerank", "answer"]
 
 
 def test_model_can_cite_tool_facts() -> None:

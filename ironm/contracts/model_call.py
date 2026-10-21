@@ -19,6 +19,9 @@ class ModelStage(StrEnum):
     REVIEW_SEMANTIC = "review_semantic"
     REFLECT = "reflect"
     SAFETY_REVIEW = "safety_review"  # 急症判定的模型复核，只升不降（spec [2026-10-21] §12）
+    QUERY_REWRITE = "query_rewrite"  # 检索前把一句话改写为多条查询（spec [2026-10-21] §13）
+    RERANK = "rerank"  # 召回候选的大模型重排（§13）
+    EMBEDDING = "embedding"  # 向量模型：查询与知识段落的向量（§13）
 
 
 class ModelCall(ContractModel):

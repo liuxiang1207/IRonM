@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ironm import __version__
 from ironm.contracts.events import EVENT_ADAPTER, EnergyCheckEvent, Event, WeightEvent
 from ironm.contracts.memory import Candidate
+from ironm.contracts.model_call import ModelStage
 from ironm.contracts.screening import SafetyFlag
 from ironm.core.clock import Clock, SystemClock, local_day_bounds
 from ironm.core.config import Settings, load_settings
@@ -33,7 +34,7 @@ from ironm.knowledge.exercises import LIBRARY_PATH, load_library
 from ironm.knowledge.kb import KnowledgeBase, load_passages, retriever_from_rules
 from ironm.knowledge.qa_cards import load_cards
 from ironm.llm.config import load_models
-from ironm.llm.gateway import Gateway
+from ironm.llm.gateway import Gateway, GatewayEmbedder
 from ironm.memory.conversation import MEMORY_RULE, MemoryParams
 from ironm.memory.profile import ProfileService
 from ironm.memory.profile import load_terms as load_profile_terms
@@ -204,8 +205,13 @@ def create_app(
     env = os.environ if environ is None else environ
     library = load_library(library_path)  # 动作库：启动时校验（spec §27）
     # 知识库与检索（spec [2026-10-21] §12）：问答卡 + 动作库 + 资料目录的段落，启动时建索引
+    # 向量一路（spec §13）：配置了向量服务的密钥才启用；段落向量第一次检索时计算，调用只记日志
+    vectors = bool(env.get(models.routes[ModelStage.EMBEDDING].api_key_env))
+    index_gateway = Gateway(models, environ=env, clock=clock, ids=id_gen)
     retriever = retriever_from_rules(
-        KnowledgeBase.from_sources(cards, library, load_passages(settings.kb_dir)), rulebook
+        KnowledgeBase.from_sources(cards, library, load_passages(settings.kb_dir)),
+        rulebook,
+        embedder=GatewayEmbedder(index_gateway, "kb-index") if vectors else None,
     )
     load_baseline(baseline_path)  # 基线测试方案：启动时校验（spec §31）
     # Skill 头信息与它们用到的规则参数：启动时校验（spec §28、§30）
@@ -266,6 +272,7 @@ def create_app(
             profiles=ProfileService(memory, terms=profile_terms, ids=id_gen, now=clock.now),
             gateway=Gateway(models, environ=env, clock=clock, ids=id_gen, record=calls.add),
             retriever=retriever,
+            vectors=vectors,
         )
 
     def save_turn(user: str, text: str, reply: ChatReply) -> None:

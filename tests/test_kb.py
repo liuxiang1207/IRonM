@@ -84,9 +84,13 @@ class _AllPass:
 
 def test_vector_recall_finds_what_keywords_miss() -> None:
     """“夜里老醒”与睡眠卡没有共同的两字片段，关键词召回不到；向量召回补上。"""
-    assert _ids("夜里老醒", _A.RECOVERY, Retriever(KB, reranker=_AllPass())) == []
-    found = _ids("夜里老醒", _A.RECOVERY, Retriever(KB, embedder=_Embedder(), reranker=_AllPass()))
-    assert "card:QA-SLEEP" in found
+    plain = Retriever(KB).retrieve(["夜里老醒"], _A.RECOVERY, reranker=_AllPass())
+    assert plain.passages == () and plain.vector == ()
+    both = Retriever(KB, embedder=_Embedder()).retrieve(
+        ["夜里老醒"], _A.RECOVERY, reranker=_AllPass()
+    )
+    assert "card:QA-SLEEP" in [r.passage.passage_id for r in both.passages]
+    assert "card:QA-SLEEP" in both.vector and both.reranked_by == "model"
 
 
 def test_min_score_threshold_applies() -> None:
@@ -130,14 +134,91 @@ def test_duplicate_ids_rejected() -> None:
         KnowledgeBase([KB.passages[0], KB.passages[0]])
 
 
-def test_pinned_cards_come_first_once_and_bypass_threshold() -> None:
-    """问答卡触发词命中的卡排在最前、不重复；只认本领域的段落。"""
-    r = Retriever(KB)
-    query = "增肌一周练几次，蛋白质一天吃多少"  # 两个领域混在一句里，片段覆盖被稀释
-    assert "card:QA-STRENGTH-FREQUENCY" not in _ids(query, _A.TRAINING_PLANNER, r)
-    pinned = ["card:QA-STRENGTH-FREQUENCY", "card:QA-PROTEIN"]
-    got = [x.passage.passage_id for x in r.search(query, _A.TRAINING_PLANNER, pinned=pinned)]
-    assert got[0] == "card:QA-STRENGTH-FREQUENCY" and "card:QA-PROTEIN" not in got
-    both = ["card:QA-PROTEIN-POWDER", "card:QA-PROTEIN"]
-    got = [x.passage.passage_id for x in r.search(query, _A.NUTRITIONIST, pinned=both)]
-    assert got[:2] == both and len(got) == len(set(got))
+def _guide(pid: str, domain: AgentId, title: str, text: str) -> Passage:
+    return Passage(
+        passage_id=pid, domain=domain, title=title, text=text, source="某指南",
+        level="guideline", review="approved",
+    )  # fmt: skip
+
+
+PROTEIN_GUIDE = _guide(
+    "guide:protein",
+    _A.NUTRITIONIST,
+    "蛋白质摄入",
+    "力量训练人群每天蛋白质摄入按体重计算，分到三餐。",
+)
+
+
+def test_cards_have_lowest_priority() -> None:
+    """同一领域资料段落与问答卡都过门槛：只用资料段落；没有资料段落时才用卡。"""
+    kb = KnowledgeBase([*KB.passages, PROTEIN_GUIDE])
+    got = [
+        r.passage.passage_id
+        for r in Retriever(kb).retrieve(["一天要吃多少蛋白质"], _A.NUTRITIONIST).passages
+    ]
+    assert got == ["guide:protein"]
+    only_cards = _ids("一天要吃多少蛋白质", _A.NUTRITIONIST)
+    assert only_cards and all(i.startswith("card:") for i in only_cards)
+
+
+def test_must_passages_always_kept() -> None:
+    """命中触发词的安全类卡（must）一定在依据里，即使召回不到、分数低。"""
+    r = Retriever(KB, min_score=0.99)
+    got = r.retrieve(["今天天气怎么样"], _A.SAFETY_OFFICER, must=["card:QA-RAPID-LOSS"])
+    assert [x.passage.passage_id for x in got.passages] == ["card:QA-RAPID-LOSS"]
+    other = r.retrieve(["今天天气怎么样"], _A.NUTRITIONIST, must=["card:QA-RAPID-LOSS"])
+    assert other.passages == ()  # 只认本领域的段落
+
+
+def test_multiple_queries_recall_what_one_misses() -> None:
+    """一句话里混了两件事时，单条查询召回不到训练的卡；拆成两条后能召回。"""
+    mixed = "增肌一周练几次，蛋白质一天吃多少"
+    assert "card:QA-STRENGTH-FREQUENCY" not in _ids(mixed, _A.TRAINING_PLANNER)
+    split = Retriever(KB).retrieve(
+        ["增肌一周练几次", "蛋白质一天吃多少", mixed], _A.TRAINING_PLANNER
+    )
+    assert split.passages[0].passage.passage_id == "card:QA-STRENGTH-FREQUENCY"
+    assert "card:QA-STRENGTH-FREQUENCY" in split.keyword
+
+
+class _Broken:
+    def score(self, query: str, passages: Sequence[Passage]) -> list[float] | None:
+        return None
+
+
+class _Low:
+    def score(self, query: str, passages: Sequence[Passage]) -> list[float] | None:
+        return [0.1 for _ in passages]
+
+
+def test_model_rerank_threshold_and_fallback() -> None:
+    r = Retriever(KB, model_min_score=0.5)
+    low = r.retrieve(["肌酸要怎么吃"], _A.NUTRITIONIST, reranker=_Low())
+    assert low.passages == () and low.reranked_by == "model"  # 大模型判为无关：不算依据
+    broken = r.retrieve(["肌酸要怎么吃"], _A.NUTRITIONIST, reranker=_Broken())
+    assert broken.reranked_by == "coverage"
+    assert broken.passages[0].passage.passage_id == "card:QA-CREATINE"
+
+
+class _FlakyEmbedder:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        self.calls += 1
+        if self.calls == 1:
+            raise TimeoutError
+        return _Embedder().embed(texts)
+
+
+def test_vector_service_failure_skips_route_and_retries_later() -> None:
+    now = [0.0]
+    emb = _FlakyEmbedder()
+    r = Retriever(KB, embedder=emb, retry_after_s=60, timer=lambda: now[0])
+    first = r.retrieve(["夜里老醒"], _A.RECOVERY, reranker=_AllPass())
+    assert first.vector == () and emb.calls == 1  # 失败：这一路跳过，回答照常
+    r.retrieve(["夜里老醒"], _A.RECOVERY, reranker=_AllPass())
+    assert emb.calls == 1  # 冷却期内不再重试
+    now[0] = 61
+    later = r.retrieve(["夜里老醒"], _A.RECOVERY, reranker=_AllPass())
+    assert "card:QA-SLEEP" in later.vector

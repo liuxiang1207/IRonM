@@ -51,7 +51,8 @@ def card_opinion(agent: AgentId, found: Iterable[QACard]) -> Opinion | None:
     return Opinion(
         conclusion=best.conclusion,
         citations=tuple(citations),
-        reasoning=f"按审定过的问答卡 {best.id} 回答（依据见下）。",
+        # 卡里写好的“为什么”就是推理；没有时说明按哪张卡回答
+        reasoning=best.why or f"按审定过的问答卡 {best.id} 回答（依据见下）。",
         how="；".join(h for h in how if h) or None,
         caution="；".join(c for c in caution if c) or None,
         uncertain=best.uncertain,

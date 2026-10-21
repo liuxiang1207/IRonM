@@ -53,3 +53,28 @@ routes:
     timeout_s: 20
     max_tokens: 1000
     extra_body: {thinking: {type: disabled}}
+  query_rewrite:  # 检索前的多查询改写（spec [2026-10-21] §13）
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    timeout_s: 6
+    max_tokens: 400
+    extra_body: {thinking: {type: disabled}}
+  rerank:  # 召回候选的重排（§13）
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    model: deepseek-flash
+    api_key_env: DEEPSEEK_API_KEY
+    timeout_s: 8
+    max_tokens: 800
+    extra_body: {thinking: {type: disabled}}
+  embedding:  # 向量模型（§13）：只发送查询文字与知识段落，不发画像与对话记录
+    # 按通用的 embeddings 接口调用，可换成其他服务；没有密钥时只用关键词召回。
+    # max_tokens 对向量接口不起作用，按配置格式填写。
+    provider: siliconflow
+    base_url: https://api.siliconflow.cn/v1
+    model: BAAI/bge-m3
+    api_key_env: SILICONFLOW_API_KEY
+    timeout_s: 10
+    max_tokens: 1

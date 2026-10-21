@@ -9,8 +9,11 @@
 
 import json
 import math
+import re
+import threading
+import time
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal, Protocol
@@ -32,6 +35,7 @@ __all__ = [
     "KnowledgeLoadError",
     "Passage",
     "Reranker",
+    "Retrieval",
     "RetrievalParams",
     "Retrieved",
     "Retriever",
@@ -79,9 +83,61 @@ class Embedder(Protocol):
 
 
 class Reranker(Protocol):
-    """重排：给每段打 0–1 的相关分。"""
+    """重排：给每段打 0–1 的相关分；不可用时返回 None，由检索改用覆盖比例打分。"""
 
-    def score(self, query: str, passages: Sequence[Passage]) -> list[float]: ...
+    def score(self, query: str, passages: Sequence[Passage]) -> list[float] | None: ...
+
+
+# 问句里的虚词与口头语：不表示问的是什么，算覆盖比例前去掉（只用于没有大模型重排时的打分）
+_QUESTION_TERMS = (
+    "怎么样",
+    "怎么",
+    "什么",
+    "多少",
+    "哪个",
+    "哪些",
+    "哪种",
+    "为什么",
+    "可以",
+    "能不能",
+    "是不是",
+    "有没有",
+    "应该",
+    "需要",
+    "比较",
+    "合适",
+    "一下",
+    "还是",
+    "吗",
+    "呢",
+    "吧",
+    "啊",
+    "呀",
+    "要",
+    "能",
+    "会",
+    "该",
+    "好",
+    "的",
+    "了",
+    "我",
+    "你",
+    "是",
+    "有",
+    "在",
+    "就",
+    "都",
+    "也",
+    "很",
+    "太",
+    "想",
+    "做",
+    "这个",
+    "那个",
+    "这",
+    "那",
+)
+_QUESTION_WORDS = re.compile("|".join(sorted(_QUESTION_TERMS, key=len, reverse=True)))
 
 
 class CoverageReranker:
@@ -90,12 +146,15 @@ class CoverageReranker:
     “怎么、多少”这类到处都有的问句片段权重低，“肌酸、蛋白”这类专业词权重高。
     """
 
-    def __init__(self, idf: dict[str, float] | None = None) -> None:
+    def __init__(self, idf: dict[str, float] | None = None, unseen: float = 0.0) -> None:
         self._idf = idf or {}
+        self._unseen = unseen
 
     def score(self, query: str, passages: Sequence[Passage]) -> list[float]:
-        q = set(_grams(query))
-        weight = {g: self._idf.get(g, 0.0) for g in q}
+        # 知识库里从没出现过的片段（如“跑鞋”）最稀有：按最高权重计入，没被覆盖就拉低分数，
+        # 避免只凭“什么”这类常见片段就判为全覆盖
+        q = set(_grams(_QUESTION_WORDS.sub("，", query)))
+        weight = {g: self._idf.get(g, self._unseen) for g in q}
         total = sum(weight.values())
         if total == 0:
             return [0.0 for _ in passages]
@@ -127,6 +186,7 @@ class KnowledgeBase:
             df.update(d.keys())
         n = len(self._docs)
         self._idf = {g: math.log(1 + (n - c + 0.5) / (c + 0.5)) for g, c in df.items()}
+        self.unseen_idf = math.log(1 + (n + 0.5) / 0.5)  # 没出现过的片段的权重
 
     @property
     def idf(self) -> dict[str, float]:
@@ -189,65 +249,159 @@ def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
     return 0.0 if na == 0 or nb == 0 else sum(x * y for x, y in zip(a, b, strict=True)) / (na * nb)
 
 
+@dataclass(frozen=True)
+class Retrieval:
+    """一次检索的结果与过程（过程写进运行记录，只有段落编号与分数，不含查询原文）。"""
+
+    passages: tuple[Retrieved, ...]
+    keyword: tuple[str, ...] = ()  # 关键词一路召回的段落编号（各查询合并）
+    vector: tuple[str, ...] = ()  # 向量一路召回的段落编号；没有向量模型或不可用时为空
+    reranked_by: Literal["model", "coverage", "none"] = "none"
+
+
 class Retriever:
-    """按领域召回、融合、重排。只返回审定过且重排分不低于门槛的段落。"""
+    """多查询、两路召回（关键词 + 向量）→ 倒数排名融合 → 重排（spec [2026-10-21] §12、§13）。
+
+    - 每条查询各走两路；所有结果按排名融合、去重，取前若干条作为候选。
+    - 重排：调用方给出的重排器（大模型）优先；它不可用时按覆盖比例打分。只保留审定过、
+      不低于门槛的段落。
+    - 问答卡优先级最低：本领域有其他过门槛的依据时，不用问答卡。
+    - must：一定要进入依据的段落（命中触发词的安全类卡），不受门槛与优先级限制。
+    """
 
     def __init__(
         self,
         kb: KnowledgeBase,
         *,
         embedder: Embedder | None = None,
-        reranker: Reranker | None = None,
         recall_k: int = 20,
+        candidates: int = 20,
         keep_k: int = 4,
-        min_score: float = 0.3,
+        min_score: float = 0.2,
+        model_min_score: float = 0.5,
+        retry_after_s: float = 300.0,
+        timer: Callable[[], float] = time.monotonic,
     ) -> None:
         self._kb = kb
         self._embedder = embedder
-        self._reranker = reranker or CoverageReranker(kb.idf)
-        self._recall_k, self._keep_k, self._min = recall_k, keep_k, min_score
-        self._vectors = (
-            embedder.embed([p.title + p.text for p in kb.passages]) if embedder else None
-        )
+        self._coverage = CoverageReranker(kb.idf, kb.unseen_idf)
+        self._recall_k, self._candidates, self._keep_k = recall_k, candidates, keep_k
+        self._min, self._model_min = min_score, model_min_score
+        self._retry_after, self._timer = retry_after_s, timer
+        self._vectors: list[list[float]] | None = None
+        self._failed_at: float | None = None
+        self._lock = threading.Lock()
 
-    def search(self, query: str, domain: AgentId, *, pinned: Iterable[str] = ()) -> list[Retrieved]:
-        """pinned：按问答卡触发词命中的段落编号。问答卡是人工精选、优先级最高的条目，
-        命中即排在最前（分数记 1.0），不受重排门槛限制；只认本领域、已审定的段落。"""
+    def _passage_vectors(self) -> list[list[float]] | None:
+        """段落向量：第一次用到时计算并缓存；失败后隔一段时间再试，期间只用关键词一路。"""
+        if self._embedder is None:
+            return None
+        with self._lock:
+            if self._vectors is not None:
+                return self._vectors
+            if self._failed_at is not None and self._timer() - self._failed_at < self._retry_after:
+                return None
+            try:
+                vectors = self._embedder.embed([p.title + p.text for p in self._kb.passages])
+            except Exception:  # 向量服务不可用：这一路跳过，不影响回答
+                self._failed_at = self._timer()
+                return None
+            if len(vectors) != len(self._kb.passages):
+                self._failed_at = self._timer()
+                return None
+            self._vectors = vectors
+            return vectors
+
+    def _vector_lists(
+        self, queries: Sequence[str], allowed: frozenset[int], embedder: Embedder | None
+    ) -> list[list[int]]:
+        vectors = self._passage_vectors()
+        if vectors is None:
+            return []
+        try:
+            qvs = (embedder or self._embedder).embed(list(queries))  # type: ignore[union-attr]
+        except Exception:
+            return []
+        lists = []
+        for qv in qvs:
+            sims = sorted(((i, _cosine(qv, vectors[i])) for i in allowed), key=lambda x: -x[1])
+            lists.append([i for i, _ in sims[: self._recall_k]])
+        return lists
+
+    def retrieve(
+        self,
+        queries: Sequence[str],
+        domain: AgentId,
+        *,
+        embedder: Embedder | None = None,
+        reranker: Reranker | None = None,
+        must: Iterable[str] = (),
+    ) -> Retrieval:
+        """queries 第一条为主查询（重排按它判断）；embedder 用于本次查询的向量（可带请求编号）。"""
+        queries = [q for q in dict.fromkeys(queries) if q.strip()]
         allowed = frozenset(
             i
             for i, p in enumerate(self._kb.passages)
             if p.domain == domain and p.review == "approved"
         )
-        if not allowed:
-            return []
-        order = {pid: n for n, pid in enumerate(dict.fromkeys(pinned))}
-        top = sorted(
-            (Retrieved(self._kb.passages[i], 1.0) for i in allowed
-             if self._kb.passages[i].passage_id in order),
-            key=lambda r: order[r.passage.passage_id],
-        )  # fmt: skip
-        lists = [[i for i, _ in self._kb.bm25(query, allowed)[: self._recall_k]]]
-        if self._embedder is not None and self._vectors is not None:
-            [qv] = self._embedder.embed([query])
-            sims = sorted(
-                ((i, _cosine(qv, self._vectors[i])) for i in allowed), key=lambda x: -x[1]
-            )
-            lists.append([i for i, _ in sims[: self._recall_k]])
+        if not allowed or not queries:
+            return Retrieval(())
+        keyword = [[i for i, _ in self._kb.bm25(q, allowed)[: self._recall_k]] for q in queries]
+        vector = self._vector_lists(queries, allowed, embedder)
         fused: dict[int, float] = {}
-        for ranked in lists:
+        for ranked in (*keyword, *vector):
             for rank, i in enumerate(ranked):
                 fused[i] = fused.get(i, 0.0) + 1 / (_RRF_K + rank + 1)
-        candidates = [self._kb.passages[i] for i, _ in sorted(fused.items(), key=lambda x: -x[1])]
-        scores = self._reranker.score(query, candidates)
+        order = sorted(fused, key=lambda i: -fused[i])[: self._candidates]
+        candidates = [self._kb.passages[i] for i in order]
+
+        def ids(lists: list[list[int]]) -> tuple[str, ...]:
+            return tuple(
+                dict.fromkeys(self._kb.passages[i].passage_id for ranked in lists for i in ranked)
+            )
+
+        forced_ids = list(dict.fromkeys(must))
+        forced = [
+            Retrieved(self._kb.passages[i], 1.0)
+            for i in sorted(allowed)
+            if self._kb.passages[i].passage_id in forced_ids
+        ]
+        kept, by = self._rerank(queries, candidates, reranker)
+        kept = [r for r in kept if r.passage.passage_id not in forced_ids]
+        own = [r for r in kept if r.passage.level != "card"]
+        chosen = own or kept  # 问答卡优先级最低：有其他依据时不用卡
+        return Retrieval(
+            passages=tuple([*forced, *chosen][: max(self._keep_k, len(forced))]),
+            keyword=ids(keyword),
+            vector=ids(vector),
+            reranked_by=by if candidates else "none",
+        )
+
+    def _rerank(
+        self, queries: Sequence[str], candidates: list[Passage], reranker: Reranker | None
+    ) -> tuple[list[Retrieved], Literal["model", "coverage"]]:
+        if not candidates:
+            return [], "coverage"
+        scores = reranker.score(queries[0], candidates) if reranker is not None else None
+        if scores is not None and len(scores) == len(candidates):
+            threshold, by = self._model_min, "model"
+        else:
+            # 大模型重排不可用：按覆盖比例打分，取各条查询里最高的分
+            per_query = [self._coverage.score(q, candidates) for q in queries]
+            scores = [max(col) for col in zip(*per_query, strict=True)]
+            threshold, by = self._min, "coverage"
         kept = sorted(
-            (
-                Retrieved(p, s)
-                for p, s in zip(candidates, scores, strict=True)
-                if s >= self._min and p.passage_id not in order
-            ),
+            (Retrieved(p, s) for p, s in zip(candidates, scores, strict=True) if s >= threshold),
             key=lambda r: -r.score,
         )
-        return [*top, *kept][: self._keep_k]
+        return kept, by  # type: ignore[return-value]
+
+    def passage(self, passage_id: str) -> Passage | None:
+        return next((p for p in self._kb.passages if p.passage_id == passage_id), None)
+
+    def search(self, query: str, domain: AgentId) -> list[Retrieved]:
+        """单条查询、默认重排（兼容旧调用）。"""
+        return list(self.retrieve([query], domain).passages)
 
 
 def load_passages(folder: Path | None) -> list[Passage]:
@@ -273,9 +427,12 @@ def load_passages(folder: Path | None) -> list[Passage]:
 
 
 class RetrievalParams(ContractModel):
+    max_queries: Annotated[int, Field(ge=1, le=6)]  # 改写后的查询条数上限（含主查询）
     recall_k: Annotated[int, Field(ge=1, le=200)]
+    candidates: Annotated[int, Field(ge=1, le=100)]
     keep_k: Annotated[int, Field(ge=1, le=20)]
     min_score: Annotated[float, Field(ge=0, le=1)]
+    model_min_score: Annotated[float, Field(ge=0, le=1)]
 
 
 def retriever_from_rules(
@@ -284,5 +441,11 @@ def retriever_from_rules(
     """按规则表 R-QA-RETRIEVAL 的参数建检索器；参数不合规时抛错（启动时失败）。"""
     p = rulebook.get(RETRIEVAL_RULE).params_as(RetrievalParams)
     return Retriever(
-        kb, embedder=embedder, recall_k=p.recall_k, keep_k=p.keep_k, min_score=p.min_score
+        kb,
+        embedder=embedder,
+        recall_k=p.recall_k,
+        candidates=p.candidates,
+        keep_k=p.keep_k,
+        min_score=p.min_score,
+        model_min_score=p.model_min_score,
     )

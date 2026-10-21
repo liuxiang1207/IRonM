@@ -26,17 +26,26 @@ from ironm.core.clock import Clock
 from ironm.core.ids import IdGenerator
 from ironm.core.log import get_logger
 from ironm.core.yamlfile import load_yaml
-from ironm.knowledge.kb import Retriever
+from ironm.knowledge.kb import RETRIEVAL_RULE, RetrievalParams, Retriever
 from ironm.knowledge.qa_cards import CardBook
-from ironm.llm.gateway import Gateway
+from ironm.llm.gateway import Gateway, GatewayEmbedder
 from ironm.memory.conversation import compress, context
 from ironm.memory.profile import ProfileService
 from ironm.memory.repo import MemoryRepo
 from ironm.orchestrator.domains import DOMAIN_WEIGHTS
 from ironm.orchestrator.general import general_answer
-from ironm.orchestrator.intent import Concern, Intent, IntentBook, recognize
+from ironm.orchestrator.intent import (
+    INTENT_RULE,
+    Concern,
+    Intent,
+    IntentBook,
+    IntentParams,
+    recognize,
+    rule_intent,
+)
 from ironm.orchestrator.pages import PAGE_AGENTS, PAGE_DEFAULT, Page, PageContext
 from ironm.orchestrator.qa import AnswerPart, RunRecord, answer_question
+from ironm.orchestrator.rewrite import Rewritten, rewrite_queries
 from ironm.orchestrator.safety_review import review_safety
 from ironm.rules.loader import RuleBook
 from ironm.safety.decision import SafetyKit
@@ -155,6 +164,29 @@ class ChatDeps:
     # 知识库检索（spec [2026-10-21] §12）；为空时专业问题只查问答卡
     retriever: Retriever | None = None
     tz: ZoneInfo = _DEFAULT_TZ
+    vectors: bool = False  # 是否配置了向量服务（查询的向量按本次请求记录调用）
+
+
+def _rewrite(
+    text: str,
+    history: tuple[str, ...],
+    item: str | None,
+    deps: ChatDeps,
+    request_id: str,
+) -> Rewritten:
+    pre = rule_intent(text, deps.intents, deps.rulebook.get(INTENT_RULE).params_as(IntentParams))
+    if pre.intent in (*_GENERAL, Intent.OUT_OF_SCOPE) and not pre.concerns:
+        return Rewritten((text,), "original")
+    params = deps.rulebook.get(RETRIEVAL_RULE).params_as(RetrievalParams)
+    return rewrite_queries(
+        text,
+        history=history,
+        context_item=item,
+        book=deps.intents,
+        gateway=deps.gateway,
+        request_id=request_id,
+        max_queries=params.max_queries,
+    )
 
 
 def respond(
@@ -217,8 +249,12 @@ def respond(
         sections = refusal_part
         ctx = context(deps.memory, user_id)
         history = tuple(m.text for m in ctx.recent if m.role == "user")[-HISTORY_TURNS:]
+        # 检索前的多查询改写（spec §13）：明显是闲聊、问 App 用法或超范围时不改写；
+        # 主查询交给意图识别（改写不能丢原话里的关注点，见 rewrite 的校验）
+        item = page_context.item if page_context else None
+        rewritten = _rewrite(text, history, item, deps, request_id)
         result = recognize(
-            text,
+            rewritten.queries[0],
             book=deps.intents,
             rulebook=deps.rulebook,
             gateway=deps.gateway,
@@ -293,6 +329,15 @@ def respond(
                 profile=profile,
                 as_of=deps.clock.now(),
                 tz=deps.tz,
+                queries=rewritten.queries,
+                embedder=(
+                    GatewayEmbedder(deps.gateway, request_id)
+                    if deps.gateway is not None and deps.vectors
+                    else None
+                ),
+                rewrite=rewritten.status
+                if rewritten.reason is None
+                else f"{rewritten.status}:{rewritten.reason}",
             )
             citations = qa.citations
             # 没有给出意见的 Agent 如实标出（不含原话）

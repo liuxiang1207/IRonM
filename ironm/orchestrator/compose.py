@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ironm.agents.answering import SPECS, AgentAnswer
 from ironm.contracts.agents import Citation, Opinion
 from ironm.contracts.model_call import ModelStage
+from ironm.contracts.roles import AgentId
 from ironm.core.numbers import numbers_in, unregistered
 from ironm.llm.gateway import Gateway, Message
 from ironm.llm.validate import json_model
@@ -34,6 +35,7 @@ class Composed(BaseModel):
     parts: tuple[AnswerPart, ...]
     by_model: bool  # 是否由模型整合
     partial: bool  # 是否有 Agent 缺失
+    fallback: bool  # 本应由模型整合却退回了按顺序拼接
     rewrites: int  # 数字校验后重写的次数
     citations: tuple[dict[str, Any], ...]
 
@@ -159,23 +161,46 @@ def compose(
     gateway: Gateway | None,
     request_id: str,
 ) -> Composed:
-    """answers 按主领域在前排列；至少要有一条意见。"""
+    """answers 按主领域在前排列，安全官在最后；至少要有一条意见。
+
+    安全官有意见、也有其他领域的意见时，它的结论与注意作为必须写进回答的提醒（冲突时以它为准）；
+    只有安全官有意见时，它的意见就是回答。
+    """
     with_opinion = [a for a in answers if a.opinion is not None]
     if not with_opinion:
         raise ValueError("没有可整合的意见")
-    partial = answers[0].opinion is None or any(
-        a.opinion is None and a.reason != "no_basis" for a in answers
+    # 安全官每次都参与：它没话说不算“部分建议”
+    core = [a for a in answers if a.agent is not AgentId.SAFETY_OFFICER]
+    partial = bool(core) and (
+        core[0].opinion is None or any(a.opinion is None and a.reason != "no_basis" for a in core)
     )
+    extra_for_you: list[AnswerPart] = []
+    safety = next((a for a in with_opinion if a.agent is AgentId.SAFETY_OFFICER), None)
+    others = [a for a in with_opinion if a.agent is not AgentId.SAFETY_OFFICER]
+    if safety is None:
+        body = with_opinion
+    elif safety.status == "card":
+        # 安全官的模型回答不了，降级为直接用命中的安全类卡（spec §13）；其他领域不再拼进来
+        body, partial = [safety], False
+        # 其他领域算出的“针对你”的数字（如 BMI）仍然给出
+        extra_for_you = [p for a in others for p in _for_you(a.opinion)]  # type: ignore[arg-type]
+    else:
+        # 安全官的意见放在最前，冲突时以它为准；它的结论作为必须写进回答的提醒交给整合
+        body = [safety, *others]
+        cautions = [*dict.fromkeys([safety.opinion.conclusion, *cautions])]  # type: ignore[union-attr]
+        partial = partial and bool(others)
     by_model, rewrites = False, 0
     parts: list[AnswerPart] | None = None
-    if len(with_opinion) > 1 and gateway is not None:
-        parts, rewrites = _merge(text, with_opinion, cautions, gateway, request_id)
+    wanted_model = len(body) > 1 and gateway is not None
+    if wanted_model:
+        parts, rewrites = _merge(text, body, cautions, gateway, request_id)  # type: ignore[arg-type]
         by_model = parts is not None
     if parts is None:
-        parts = _render(with_opinion, cautions)
+        parts = _render(body, cautions)
+        parts = [parts[0], *extra_for_you, *parts[1:]]
     else:
         # “针对你”的计算（BMI、热量目标）不交给模型改写，原样放在结论之后
-        mine = [p for a in with_opinion for p in _for_you(a.opinion)]  # type: ignore[arg-type]
+        mine = [p for a in body for p in _for_you(a.opinion)]  # type: ignore[arg-type]
         parts = [parts[0], *mine, *parts[1:]]
     if partial:
         parts = [AnswerPart(kind="notice", text=partial_notice), *parts]
@@ -188,6 +213,7 @@ def compose(
         parts=tuple(parts),
         by_model=by_model,
         partial=partial,
+        fallback=wanted_model and not by_model,
         rewrites=rewrites,
         citations=citations,
     )

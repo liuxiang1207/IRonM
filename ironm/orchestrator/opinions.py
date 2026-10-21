@@ -5,7 +5,7 @@
 问答不加载 Skill。
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime
@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 from ironm.agents.answering import SPECS, AgentAnswer, answer_as
 from ironm.contracts.roles import AgentId
 from ironm.core.log import get_logger
-from ironm.knowledge.kb import Retriever
+from ironm.knowledge.kb import Embedder, Retriever
 from ironm.knowledge.qa_cards import CardBook
 from ironm.llm.gateway import Gateway
 from ironm.rules.loader import RuleBook
@@ -51,6 +51,8 @@ def collect_opinions(
     request_id: str,
     as_of: datetime,
     tz: ZoneInfo,
+    queries: Sequence[str] = (),
+    embedder: Embedder | None = None,
 ) -> Collected:
     chosen = [a for a in dict.fromkeys(agents) if a in SPECS]
     if not chosen:
@@ -70,6 +72,8 @@ def collect_opinions(
                 request_id=request_id,
                 as_of=as_of,
                 tz=tz,
+                queries=queries,
+                embedder=embedder,
             )
         except Exception as e:  # 单个 Agent 出错为缺失，不影响其他
             _log.exception("opinions.agent_failed", e, request_id=request_id)

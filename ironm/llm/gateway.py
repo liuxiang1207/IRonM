@@ -6,6 +6,7 @@
 - 网关本身从不抛出调用异常：失败时返回的 value 为 None，由调用方使用兜底。
 """
 
+import functools
 import json
 import threading
 import time
@@ -23,6 +24,8 @@ from ironm.llm.config import ModelsConfig
 from ironm.llm.validate import OutputRejected
 
 MAX_ATTEMPTS = 2  # 首次 + 重试 1 次
+EMBED_BATCH = 32  # 向量接口每批的文本数
+EMBED_TEMPLATE = "embedding@1.0.0"  # 向量调用没有提示词，记录里用固定的名称
 
 _log = get_logger("ironm.llm")
 
@@ -88,6 +91,38 @@ def _content(resp: Mapping[str, object]) -> str:
     return content
 
 
+def _vectors(resp: Mapping[str, object], expected: int) -> list[list[float]]:
+    """embeddings 响应：data[i].embedding，按 index 排序；条数或格式不对即拒收。"""
+    data = resp.get("data")
+    if not isinstance(data, list) or len(data) != expected:
+        raise OutputRejected("向量条数不对")
+    rows: list[tuple[int, list[float]]] = []
+    for n, item in enumerate(data):
+        vec = item.get("embedding") if isinstance(item, dict) else None
+        index = item.get("index", n) if isinstance(item, dict) else n
+        if not isinstance(vec, list) or not vec or not all(isinstance(x, int | float) for x in vec):
+            raise OutputRejected("向量格式不对")
+        rows.append((index if isinstance(index, int) else n, [float(x) for x in vec]))
+    return [v for _, v in sorted(rows, key=lambda r: r[0])]
+
+
+class GatewayEmbedder:
+    """把网关的向量接口包成检索用的向量模型；失败时抛错，由检索跳过向量这一路。"""
+
+    def __init__(self, gateway: "Gateway", request_id: str) -> None:
+        self._gateway, self._request_id = gateway, request_id
+
+    def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        result = self._gateway.embed(texts, request_id=self._request_id)
+        if result.value is None:
+            raise EmbeddingUnavailable
+        return result.value
+
+
+class EmbeddingUnavailable(Exception):
+    pass
+
+
 def _tokens(resp: Mapping[str, object]) -> dict[str, int]:
     usage = resp.get("usage")
     if not isinstance(usage, dict):
@@ -134,6 +169,55 @@ class Gateway:
         validate: Callable[[str], T],
     ) -> Completion[T]:
         route = self._config.routes[stage]
+        body: dict[str, Any] = {
+            "model": route.model,
+            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "max_tokens": route.max_tokens,
+            **route.extra_body,
+        }
+        return self._run(
+            stage,
+            request_id=request_id,
+            template=template,
+            path="/chat/completions",
+            body=body,
+            parse=lambda resp: validate(_content(resp)),
+        )
+
+    def embed(
+        self, texts: Sequence[str], *, request_id: str, stage: ModelStage = ModelStage.EMBEDDING
+    ) -> Completion[list[list[float]]]:
+        """向量（spec [2026-10-21] §13）：按通用的 embeddings 接口分批请求；一批失败即整体失败。"""
+        route = self._config.routes[stage]
+        vectors: list[list[float]] = []
+        calls: list[ModelCall] = []
+        for start in range(0, len(texts), EMBED_BATCH):
+            batch = list(texts[start : start + EMBED_BATCH])
+            done = self._run(
+                stage,
+                request_id=request_id,
+                template=EMBED_TEMPLATE,
+                path="/embeddings",
+                body={"model": route.model, "input": batch},
+                parse=functools.partial(_vectors, expected=len(batch)),
+            )
+            calls += done.calls
+            if done.value is None:
+                return Completion(value=None, calls=tuple(calls))
+            vectors += done.value
+        return Completion(value=vectors, calls=tuple(calls))
+
+    def _run[T](
+        self,
+        stage: ModelStage,
+        *,
+        request_id: str,
+        template: str,
+        path: str,
+        body: dict[str, Any],
+        parse: Callable[[Mapping[str, object]], T],
+    ) -> Completion[T]:
+        route = self._config.routes[stage]
         calls: list[ModelCall] = []
         for attempt in range(1, MAX_ATTEMPTS + 1):
             started_at = self._clock.now()
@@ -145,18 +229,10 @@ class Gateway:
                 key = self._environ.get(route.api_key_env)
                 if not key:
                     raise MissingApiKey
-                body: dict[str, Any] = {
-                    "model": route.model,
-                    "messages": [{"role": m.role, "content": m.content} for m in messages],
-                    "max_tokens": route.max_tokens,
-                    **route.extra_body,
-                }
                 headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-                resp = self._transport(
-                    f"{route.base_url}/chat/completions", headers, body, route.timeout_s
-                )
+                resp = self._transport(f"{route.base_url}{path}", headers, body, route.timeout_s)
                 tokens = _tokens(resp)
-                value = validate(_content(resp))
+                value = parse(resp)
             except Exception as e:  # 任何失败都只记类型，不外抛
                 error = e
             status = (
