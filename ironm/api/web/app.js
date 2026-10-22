@@ -146,10 +146,29 @@ function select(name, choices, value) {
   return h("select", { name }, ...Object.entries(choices).map(([v, t]) => h("option", { value: v, selected: v === value }, t)));
 }
 
+// 出生日期：年、月、日三个下拉框（浏览器自带的日期控件选年份要往前翻很久）。
+// 取值为 YYYY-MM-DD；没选全或日期不存在（如 2 月 30 日）时为空字符串
+function birthPicker(name) {
+  const thisYear = new Date().getFullYear();
+  const pick = (part, label, values, unit) => h("select", { name: `${name}_${part}`, required: true, "aria-label": label },
+    h("option", { value: "" }, label), ...values.map((v) => h("option", { value: v }, `${v} ${unit}`)));
+  const year = pick("year", "年", Array.from({ length: 100 }, (_, i) => thisYear - i), "年");
+  const month = pick("month", "月", Array.from({ length: 12 }, (_, i) => i + 1), "月");
+  const day = pick("day", "日", Array.from({ length: 31 }, (_, i) => i + 1), "日");
+  const box = h("span", { class: "row", "data-picker": name }, year, month, day);
+  Object.defineProperty(box, "value", { get() {
+    if (!year.value || !month.value || !day.value) return "";
+    const d = new Date(Date.UTC(Number(year.value), Number(month.value) - 1, Number(day.value)));
+    if (d.getUTCMonth() !== Number(month.value) - 1) return "";
+    return d.toISOString().slice(0, 10);
+  } });
+  return box;
+}
+
 function renderOnboarding(result) {
   const f = (name, attrs = {}) => h("input", { name, ...attrs });
   const fields = {
-    birth_date: f("birth_date", { type: "date", required: true, max: new Date().toISOString().slice(0, 10) }),
+    birth_date: birthPicker("birth_date"),
     sex: select("sex", { male: "男", female: "女" }, "male"),
     height_cm: f("height_cm", { type: "number", step: "0.1", min: 100, max: 250, required: true }),
     weight_kg: f("weight_kg", { type: "number", step: "0.1", min: 25, max: 300, required: true }),
@@ -167,6 +186,10 @@ function renderOnboarding(result) {
     e.preventDefault();
     // 健康状况不替用户默认“都没有”：由服务端追问，用户必须自己勾选（含“都没有”）
     const body = { restrictions: [] };
+    if (!fields.birth_date.value) {
+      out.replaceChildren(h("p", { class: "error" }, "出生日期不存在，请重新选择（比如 2 月没有 30 日）。"));
+      return;
+    }
     for (const [k, el] of Object.entries(fields)) {
       if (el.value === "") continue;
       body[k] = el.type === "number" || k === "available_days" ? Number(el.value) : el.value;
@@ -210,7 +233,8 @@ function showQuestions(box, answers, questions) {
       answers[id] = { multi, inputs };
       box.append(h("div", {}, h("p", {}, q.text, q.blocking ? "" : "（可以跳过）"), h("div", { class: "row" }, ...inputs)));
     } else {
-      const input = h("input", { name: id, type: /date$/.test(id) ? "date" : /_(cm|kg)$/.test(id) ? "number" : "text", step: "0.1" });
+      const input = /date$/.test(id) ? birthPicker(id)
+        : h("input", { name: id, type: /_(cm|kg)$/.test(id) ? "number" : "text", step: "0.1" });
       answers[id] = { input };
       box.append(h("label", {}, q.text + (q.blocking ? "" : "（可以跳过）"), input));
     }
