@@ -59,7 +59,7 @@ from ironm.rules.loader import load_rules
 from ironm.safety.decision import load_kit
 from ironm.safety.emergency import TERMS_PATH
 from ironm.safety.refusals import REFUSALS_PATH
-from ironm.safety.replies import REPLIES_PATH
+from ironm.safety.replies import REPLIES_PATH, notice_sections
 from ironm.scheduler.runner import Scheduler, TickResult
 from ironm.skills.loader import SKILLS_DIR, load_skills, validate_skill_rules
 from ironm.store.auth import AuthStore
@@ -667,6 +667,12 @@ def create_app(
                 log.info("plan.onboarding", status="conflict")
                 return JSONResponse(status_code=409, content={"status": "conflict"})
         log.info("plan.onboarding", status=result["status"])
+        # 分层提示的说明文字（审定过的模板，spec §15、§19）：网页照着显示，不只给代号；
+        # “还差什么”由追问列出，这里不重复
+        codes = [c for c in result.get("notices", []) if c in kit.replies.notices]
+        result["notice_texts"] = [
+            s.text for s in notice_sections(kit.replies, [c for c in codes if c != "tier_unknown"])
+        ]
         return JSONResponse(content=result)
 
     @app.get("/plan")

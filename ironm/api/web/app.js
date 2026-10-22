@@ -149,10 +149,10 @@ function select(name, choices, value) {
 function renderOnboarding(result) {
   const f = (name, attrs = {}) => h("input", { name, ...attrs });
   const fields = {
-    birth_date: f("birth_date", { type: "date" }),
+    birth_date: f("birth_date", { type: "date", required: true, max: new Date().toISOString().slice(0, 10) }),
     sex: select("sex", { male: "男", female: "女" }, "male"),
-    height_cm: f("height_cm", { type: "number", step: "0.1", min: 100, max: 250 }),
-    weight_kg: f("weight_kg", { type: "number", step: "0.1", min: 25, max: 300 }),
+    height_cm: f("height_cm", { type: "number", step: "0.1", min: 100, max: 250, required: true }),
+    weight_kg: f("weight_kg", { type: "number", step: "0.1", min: 25, max: 300, required: true }),
     waist_cm: f("waist_cm", { type: "number", step: "0.1", min: 40, max: 200, placeholder: "可不填" }),
     goal: select("goal", GOALS, "fitness"),
     environment: select("environment", ENVS, "gym"),
@@ -178,7 +178,10 @@ function renderOnboarding(result) {
       const r = await api(`/onboarding?tz=${encodeURIComponent(TZ)}`, { method: "POST", body });
       if (r.status === "plan") { location.hash = "#today"; return route(); }
       if (r.status === "questions") { showQuestions(questions, answers, r.questions); out.replaceChildren(); return; }
-      out.replaceChildren(h("div", { class: "warn" }, "目前不能给你出训练计划。", ...(r.notices || []).map((n) => h("div", {}, n))));
+      // 不能给计划：显示服务端给的原因（审定过的说明文字），不显示代号
+      const why = r.notice_texts && r.notice_texts.length ? r.notice_texts : ["目前不能给你出训练计划。"];
+      out.replaceChildren(h("div", { class: "warn" }, ...why.map((t) => h("div", {}, t))),
+        h("p", { class: "muted" }, "如果资料填错了，改正后重新提交即可。"));
     } catch (ex) { out.replaceChildren(failed(ex)); }
   } } },
     h("h1", {}, "建档"),

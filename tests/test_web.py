@@ -71,3 +71,12 @@ def test_onboarding_never_defaults_health_conditions_to_none() -> None:
     script = (WEB_DIR / "app.js").read_text(encoding="utf-8")
     assert not re.search(r"conditions\s*:\s*\[\s*\]", script)
     assert '"都没有"' in script
+
+
+def test_onboarding_explains_why_no_plan(client: TestClient) -> None:
+    """不能给计划时，建档结果带上审定过的说明文字，网页照着显示（不只是代号）。"""
+    minor = {"birth_date": "2015-01-01", "sex": "male", "height_cm": 150, "weight_kg": 45,
+             "conditions": [], "goal": "fitness"}  # fmt: skip
+    r = client.post("/onboarding", json=minor, headers={"X-IronM-User": "kid"}).json()
+    assert r["status"] == "not_allowed"
+    assert any("未满 18 岁" in t for t in r["notice_texts"])
